@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
@@ -14,7 +14,10 @@
 <style>
 :root{--bg:#f2f5f7;--card:#fff;--tx:#0f1b24;--mu:#5b6b78;--ac:#0f766e;--onac:#fff;--ac2:#d5f5ef;--bd:#dce3e8;--wa:#b45309;--wabg:#fef3c7;--ok:#15803d;--okbg:#dcfce7;--dn:#b91c1c;--albg:#fee2e2}
 @media(prefers-color-scheme:dark){:root{--bg:#0b1218;--card:#141f28;--tx:#e8eef2;--mu:#8fa1ae;--ac:#2dd4bf;--onac:#06201e;--ac2:#0f3b38;--bd:#25343f;--wa:#fbbf24;--wabg:#3a2e0b;--ok:#4ade80;--okbg:#0f3320;--dn:#f87171;--albg:#3b1414}}
-*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;touch-action:manipulation}
+html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
+.lrow{display:flex;justify-content:space-between;align-items:flex-end}
+.lrow button{font-size:13px;color:var(--ac);font-weight:700;padding:6px 8px}
 html,body{margin:0;background:var(--bg);color:var(--tx);font:16px/1.35 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
 body.lock{overflow:hidden}
 #app{max-width:640px;margin:0 auto;padding:0 12px calc(150px + env(safe-area-inset-bottom))}
@@ -91,8 +94,8 @@ details{margin-top:12px}summary{padding:6px 0;color:var(--mu);font-weight:600}
 #vw.on{display:flex}
 #vw .bar{display:flex;gap:8px;justify-content:space-between;padding:calc(10px + env(safe-area-inset-top)) 12px 10px}
 #vw .bar button{background:#fff2;color:#fff;border-radius:10px;padding:10px 14px;font-weight:600}
-#vw .sc{flex:1;overflow:auto;-webkit-overflow-scrolling:touch}
-#vw img{width:100%;display:block}#vw.z img{width:320%;max-width:none}
+#vw .sc{flex:1;overflow:auto;-webkit-overflow-scrolling:touch;touch-action:pan-x pan-y}
+#vw img{width:100%;max-width:none;display:block}
 </style>
 </head>
 <body>
@@ -251,7 +254,7 @@ const turnoOpts=sel=>TURNOS.map(t=>`<option value="${t}" ${t===sel?'selected':''
 async function openAdd(){
   const pats=await all('patients');
   const sh=openSheet(`<div class="sh-head"><b style="font-size:18px;padding-top:10px">Agregar paciente</b><button data-close>Cerrar</button></div>
-    <label>Expediente</label><input id="a-exp" autocomplete="off" autocapitalize="characters" autocorrect="off">
+    <div class="lrow"><label>Expediente</label><button type="button" id="a-kb">ABC</button></div><input id="a-exp" inputmode="numeric" pattern="[0-9]*" autocomplete="off" autocapitalize="characters" autocorrect="off">
     <label>Nombre</label><input id="a-nom" autocomplete="off">
     <div id="a-sug"></div>
     <div class="row"><div><label>Turno</label><select id="a-tur">${turnoOpts(S.turno)}</select></div>
@@ -273,6 +276,7 @@ async function openAdd(){
     sug.innerHTML=m.map(p=>`<button data-sg="${esc(p.expediente)}">${esc(p.nombre||'(sin nombre)')} <small>· ${esc(p.expediente)}</small></button>`).join('');
   };
   exp.addEventListener('input',()=>upd(exp));nom.addEventListener('input',()=>upd(nom));
+  $('#a-kb',sh).onclick=ev=>{const num=exp.inputMode==='numeric';exp.inputMode=num?'text':'numeric';ev.target.textContent=num?'123':'ABC';exp.blur();setTimeout(()=>exp.focus(),30)};
   sug.addEventListener('click',ev=>{const b=ev.target.closest('[data-sg]');if(!b)return;const p=pats.find(x=>x.expediente===b.dataset.sg);exp.value=p.expediente;nom.value=p.nombre||'';auto=true;upd(exp);sug.innerHTML=''});
   $('#a-ok',sh).onclick=()=>addEntry(exp.value,nom.value,+$('#a-tur',sh).value,$('#a-sil',sh).value);
   setTimeout(()=>exp.focus(),50);
@@ -411,12 +415,29 @@ function compress(file,max=1600,qual=.72){return new Promise((res,rej)=>{
     URL.revokeObjectURL(url);c.toBlob(b=>b?res(b):rej(new Error('blob')),'image/jpeg',qual);};
   img.onerror=()=>{URL.revokeObjectURL(url);rej(new Error('img'))};img.src=url;});}
 
-let vwDel=null;
+let vwDel=null,vz=1;
+function setZoom(z){
+  const sc=$('#vw .sc'),im=$('#v-img');
+  z=Math.min(5,Math.max(1,z));
+  const cx=(sc.scrollLeft+sc.clientWidth/2)/(im.offsetWidth||1),cy=(sc.scrollTop+sc.clientHeight/2)/(im.offsetHeight||1);
+  vz=z;im.style.width=(z*100)+'%';
+  sc.scrollLeft=cx*im.offsetWidth-sc.clientWidth/2;sc.scrollTop=cy*im.offsetHeight-sc.clientHeight/2;
+  $('#v-zoom').textContent='🔍 '+(Math.round(z*10)/10)+'×';
+}
 function viewPhoto(url,onDelete){
-  $('#v-img').src=url;$('#vw').classList.remove('z');$('#vw').classList.add('on');vwDel=onDelete;
+  $('#v-img').src=url;$('#vw').classList.add('on');vwDel=onDelete;setZoom(1);
 }
 $('#v-x').onclick=()=>{$('#vw').classList.remove('on');$('#v-img').removeAttribute('src');vwDel=null};
-$('#v-zoom').onclick=()=>$('#vw').classList.toggle('z');
+$('#v-zoom').onclick=()=>setZoom(vz>=3.5?1:Math.floor(vz)+1);
+{ // zoom con pellizco solo dentro del visor de fotos
+  const sc=$('#vw .sc');let d0=0,z0=1;
+  const dist=t=>Math.hypot(t[0].clientX-t[1].clientX,t[0].clientY-t[1].clientY);
+  sc.addEventListener('touchstart',e=>{if(e.touches.length===2){d0=dist(e.touches);z0=vz}},{passive:true});
+  sc.addEventListener('touchmove',e=>{if(e.touches.length===2&&d0){e.preventDefault();setZoom(z0*dist(e.touches)/d0)}},{passive:false});
+  sc.addEventListener('touchend',()=>{d0=0});
+}
+// evita que el pellizco o el doble toque desajusten el tamaño de la app (Safari/iOS)
+['gesturestart','gesturechange','gestureend'].forEach(g=>document.addEventListener(g,e=>e.preventDefault()));
 $('#v-del').onclick=async()=>{if(!vwDel||!confirm('¿Borrar esta foto?'))return;const f=vwDel;$('#v-x').onclick();await f()};
 
 async function purge(){
