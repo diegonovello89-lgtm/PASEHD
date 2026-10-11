@@ -16,24 +16,29 @@
 @media(prefers-color-scheme:dark){:root{--bg:#0b1218;--card:#141f28;--tx:#e8eef2;--mu:#8fa1ae;--ac:#2dd4bf;--onac:#06201e;--ac2:#0f3b38;--bd:#25343f;--wa:#fbbf24;--wabg:#3a2e0b;--ok:#4ade80;--okbg:#0f3320;--dn:#f87171;--albg:#3b1414}}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;touch-action:manipulation}
 html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
+button,.card,.tab,nav,.chip,.sil,.nota,.th,.tg,.ib,.btn,summary{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+input,textarea{-webkit-user-select:text;user-select:text}
 .lrow{display:flex;justify-content:space-between;align-items:flex-end}
 .lrow button{font-size:13px;color:var(--ac);font-weight:700;padding:6px 8px}
 html,body{margin:0;background:var(--bg);color:var(--tx);font:16px/1.35 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
 body.lock{overflow:hidden}
-#app{max-width:640px;margin:0 auto;padding:0 12px calc(150px + env(safe-area-inset-bottom))}
+#app{max-width:640px;margin:0 auto;padding:0 12px calc(96px + env(safe-area-inset-bottom))}
+#pane{display:none}
 button,input,select,textarea{font:inherit;color:inherit}
 button{cursor:pointer;border:0;background:none}
 .top{position:sticky;top:0;z-index:5;background:var(--bg);padding:calc(10px + env(safe-area-inset-top)) 0 8px}
 .datebar{display:flex;align-items:center;gap:8px;margin-bottom:8px}
-.datebar .d{flex:1;text-align:center;font-weight:700;font-size:18px;text-transform:capitalize}
+.datebar .d{flex:1;text-align:center;font-weight:700;font-size:18px;text-transform:capitalize;min-width:0}
 .datebar .d small{display:block;font-weight:500;color:var(--mu);font-size:13px;text-transform:none}
-.ib{width:44px;height:44px;border-radius:12px;background:var(--card);border:1px solid var(--bd);font-size:20px}
+.ib{width:44px;height:44px;flex:none;border-radius:12px;background:var(--card);border:1px solid var(--bd);font-size:20px}
+.ib.pl{background:var(--ac);color:var(--onac);border-color:var(--ac);font-size:26px;font-weight:700;line-height:1}
 .tabs{display:grid;grid-template-columns:repeat(5,1fr);gap:6px}
 .tab{position:relative;height:48px;border-radius:12px;background:var(--card);border:1px solid var(--bd);font-weight:700}
 .tab.on{background:var(--ac);color:var(--onac);border-color:var(--ac)}
 .tab i{position:absolute;top:-6px;right:-4px;min-width:20px;height:20px;border-radius:10px;font-style:normal;font-size:12px;line-height:20px;padding:0 5px;font-weight:700}
 .tab i.w{background:var(--wa);color:#fff}.tab i.k{background:var(--ok);color:#fff}
-.card{display:grid;grid-template-columns:54px 1fr 64px;gap:10px;align-items:center;background:var(--card);border:1px solid var(--bd);border-radius:14px;padding:10px;margin-top:10px}
+.card{display:grid;grid-template-columns:54px 1fr 64px;gap:10px;align-items:center;background:var(--card);border:1px solid var(--bd);border-radius:14px;padding:10px;margin-top:10px;cursor:pointer}
+.card.sel{border-color:var(--ac);box-shadow:0 0 0 2px var(--ac)}
 .sil{text-align:center;background:var(--ac2);border-radius:10px;padding:6px 0}.sil small{display:block;font-size:10px;color:var(--mu)}.sil b{font-size:22px}
 .nm{font-weight:700;overflow-wrap:anywhere}.ex{color:var(--mu);font-size:13px}
 .chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:4px}
@@ -50,8 +55,7 @@ button{cursor:pointer;border:0;background:none}
 .tgrow{display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--bd)}
 .tgrow span{flex:1}
 .empty{text-align:center;color:var(--mu);padding:40px 10px}
-.sum{font-size:13px;color:var(--mu);margin:2px 2px 0}
-.fab{position:fixed;right:max(16px,calc(50% - 304px));bottom:calc(76px + env(safe-area-inset-bottom));height:54px;padding:0 20px;border-radius:27px;background:var(--ac);color:var(--onac);font-weight:700;box-shadow:0 4px 14px rgba(0,0,0,.3);z-index:6}
+.addend{display:block;width:100%;margin-top:14px;padding:14px;border-radius:14px;border:2px dashed var(--ac);color:var(--ac);font-weight:700;font-size:16px}
 nav{position:fixed;left:0;right:0;bottom:0;z-index:7;background:var(--card);border-top:1px solid var(--bd);display:flex;padding-bottom:env(safe-area-inset-bottom)}
 nav button{flex:1;height:62px;font-size:12px;color:var(--mu);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;position:relative}
 nav button span{font-size:22px}nav button.on{color:var(--ac);font-weight:700}
@@ -59,8 +63,10 @@ nav button em{position:absolute;top:6px;left:calc(50% + 6px);background:var(--wa
 #ov{display:none;position:fixed;inset:0;z-index:20;background:rgba(0,0,0,.5);align-items:flex-end;justify-content:center}
 #ov.on{display:flex}
 .sheet{background:var(--bg);width:100%;max-width:640px;max-height:94vh;overflow-y:auto;-webkit-overflow-scrolling:touch;border-radius:18px 18px 0 0;padding:14px 14px calc(24px + env(safe-area-inset-bottom))}
-.sh-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:8px}
-.sh-head>button,.btn,.pri{background:var(--ac);color:var(--onac);border-radius:12px;padding:12px 16px;font-weight:700;display:inline-block;text-align:center}
+.sh-head{position:sticky;top:0;z-index:4;background:var(--bg);margin:-14px -14px 8px;padding:14px 14px 8px;display:flex;align-items:flex-start;justify-content:space-between;gap:10px;box-shadow:0 1px 0 var(--bd)}
+.sh-act{display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex:none}
+.sv{font-size:12px;color:var(--ok);opacity:0;transition:opacity .3s;white-space:nowrap}.sv.on{opacity:1}.sv.err{color:var(--dn);font-weight:700}
+[data-close],.btn,.pri{background:var(--ac);color:var(--onac);border-radius:12px;padding:12px 16px;font-weight:700;display:inline-block;text-align:center}
 .pri{width:100%;margin-top:12px;font-size:17px}
 .dng{width:100%;margin-top:20px;border:1px solid var(--dn);color:var(--dn);border-radius:12px;padding:12px;font-weight:600}
 label{display:block;font-size:13px;color:var(--mu);margin:10px 0 4px}
@@ -84,23 +90,32 @@ h4{margin:18px 0 6px;font-size:14px;color:var(--mu);text-transform:uppercase;let
 details{margin-top:12px}summary{padding:6px 0;color:var(--mu);font-weight:600}
 .box{background:var(--card);border:1px solid var(--bd);border-radius:14px;padding:12px;margin-top:12px}
 .box h3{margin:0 0 6px;font-size:16px}.box p{margin:6px 0;font-size:14px;color:var(--mu)}
-.box .btn{margin-top:8px}.box .sec{background:var(--card);color:var(--tx);border:1px solid var(--bd)}
+.box .btn{margin-top:8px;margin-right:6px}.box .sec{background:var(--card);color:var(--tx);border:1px solid var(--bd)}
 .banner{background:var(--wabg);color:var(--wa);border-radius:12px;padding:10px 12px;margin-top:10px;font-size:13px;display:flex;gap:8px;align-items:flex-start}
 .banner button{margin-left:auto;font-size:20px;color:inherit}
 .pg{margin-top:10px;background:var(--card);border:1px solid var(--bd);border-radius:14px;padding:10px}
 .pg .hd{display:flex;justify-content:space-between;gap:8px;align-items:center}
-#toast{position:fixed;left:50%;bottom:calc(140px + env(safe-area-inset-bottom));transform:translateX(-50%);background:#111;color:#fff;padding:10px 16px;border-radius:20px;font-size:14px;z-index:40;display:none;max-width:90%}
+#toast{position:fixed;left:50%;bottom:calc(88px + env(safe-area-inset-bottom));transform:translateX(-50%);background:#111;color:#fff;padding:10px 16px;border-radius:20px;font-size:14px;z-index:40;display:none;max-width:90%}
 #vw{display:none;position:fixed;inset:0;background:#000;z-index:30;flex-direction:column}
 #vw.on{display:flex}
 #vw .bar{display:flex;gap:8px;justify-content:space-between;padding:calc(10px + env(safe-area-inset-top)) 12px 10px}
 #vw .bar button{background:#fff2;color:#fff;border-radius:10px;padding:10px 14px;font-weight:600}
 #vw .sc{flex:1;overflow:auto;-webkit-overflow-scrolling:touch;touch-action:pan-x pan-y}
 #vw img{width:100%;max-width:none;display:block}
+/* Pantallas grandes (iPad, Windows): lista a la izquierda, paciente a la derecha */
+@media(min-width:900px){
+  #app{max-width:1180px}
+  #cols{display:grid;grid-template-columns:minmax(380px,460px) 1fr;gap:16px;align-items:start}
+  #pane{display:block;position:sticky;top:calc(10px + env(safe-area-inset-top))}
+  #pane:empty::before{content:'Elige un paciente de la lista o agrega uno nuevo';display:block;color:var(--mu);text-align:center;padding:70px 20px;border:2px dashed var(--bd);border-radius:18px}
+  #pane .sheet{max-width:none;max-height:calc(100vh - 100px - env(safe-area-inset-bottom));border-radius:16px;border:1px solid var(--bd);padding-bottom:20px}
+  #cols[data-v=pend],#cols[data-v=resp]{grid-template-columns:1fr;max-width:640px;margin:0 auto}
+  #cols[data-v=pend] #pane,#cols[data-v=resp] #pane{display:none}
+}
 </style>
 </head>
 <body>
-<div id="app"><div id="main"></div></div>
-<button class="fab" id="fab">＋ Paciente</button>
+<div id="app"><div id="cols" data-v="hoy"><div id="main"></div><div id="pane"></div></div></div>
 <nav>
   <button data-v="hoy"><span>🩺</span>Pase</button>
   <button data-v="pend"><span>⏳</span>Pendientes</button>
@@ -112,6 +127,7 @@ details{margin-top:12px}summary{padding:6px 0;color:var(--mu);font-weight:600}
 
 <script>
 'use strict';
+const VERSION='4';
 const TURNOS=[1,2,3,4,5];
 const DIAS_FOTO=7;
 const ACCESOS=['FAV','Injerto','Catéter tunelizado','Catéter temporal'];
@@ -126,6 +142,20 @@ const fmtFecha=s=>new Date(s+'T12:00:00').toLocaleDateString('es-MX',{weekday:'s
 const normExp=s=>String(s||'').trim().toUpperCase();
 const lsGet=k=>{try{return localStorage.getItem(k)}catch(e){return null}};
 const lsSet=(k,v)=>{try{localStorage.setItem(k,v)}catch(e){}};
+
+/* ---------- Registro de errores (se ve en Ajustes) ---------- */
+function readErrs(){try{const a=JSON.parse(lsGet('errlog')||'[]');return Array.isArray(a)?a:[]}catch(e){return[]}}
+function logErr(donde,err){
+  try{
+    const a=readErrs();
+    a.push({t:Date.now(),d:donde,m:String(err&&err.message||err),s:String(err&&err.stack||'').slice(0,300)});
+    while(a.length>30)a.shift();
+    lsSet('errlog',JSON.stringify(a));
+  }catch(e){}
+  try{console.error(donde,err)}catch(e){}
+}
+window.addEventListener('error',e=>logErr('error',e.error||e.message));
+window.addEventListener('unhandledrejection',e=>logErr('promesa',e.reason));
 
 /* ---------- IndexedDB ---------- */
 let db;
@@ -146,12 +176,14 @@ const all=n=>rq(store(n).getAll());
 const byDate=f=>rq(store('entries').index('fecha').getAll(f));
 async function getTags(){const m=await get('meta','tags');return m&&Array.isArray(m.v)?m.v:DEF_TAGS.slice()}
 const setTags=a=>put('meta',{k:'tags',v:a});
+async function getFotoModo(){const m=await get('meta','foto');return m&&m.v==='normal'?'normal':'ligera'}
 
 /* ---------- Estado ---------- */
-const S={fecha:todayStr(),turno:1,view:'hoy',hoy:true};
+const S={fecha:todayStr(),turno:1,view:'hoy',hoy:true,sel:null};
 {const t=+lsGet('turno');if(t>=1&&t<=5)S.turno=t}
 const isIOS=/iphone|ipad|ipod/i.test(navigator.userAgent);
 const standalone=window.navigator.standalone===true||matchMedia('(display-mode: standalone)').matches;
+const isWide=()=>{try{return matchMedia('(min-width:900px)').matches}catch(e){return false}};
 
 function toast(m){const t=$('#toast');t.textContent=m;t.style.display='block';clearTimeout(toast.t);toast.t=setTimeout(()=>t.style.display='none',2200)}
 const sillonNum=e=>{const n=parseInt(e.sillon,10);return isNaN(n)?9999:n};
@@ -160,9 +192,9 @@ const cmpSillon=(a,b)=>sillonNum(a)-sillonNum(b)||(a.creado||0)-(b.creado||0);
 /* ---------- Render principal ---------- */
 async function render(){
   if(!db)return;
+  $('#cols').dataset.v=S.view;
   if(S.view==='hoy')await renderHoy();else if(S.view==='pend')await renderPend();else await renderResp();
   document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',b.dataset.v===S.view));
-  $('#fab').style.display=S.view==='hoy'?'block':'none';
   try{
     const pats=await all('patients');const n=pats.reduce((s,p)=>s+p.pendientes.filter(x=>!x.hecho).length,0);
     const b=$('nav button[data-v=pend]');let em=$('em',b);
@@ -179,7 +211,7 @@ async function renderHoy(){
   const list=ents.filter(e=>e.turno===S.turno).sort(cmpSillon);
   const cards=list.map(e=>{
     const pe=P[e.expediente];const open=pe?pe.pendientes.filter(x=>!x.hecho).length:0;
-    return `<div class="card" data-id="${e.id}">
+    return `<div class="card ${e.id===S.sel?'sel':''}" data-id="${e.id}">
       <div class="sil"><small>sillón</small><b>${esc(e.sillon||'–')}</b></div>
       <div><div class="nm">${esc(pe&&pe.nombre||'(sin nombre)')}</div><div class="ex">${esc(e.expediente)}</div>
         <div class="chips">${pe&&pe.acceso?`<span class="chip ax">${esc(pe.acceso)}</span>`:''}${pe&&pe.aviso?`<span class="chip al">⚠ ${esc(pe.aviso)}</span>`:''}${(e.tags||[]).map(g=>`<span class="chip ev">${esc(g)}</span>`).join('')}${e.fotos&&e.fotos.length?`<span class="chip">📷 ${e.fotos.length}</span>`:''}${open?`<span class="chip w">⏳ ${open} pendiente${open>1?'s':''}</span>`:''}</div>
@@ -191,10 +223,12 @@ async function renderHoy(){
     <div class="top">
       <div class="datebar"><button class="ib" data-d="-1">‹</button>
         <div class="d">${esc(fmtFecha(S.fecha))}<small>${esHoy?'hoy':'<a data-d="0" style="color:var(--ac);text-decoration:underline">ir a hoy</a>'} · notas pendientes: ${pend} de ${ents.length}</small></div>
-        <button class="ib" data-d="1">›</button></div>
+        <button class="ib" data-d="1">›</button>
+        <button class="ib pl" data-add aria-label="Agregar paciente">＋</button></div>
       <div class="tabs">${tabs}</div></div>
     ${showBanner?`<div class="banner"><div>Para que iOS no borre tus datos, instala la app: botón Compartir → <b>Agregar a pantalla de inicio</b>, y úsala siempre desde ese ícono.</div><button data-bn>×</button></div>`:''}
-    ${cards||`<div class="empty">Sin pacientes en el turno ${S.turno}.<br>Toca <b>＋ Paciente</b> para agregar.</div>`}`;
+    ${cards||`<div class="empty">Sin pacientes en el turno ${S.turno}.</div>`}
+    <button class="addend" data-add>＋ Agregar paciente</button>`;
 }
 
 async function renderPend(){
@@ -217,6 +251,8 @@ async function renderResp(){
   try{per=await navigator.storage.persisted()}catch(e){}
   const last=await get('meta','lastBackup');
   const tags=await getTags();
+  const modo=await getFotoModo();
+  const errs=readErrs().slice(-10).reverse();
   const mb=n=>(n/1048576).toFixed(1)+' MB';
   $('#main').innerHTML=`<div class="top"><div class="datebar"><div class="d">Ajustes y respaldo</div></div></div>
   <div class="box"><h3>Etiquetas de eventos</h3>
@@ -224,6 +260,9 @@ async function renderResp(){
     ${tags.map((g,i)=>`<div class="tgrow"><span>${esc(g)}</span><button class="x" data-tgi="${i}" aria-label="Quitar">×</button></div>`).join('')||'<p>Sin etiquetas.</p>'}
     <div class="addrow"><input id="tg-in" placeholder="Nueva etiqueta…" autocomplete="off"><button id="tg-add">+</button></div>
     <button class="btn sec" id="tg-def">Restaurar lista por defecto</button></div>
+  <div class="box"><h3>Calidad de las fotos</h3>
+    <p>Ligera (recomendada): escala de grises y menor tamaño, aprox. 100-150 KB por foto. Normal: a color, aprox. 300 KB. Aplica a las fotos nuevas.</p>
+    <div class="tags"><button class="tg ${modo==='ligera'?'on':''}" data-fq="ligera">Ligera</button><button class="tg ${modo==='normal'?'on':''}" data-fq="normal">Normal</button></div></div>
   <div class="box"><h3>Almacenamiento</h3>
     <p>${pats.length} paciente${pats.length===1?'':'s'} guardado${pats.length===1?'':'s'} · ${ents.length} registro${ents.length===1?'':'s'} de sesión</p>
     <p>${phs.length} foto${phs.length===1?'':'s'} de hoja de signos: ${mb(bytes)}. Se borran solas a los ${DIAS_FOTO} días.</p>
@@ -238,20 +277,42 @@ async function renderResp(){
   <div class="box"><h3>Importar respaldo</h3>
     <p>Combina el archivo con lo que ya tienes; gana el registro más reciente.</p>
     <label class="btn sec" for="r-file">Elegir archivo…</label><input id="r-file" type="file" accept=".json,application/json" hidden></div>
-  <div class="box"><h3>Notas</h3><p>Todo se guarda solo en este teléfono. Sin conexión funciona normal una vez instalada. Si cambias de teléfono o reinstalas, exporta antes.</p></div>`;
+  <div class="box"><h3>Registro de errores</h3>
+    <p>Si algo falla, aquí queda el motivo. Puedes copiarlo y mandármelo.</p>
+    ${errs.length?errs.map(x=>`<p style="font-size:12px;word-break:break-word">${esc(new Date(x.t).toLocaleTimeString('es-MX'))} · ${esc(x.d)}: ${esc(x.m)}</p>`).join(''):'<p>Sin errores registrados ✓</p>'}
+    <button class="btn sec" id="er-copy">Copiar</button><button class="btn sec" id="er-clear">Borrar</button></div>
+  <div class="box"><h3>Notas</h3><p>Todo se guarda solo en este dispositivo. Sin conexión funciona normal una vez instalada. Si cambias de dispositivo o reinstalas, exporta antes.</p><p>Versión ${VERSION}</p></div>`;
 }
 
-/* ---------- Hojas (sheets) ---------- */
-let sheetCb=null;
-function openSheet(html){const o=$('#ov');o.innerHTML=`<div class="sheet" role="dialog">${html}</div>`;o.classList.add('on');document.body.classList.add('lock');return o.firstChild}
-async function closeSheet(){
-  const o=$('#ov');
-  if(sheetCb){const f=sheetCb;sheetCb=null;try{await f()}catch(e){console.error(e)}}
-  o.classList.remove('on');o.innerHTML='';document.body.classList.remove('lock');render();
+/* ---------- Hojas (sheets): modal en pantallas chicas, panel derecho en grandes ---------- */
+let sheetCb=null,sheetEl=null,sheetDocked=false,live=null,lastClose=Promise.resolve();
+const sheetOpen=()=>!!sheetEl;
+const settle=()=>Promise.race([lastClose,new Promise(r=>setTimeout(r,600))]);
+function refreshList(){if(sheetDocked&&sheetEl){clearTimeout(refreshList.t);refreshList.t=setTimeout(()=>render().catch(()=>{}),250)}}
+function openSheet(html){
+  if(sheetEl)closeSheet(true);
+  const docked=isWide();sheetDocked=docked;
+  const host=docked?$('#pane'):$('#ov');
+  host.innerHTML=`<div class="sheet ${docked?'docked':''}" role="dialog">${html}</div>`;
+  if(!docked){host.classList.add('on');document.body.classList.add('lock')}
+  sheetEl=host.firstChild;
+  return sheetEl;
+}
+// Cierra de inmediato; el guardado pendiente se termina en segundo plano y nunca bloquea el cierre.
+function closeSheet(skipRender){
+  if(!sheetEl)return Promise.resolve();
+  const host=sheetDocked?$('#pane'):$('#ov');
+  const f=sheetCb;sheetCb=null;sheetEl=null;live=null;S.sel=null;
+  host.classList.remove('on');host.innerHTML='';document.body.classList.remove('lock');
+  const done=Promise.resolve().then(()=>f&&f()).catch(err=>logErr('guardar',err));
+  lastClose=done;
+  if(skipRender!==true){render().catch(()=>{});done.then(()=>render()).catch(()=>{})}
+  return done;
 }
 const turnoOpts=sel=>TURNOS.map(t=>`<option value="${t}" ${t===sel?'selected':''}>Turno ${t}</option>`).join('');
 
 async function openAdd(){
+  await settle();
   const pats=await all('patients');
   const sh=openSheet(`<div class="sh-head"><b style="font-size:18px;padding-top:10px">Agregar paciente</b><button data-close>Cerrar</button></div>
     <div class="lrow"><label>Expediente</label><button type="button" id="a-kb">ABC</button></div><input id="a-exp" inputmode="numeric" pattern="[0-9]*" autocomplete="off" autocapitalize="characters" autocorrect="off">
@@ -278,7 +339,7 @@ async function openAdd(){
   exp.addEventListener('input',()=>upd(exp));nom.addEventListener('input',()=>upd(nom));
   $('#a-kb',sh).onclick=ev=>{const num=exp.inputMode==='numeric';exp.inputMode=num?'text':'numeric';ev.target.textContent=num?'123':'ABC';exp.blur();setTimeout(()=>exp.focus(),30)};
   sug.addEventListener('click',ev=>{const b=ev.target.closest('[data-sg]');if(!b)return;const p=pats.find(x=>x.expediente===b.dataset.sg);exp.value=p.expediente;nom.value=p.nombre||'';auto=true;upd(exp);sug.innerHTML=''});
-  $('#a-ok',sh).onclick=()=>addEntry(exp.value,nom.value,+$('#a-tur',sh).value,$('#a-sil',sh).value);
+  $('#a-ok',sh).onclick=()=>addEntry(exp.value,nom.value,+$('#a-tur',sh).value,$('#a-sil',sh).value).catch(err=>{logErr('agregar',err);toast('No se pudo agregar')});
   setTimeout(()=>exp.focus(),50);
 }
 
@@ -292,19 +353,20 @@ async function addEntry(expRaw,nom,tur,sil){
   const ents=await byDate(S.fecha);
   const dup=ents.find(e=>e.expediente===exp);
   if(dup){
-    if(dup.turno===tur){toast('Ya está en este turno');S.turno=tur;await closeSheet();openEntry(dup.id);return}
+    if(dup.turno===tur){toast('Ya está en este turno');S.turno=tur;closeSheet();openEntry(dup.id);return}
     if(confirm(`${pat.nombre||exp} ya está en la lista de esta fecha (turno ${dup.turno}${dup.sillon?', sillón '+dup.sillon:''}). ¿Moverlo al turno ${tur}?`)){
       dup.turno=tur;if(sil)dup.sillon=sil;dup.updatedAt=now();await put('entries',dup);S.turno=tur;lsSet('turno',tur);
-      await closeSheet();openEntry(dup.id);
+      closeSheet();openEntry(dup.id);
     }
     return;
   }
-  const e={id:uid(),fecha:S.fecha,turno:tur,sillon:sil,expediente:exp,comentario:'',nota:false,fotos:[],extras:{},creado:now(),updatedAt:now()};
+  const e={id:uid(),fecha:S.fecha,turno:tur,sillon:sil,expediente:exp,comentario:'',nota:false,fotos:[],tags:[],extras:{},creado:now(),updatedAt:now()};
   await put('entries',e);S.turno=tur;lsSet('turno',tur);
-  await closeSheet();openEntry(e.id);
+  closeSheet();openEntry(e.id);
 }
 
 async function openEntry(id){
+  await settle();
   const e=await get('entries',id);if(!e)return;
   if(!e.fotos)e.fotos=[];if(!e.extras)e.extras={};if(!e.tags)e.tags=[];
   const pat=(await get('patients',e.expediente))||{expediente:e.expediente,nombre:'',pendientes:[],updatedAt:now()};
@@ -312,7 +374,7 @@ async function openEntry(id){
   const urls=[];
   const ex=e.extras;
   const sh=openSheet(`
-    <div class="sh-head"><div style="flex:1"><input id="e-nom" class="nm-in" placeholder="Nombre del paciente" value="${esc(pat.nombre)}"><div class="ex" style="margin-top:4px">Exp. ${esc(e.expediente)} · ${esc(fmtFecha(e.fecha))}</div></div><button data-close>Listo</button></div>
+    <div class="sh-head"><div style="flex:1;min-width:0"><input id="e-nom" class="nm-in" placeholder="Nombre del paciente" value="${esc(pat.nombre)}"><div class="ex" style="margin-top:4px">Exp. ${esc(e.expediente)} · ${esc(fmtFecha(e.fecha))}</div></div><div class="sh-act"><button data-close tabindex="-1">Listo</button><span class="sv" id="e-sv"></span></div></div>
     <div class="row"><div><label>Turno</label><select id="e-tur">${turnoOpts(e.turno)}</select></div><div><label>Sillón</label><input id="e-sil" inputmode="numeric" value="${esc(e.sillon)}"></div></div>
     <div class="row"><div><label>Acceso (fijo del paciente)</label><select id="e-ac"><option value="">—</option>${ACCESOS.map(a=>`<option ${pat.acceso===a?'selected':''}>${esc(a)}</option>`).join('')}</select></div><div><label>Aviso fijo (alergia, serología…)</label><input id="e-av" placeholder="Ej. VHB+" value="${esc(pat.aviso)}"></div></div>
     <button class="notabig" id="e-nota"></button>
@@ -326,20 +388,26 @@ async function openEntry(id){
       <div class="row"><div><label>Peso seco</label><input id="x-peso" value="${esc(ex.peso)}"></div><div><label>Ganancia interdialítica</label><input id="x-gan" value="${esc(ex.gan)}"></div></div>
       <div class="row"><div><label>TA</label><input id="x-ta" value="${esc(ex.ta)}"></div><div><label>Otros</label><input id="x-otro" value="${esc(ex.otro)}"></div></div></details>
     <button class="dng" id="e-del">Quitar de la lista</button>`);
+  S.sel=e.id;refreshList();
   const q=s=>$(s,sh);
   let tm=null,dirtyPat=false;
-  const flush=async()=>{clearTimeout(tm);tm=null;
+  const sv=ok=>{const s=q('#e-sv');if(!s)return;s.textContent=ok?'Guardado ✓':'No se pudo guardar';s.className='sv on'+(ok?'':' err');clearTimeout(sv.t);if(ok)sv.t=setTimeout(()=>s.classList.remove('on'),1500)};
+  const flushRaw=async()=>{clearTimeout(tm);tm=null;
     e.comentario=q('#e-com').value;e.sillon=q('#e-sil').value.trim();
     e.extras={peso:q('#x-peso').value,gan:q('#x-gan').value,ta:q('#x-ta').value,otro:q('#x-otro').value};
     e.updatedAt=now();await put('entries',e);
     const nn=q('#e-nom').value.trim();if(nn!==pat.nombre){pat.nombre=nn;dirtyPat=true}
     const ac=q('#e-ac').value,av=q('#e-av').value.trim();
     if(ac!==(pat.acceso||'')||av!==(pat.aviso||'')){pat.acceso=ac;pat.aviso=av;dirtyPat=true}
-    if(dirtyPat){pat.updatedAt=now();await put('patients',pat);dirtyPat=false}};
-  const later=()=>{clearTimeout(tm);tm=setTimeout(()=>flush().catch(console.error),400)};
-  sheetCb=async()=>{await flush();urls.forEach(u=>URL.revokeObjectURL(u))};
+    if(dirtyPat){pat.updatedAt=now();await put('patients',pat);dirtyPat=false}
+    refreshList()};
+  const flush=async()=>{try{await flushRaw();sv(true)}catch(err){logErr('guardar',err);sv(false);throw err}};
+  const later=()=>{clearTimeout(tm);tm=setTimeout(()=>flush().catch(()=>{}),400)};
+  sheetCb=async()=>{try{await flush()}finally{urls.forEach(u=>URL.revokeObjectURL(u))}};
   ['#e-com','#e-sil','#e-nom','#e-av','#x-peso','#x-gan','#x-ta','#x-otro'].forEach(s=>q(s).addEventListener('input',later));
-  q('#e-ac').addEventListener('change',later);
+  q('#e-ac').addEventListener('change',ev=>{later();ev.target.blur()});
+  // al salir de cualquier campo se guarda enseguida
+  sh.addEventListener('focusout',()=>{clearTimeout(tm);tm=setTimeout(()=>flush().catch(()=>{}),60)});
   const drawTags=()=>{
     const lista=[...catalogo,...e.tags.filter(g=>!catalogo.includes(g))];
     q('#e-tags').innerHTML=lista.length?lista.map((g,i)=>`<button class="tg ${e.tags.includes(g)?'on':''}" data-tg="${i}">${esc(g)}</button>`).join(''):'<div class="mu">Sin etiquetas. Agrégalas en Ajustes.</div>';
@@ -350,11 +418,12 @@ async function openEntry(id){
     const b=ev.target.closest('[data-tg]');if(!b)return;
     const g=JSON.parse(q('#e-tags').dataset.lista)[+b.dataset.tg];
     e.tags=e.tags.includes(g)?e.tags.filter(x=>x!==g):[...e.tags,g];
-    await flush();drawTags();
+    await flush().catch(()=>{});drawTags();
   });
-  q('#e-tur').onchange=async ev=>{e.turno=+ev.target.value;S.turno=e.turno;lsSet('turno',e.turno);await flush()};
+  q('#e-tur').onchange=async ev=>{const v=+ev.target.value;ev.target.blur();e.turno=v;S.turno=v;lsSet('turno',v);await flush().catch(()=>{})};
   const drawNota=()=>{const b=q('#e-nota');b.className='notabig'+(e.nota?' ok':'');b.textContent=e.nota?'✓ Nota hecha':'○ Nota pendiente — toca para marcar'};
-  q('#e-nota').onclick=async()=>{e.nota=!e.nota;drawNota();await flush()};drawNota();
+  q('#e-nota').onclick=async()=>{e.nota=!e.nota;drawNota();await flush().catch(()=>{})};drawNota();
+  live={e,flush,drawNota};
 
   const drawPend=()=>{
     const row=x=>`<div class="pr ${x.hecho?'dn':''}"><button class="ck ${x.hecho?'on':''}" data-pt="${x.id}">${x.hecho?'✓':''}</button><span>${esc(x.texto)}</span><button class="x" data-px="${x.id}">×</button></div>`;
@@ -367,10 +436,10 @@ async function openEntry(id){
     if(t){const p=pat.pendientes.find(z=>z.id===t.dataset.pt);p.hecho=!p.hecho;p.hechoEn=p.hecho?now():null}
     else if(x){pat.pendientes=pat.pendientes.filter(z=>z.id!==x.dataset.px)}
     else return;
-    dirtyPat=true;await flush();drawPend();
+    dirtyPat=true;await flush().catch(()=>{});drawPend();
   });
   const addP=async()=>{const i=q('#e-pin');const t=i.value.trim();if(!t)return;
-    pat.pendientes.push({id:uid(),texto:t,hecho:false,creado:now()});i.value='';dirtyPat=true;await flush();drawPend()};
+    pat.pendientes.push({id:uid(),texto:t,hecho:false,creado:now()});i.value='';dirtyPat=true;await flush().catch(()=>{});drawPend()};
   q('#e-padd').onclick=addP;q('#e-pin').addEventListener('keydown',ev=>{if(ev.key==='Enter'){ev.preventDefault();addP()}});
 
   const drawFotos=async()=>{
@@ -382,20 +451,22 @@ async function openEntry(id){
       const left=Math.max(0,Math.ceil((ph.created+DIAS_FOTO*DAY-now())/DAY));
       html+=`<div class="th" data-ph="${fid}" data-u="${u}"><img src="${u}" alt="Hoja de signos"><small>se borra en ${left} d</small></div>`;
     }
-    if(keep.length!==e.fotos.length){e.fotos=keep;await flush()}
+    if(keep.length!==e.fotos.length){e.fotos=keep;await flush().catch(()=>{})}
+    if(!sheetEl||sheetEl!==sh)return;
     q('#e-fotos').innerHTML=html||'<div class="mu">Sin fotos</div>';
   };
   await drawFotos();
   q('#e-fotos').addEventListener('click',ev=>{const t=ev.target.closest('[data-ph]');if(!t)return;
-    viewPhoto(t.dataset.u,async()=>{await del('photos',t.dataset.ph);e.fotos=e.fotos.filter(i=>i!==t.dataset.ph);await flush();await drawFotos()})});
+    viewPhoto(t.dataset.u,async()=>{await del('photos',t.dataset.ph);e.fotos=e.fotos.filter(i=>i!==t.dataset.ph);await flush().catch(()=>{});await drawFotos()})});
   q('#e-file').onchange=async ev=>{
     const files=[...ev.target.files];ev.target.value='';if(!files.length)return;
     toast('Guardando foto…');
+    const modo=await getFotoModo();
     for(const f of files){try{
-      const blob=await compress(f);const ph={id:uid(),blob,created:now(),entry:e.id,expediente:e.expediente};
+      const blob=await compress(f,modo);const ph={id:uid(),blob,created:now(),entry:e.id,expediente:e.expediente};
       await put('photos',ph);e.fotos.push(ph.id);
-    }catch(err){console.error(err);toast('No se pudo procesar la foto')}}
-    await flush();await drawFotos();toast('Foto guardada');
+    }catch(err){logErr('foto',err);toast('No se pudo procesar la foto')}}
+    await flush().catch(()=>{});await drawFotos();toast('Foto guardada');
   };
   q('#e-del').onclick=async()=>{
     if(!confirm('¿Quitar a este paciente de la lista de esta fecha? Se borran sus fotos de hoja de signos; el paciente y sus pendientes se conservan.'))return;
@@ -406,13 +477,31 @@ async function openEntry(id){
 }
 
 /* ---------- Fotos ---------- */
-function compress(file,max=1600,qual=.72){return new Promise((res,rej)=>{
+// Escala de grises + un poco de contraste: las hojas son texto, así pesan mucho menos y se leen igual.
+function procGris(d,contraste=1.2,pivote=140){
+  for(let i=0;i<d.length;i+=4){
+    let g=.299*d[i]+.587*d[i+1]+.114*d[i+2];
+    g=(g-pivote)*contraste+pivote;
+    g=g<0?0:g>255?255:g;
+    d[i]=d[i+1]=d[i+2]=g;
+  }
+  return d;
+}
+function compress(file,modo){return new Promise((res,rej)=>{
+  const ligera=modo!=='normal';
+  const max=ligera?1280:1600,qual=ligera?.6:.72;
   const url=URL.createObjectURL(file),img=new Image();
   img.onload=()=>{
-    const r=Math.min(1,max/Math.max(img.naturalWidth,img.naturalHeight));
-    const w=Math.max(1,Math.round(img.naturalWidth*r)),h=Math.max(1,Math.round(img.naturalHeight*r));
-    const c=document.createElement('canvas');c.width=w;c.height=h;c.getContext('2d').drawImage(img,0,0,w,h);
-    URL.revokeObjectURL(url);c.toBlob(b=>b?res(b):rej(new Error('blob')),'image/jpeg',qual);};
+    try{
+      const r=Math.min(1,max/Math.max(img.naturalWidth,img.naturalHeight));
+      const w=Math.max(1,Math.round(img.naturalWidth*r)),h=Math.max(1,Math.round(img.naturalHeight*r));
+      const c=document.createElement('canvas');c.width=w;c.height=h;
+      const ctx=c.getContext('2d');ctx.drawImage(img,0,0,w,h);
+      if(ligera){const id=ctx.getImageData(0,0,w,h);procGris(id.data);ctx.putImageData(id,0,0)}
+      URL.revokeObjectURL(url);
+      c.toBlob(b=>b?res(b):rej(new Error('blob')),'image/jpeg',qual);
+    }catch(err){URL.revokeObjectURL(url);rej(err)}
+  };
   img.onerror=()=>{URL.revokeObjectURL(url);rej(new Error('img'))};img.src=url;});}
 
 let vwDel=null,vz=1;
@@ -475,28 +564,64 @@ async function importar(file){
 }
 
 /* ---------- Eventos globales ---------- */
+// "Listo"/"Cerrar" también responde al soltar el mouse o el lápiz (iPad con mouse), por si el clic no llega.
+let pdTarget=null;
+document.addEventListener('pointerdown',ev=>{pdTarget=ev.target.closest?ev.target.closest('[data-close]'):null},true);
+document.addEventListener('pointerup',ev=>{
+  if(ev.pointerType==='touch')return;
+  const c=ev.target.closest?ev.target.closest('[data-close]'):null;
+  if(c&&c===pdTarget&&sheetEl){closeSheet()}
+},true);
+document.addEventListener('keydown',ev=>{
+  if(ev.key==='Escape'){
+    if($('#vw').classList.contains('on')){$('#v-x').onclick();return}
+    if(sheetEl){ev.preventDefault();closeSheet()}
+    return;
+  }
+  if(ev.key==='Tab'&&sheetEl&&!sheetDocked){ // el Tab no se escapa de la hoja
+    const fs=[...sheetEl.querySelectorAll('button:not([tabindex="-1"]),input:not([type=hidden]):not([hidden]),select,textarea,summary')].filter(x=>!x.disabled&&x.offsetParent!==null);
+    if(!fs.length)return;
+    const first=fs[0],last=fs[fs.length-1],act=document.activeElement;
+    if(!sheetEl.contains(act)){ev.preventDefault();first.focus()}
+    else if(ev.shiftKey&&act===first){ev.preventDefault();last.focus()}
+    else if(!ev.shiftKey&&act===last){ev.preventDefault();first.focus()}
+  }
+});
 document.addEventListener('click',async ev=>{
-  const t=ev.target;
-  const nav=t.closest('nav button');if(nav){S.view=nav.dataset.v;render();window.scrollTo(0,0);return}
-  if(t.closest('#fab')){openAdd();return}
+  const t=ev.target;if(!t.closest)return;
+  const nav=t.closest('nav button');
+  if(nav){if(sheetEl&&sheetDocked)closeSheet(true);S.view=nav.dataset.v;render();window.scrollTo(0,0);return}
+  if(t.closest('[data-add]')){openAdd();return}
   if(t.closest('[data-close]')){closeSheet();return}
   if(t.id==='ov'){closeSheet();return}
   if(t.closest('[data-bn]')){lsSet('bannerOff','1');render();return}
   const dn=t.closest('[data-d]');
   if(dn&&S.view==='hoy'){const v=+dn.dataset.d;
+    if(sheetEl&&sheetDocked)closeSheet(true);
     if(v===0)S.fecha=todayStr();else{const d=new Date(S.fecha+'T12:00:00');d.setDate(d.getDate()+v);S.fecha=todayStr(d)}
     S.hoy=S.fecha===todayStr();render();return}
   const tab=t.closest('[data-t]');if(tab){S.turno=+tab.dataset.t;lsSet('turno',S.turno);render();return}
   const nt=t.closest('[data-nota]');
-  if(nt){const e=await get('entries',nt.dataset.nota);e.nota=!e.nota;e.updatedAt=now();await put('entries',e);render();return}
+  if(nt){
+    if(live&&live.e.id===nt.dataset.nota){live.e.nota=!live.e.nota;live.drawNota();await live.flush().catch(()=>{});render();return}
+    const e=await get('entries',nt.dataset.nota);e.nota=!e.nota;e.updatedAt=now();await put('entries',e);render();return}
   const pt=t.closest('[data-pt][data-pe]');
   if(pt){const p=await get('patients',pt.dataset.pe);const x=p.pendientes.find(z=>z.id===pt.dataset.pt);x.hecho=true;x.hechoEn=now();p.updatedAt=now();await put('patients',p);render();toast('Pendiente resuelto');return}
-  const op=t.closest('[data-open]');if(op){openEntry(op.dataset.open);return}
+  const op=t.closest('[data-open]');
+  if(op){
+    const e=await get('entries',op.dataset.open);
+    if(e&&isWide()&&S.view!=='hoy'){S.view='hoy';S.fecha=e.fecha;S.turno=e.turno;S.hoy=e.fecha===todayStr();await render()}
+    openEntry(op.dataset.open);return}
   const card=t.closest('.card[data-id]');if(card){openEntry(card.dataset.id);return}
   const tgd=t.closest('[data-tgi]');
   if(tgd){const a=await getTags();a.splice(+tgd.dataset.tgi,1);await setTags(a);render();return}
   if(t.id==='tg-add'){const v=$('#tg-in').value.trim();if(!v)return;const a=await getTags();if(!a.includes(v)){a.push(v);await setTags(a)}render();return}
   if(t.id==='tg-def'){if(confirm('¿Restaurar la lista de etiquetas por defecto?')){await setTags(DEF_TAGS.slice());render()}return}
+  const fq=t.closest('[data-fq]');
+  if(fq){await put('meta',{k:'foto',v:fq.dataset.fq});render();toast('Calidad: '+(fq.dataset.fq==='normal'?'normal':'ligera'));return}
+  if(t.id==='er-copy'){const txt=JSON.stringify(readErrs(),null,1);
+    try{await navigator.clipboard.writeText(txt);toast('Copiado')}catch(err){prompt('Copia este texto:',txt)}return}
+  if(t.id==='er-clear'){lsSet('errlog','[]');render();return}
   if(t.id==='r-del'){if(confirm('¿Borrar TODAS las fotos de hojas de signos?')){
     for(const p of await all('photos'))await del('photos',p.id);
     for(const e of await all('entries'))if(e.fotos&&e.fotos.length){e.fotos=[];e.updatedAt=now();await put('entries',e)}
@@ -505,12 +630,12 @@ document.addEventListener('click',async ev=>{
 });
 document.addEventListener('change',async ev=>{
   if(ev.target.id==='r-file'){const f=ev.target.files[0];ev.target.value='';if(!f)return;
-    try{const r=await importar(f);toast(`Importado: ${r.a} pacientes, ${r.b} registros`);render()}catch(err){alert('No se pudo importar: '+err.message)}}
+    try{const r=await importar(f);toast(`Importado: ${r.a} pacientes, ${r.b} registros`);render()}catch(err){logErr('importar',err);alert('No se pudo importar: '+err.message)}}
 });
 
 /* ---------- Inicio ---------- */
 (async()=>{
-  try{db=await openDB()}catch(e){$('#main').innerHTML='<div class="empty">Este navegador no permite guardar datos locales (¿modo privado?).</div>';return}
+  try{db=await openDB()}catch(e){logErr('abrir base',e);$('#main').innerHTML='<div class="empty">Este navegador no permite guardar datos locales (¿modo privado?).</div>';return}
   await purge();
   try{if(navigator.storage&&navigator.storage.persist)navigator.storage.persist()}catch(e){}
   await render();
@@ -519,7 +644,7 @@ document.addEventListener('change',async ev=>{
     if(document.visibilityState!=='visible')return;
     await purge().catch(()=>{});
     if(S.hoy&&S.fecha!==todayStr())S.fecha=todayStr();
-    if(!$('#ov').classList.contains('on'))render();
+    if(!sheetEl)render();
   });
 })();
 if('serviceWorker' in navigator&&location.protocol.startsWith('http'))navigator.serviceWorker.register('sw.js').catch(()=>{});
