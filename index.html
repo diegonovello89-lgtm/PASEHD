@@ -11,6 +11,10 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="icon-180.png">
 <title>Pase HD</title>
+<script defer src="firebase-config.js"></script>
+<script defer src="vendor/firebase-app-compat.js"></script>
+<script defer src="vendor/firebase-auth-compat.js"></script>
+<script defer src="vendor/firebase-firestore-compat.js"></script>
 <style>
 :root{--bg:#f2f5f7;--card:#fff;--tx:#0f1b24;--mu:#5b6b78;--ac:#0f766e;--onac:#fff;--ac2:#d5f5ef;--bd:#dce3e8;--wa:#b45309;--wabg:#fef3c7;--ok:#15803d;--okbg:#dcfce7;--dn:#b91c1c;--albg:#fee2e2}
 @media(prefers-color-scheme:dark){:root{--bg:#0b1218;--card:#141f28;--tx:#e8eef2;--mu:#8fa1ae;--ac:#2dd4bf;--onac:#06201e;--ac2:#0f3b38;--bd:#25343f;--wa:#fbbf24;--wabg:#3a2e0b;--ok:#4ade80;--okbg:#0f3320;--dn:#f87171;--albg:#3b1414}}
@@ -70,7 +74,7 @@ nav button em{position:absolute;top:6px;left:calc(50% + 6px);background:var(--wa
 .pri{width:100%;margin-top:12px;font-size:17px}
 .dng{width:100%;margin-top:20px;border:1px solid var(--dn);color:var(--dn);border-radius:12px;padding:12px;font-weight:600}
 label{display:block;font-size:13px;color:var(--mu);margin:10px 0 4px}
-input[type=text],input:not([type]),input[type=search],select,textarea{width:100%;background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:12px;font-size:16px}
+input[type=text],input:not([type]),input[type=search],input[type=email],input[type=password],select,textarea{width:100%;background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:12px;font-size:16px}
 .nm-in{font-weight:700;font-size:18px!important}
 .row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .hint{font-size:13px;color:var(--wa);margin-top:8px}
@@ -127,7 +131,7 @@ details{margin-top:12px}summary{padding:6px 0;color:var(--mu);font-weight:600}
 
 <script>
 'use strict';
-const VERSION='4';
+const VERSION='6';
 const TURNOS=[1,2,3,4,5];
 const DIAS_FOTO=7;
 const ACCESOS=['FAV','Injerto','Catéter tunelizado','Catéter temporal'];
@@ -160,22 +164,45 @@ window.addEventListener('unhandledrejection',e=>logErr('promesa',e.reason));
 /* ---------- IndexedDB ---------- */
 let db;
 function openDB(){return new Promise((res,rej)=>{
-  const r=indexedDB.open('pase-hd',1);
-  r.onupgradeneeded=()=>{const d=r.result;
-    d.createObjectStore('patients',{keyPath:'expediente'});
-    const e=d.createObjectStore('entries',{keyPath:'id'});e.createIndex('fecha','fecha');
-    d.createObjectStore('photos',{keyPath:'id'});
-    d.createObjectStore('meta',{keyPath:'k'});};
+  const r=indexedDB.open('pase-hd',2);
+  r.onupgradeneeded=ev=>{const d=r.result;
+    if(ev.oldVersion<1){
+      d.createObjectStore('patients',{keyPath:'expediente'});
+      const e=d.createObjectStore('entries',{keyPath:'id'});e.createIndex('fecha','fecha');
+      d.createObjectStore('photos',{keyPath:'id'});
+      d.createObjectStore('meta',{keyPath:'k'});}
+    // versión 2: índice de fotos por sesión (para unir fotos que llegan antes que su sesión)
+    const ps=r.transaction.objectStore('photos');
+    if(!ps.indexNames.contains('entry'))ps.createIndex('entry','entry');};
   r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error);});}
 const rq=req=>new Promise((res,rej)=>{req.onsuccess=()=>res(req.result);req.onerror=()=>rej(req.error)});
 const store=(n,m='readonly')=>db.transaction(n,m).objectStore(n);
 const get=(n,k)=>rq(store(n).get(k));
-const put=(n,v)=>rq(store(n,'readwrite').put(v));
+const putRaw=(n,v)=>rq(store(n,'readwrite').put(v));
+// Toda escritura local de pacientes, sesiones y etiquetas se avisa a la sincronización (si está activa).
+const put=(n,v,o)=>putRaw(n,v).then(r=>{if(!(o&&o.nosync)){try{SYNC.push(n,v)}catch(e){logErr('sync',e)}}return r});
 const del=(n,k)=>rq(store(n,'readwrite').delete(k));
 const all=n=>rq(store(n).getAll());
-const byDate=f=>rq(store('entries').index('fecha').getAll(f));
+const byDate=f=>rq(store('entries').index('fecha').getAll(f)).then(a=>a.filter(e=>!e.deleted));
+const photoIdsOf=entryId=>rq(store('photos').index('entry').getAllKeys(entryId));
 async function getTags(){const m=await get('meta','tags');return m&&Array.isArray(m.v)?m.v:DEF_TAGS.slice()}
-const setTags=a=>put('meta',{k:'tags',v:a});
+const setTags=a=>put('meta',{k:'tags',v:a,updatedAt:now()});
+// Pendientes: cada uno lleva su propia fecha de cambio; borrar = marcar (del) para que el borrado también se sincronice.
+const pStamp=x=>x.updatedAt||x.hechoEn||x.creado||0;
+const pAct=p=>(p&&p.pendientes||[]).filter(x=>!x.hecho&&!x.del);
+const pDone=p=>(p&&p.pendientes||[]).filter(x=>x.hecho&&!x.del);
+const patStamp=p=>p.pu||p.updatedAt||0;
+// Une dos copias de un paciente (importar archivo): perfil por fecha de perfil, pendientes uno por uno.
+function mergePat(cur,r){
+  if(!cur)return r;
+  const out={...cur};
+  if(patStamp(r)>patStamp(cur)){out.nombre=r.nombre;out.acceso=r.acceso;out.aviso=r.aviso;out.pu=patStamp(r)}
+  const m=new Map((cur.pendientes||[]).map(x=>[x.id,x]));
+  for(const x of r.pendientes||[]){const c=m.get(x.id);if(!c||pStamp(x)>pStamp(c))m.set(x.id,x)}
+  out.pendientes=[...m.values()];
+  out.updatedAt=Math.max(cur.updatedAt||0,r.updatedAt||0);
+  return out;
+}
 async function getFotoModo(){const m=await get('meta','foto');return m&&m.v==='normal'?'normal':'ligera'}
 
 /* ---------- Estado ---------- */
@@ -196,7 +223,7 @@ async function render(){
   if(S.view==='hoy')await renderHoy();else if(S.view==='pend')await renderPend();else await renderResp();
   document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',b.dataset.v===S.view));
   try{
-    const pats=await all('patients');const n=pats.reduce((s,p)=>s+p.pendientes.filter(x=>!x.hecho).length,0);
+    const pats=await all('patients');const n=pats.reduce((s,p)=>s+pAct(p).length,0);
     const b=$('nav button[data-v=pend]');let em=$('em',b);
     if(n){if(!em){em=document.createElement('em');b.appendChild(em)}em.textContent=n}else if(em)em.remove();
   }catch(e){}
@@ -210,7 +237,7 @@ async function renderHoy(){
     return `<button class="tab ${t===S.turno?'on':''}" data-t="${t}">T${t}${es.length?`<i class="${np?'w':'k'}">${np||'✓'}</i>`:''}</button>`}).join('');
   const list=ents.filter(e=>e.turno===S.turno).sort(cmpSillon);
   const cards=list.map(e=>{
-    const pe=P[e.expediente];const open=pe?pe.pendientes.filter(x=>!x.hecho).length:0;
+    const pe=P[e.expediente];const open=pe?pAct(pe).length:0;
     return `<div class="card ${e.id===S.sel?'sel':''}" data-id="${e.id}">
       <div class="sil"><small>sillón</small><b>${esc(e.sillon||'–')}</b></div>
       <div><div class="nm">${esc(pe&&pe.nombre||'(sin nombre)')}</div><div class="ex">${esc(e.expediente)}</div>
@@ -234,7 +261,7 @@ async function renderHoy(){
 async function renderPend(){
   const [pats,ents]=await Promise.all([all('patients'),byDate(todayStr())]);
   const hoy=Object.fromEntries(ents.map(e=>[e.expediente,e]));
-  const gs=pats.map(p=>({p,o:p.pendientes.filter(x=>!x.hecho)})).filter(g=>g.o.length)
+  const gs=pats.map(p=>({p,o:pAct(p)})).filter(g=>g.o.length)
     .sort((a,b)=>(!!hoy[b.p.expediente])-(!!hoy[a.p.expediente])||String(a.p.nombre).localeCompare(String(b.p.nombre)));
   const total=gs.reduce((s,g)=>s+g.o.length,0);
   $('#main').innerHTML=`<div class="top"><div class="datebar"><div class="d">Pendientes abiertos<small>${total} en ${gs.length} paciente${gs.length===1?'':'s'}</small></div></div></div>`+
@@ -254,7 +281,26 @@ async function renderResp(){
   const modo=await getFotoModo();
   const errs=readErrs().slice(-10).reverse();
   const mb=n=>(n/1048576).toFixed(1)+' MB';
+  const sy=SYNC.state();
+  const hace=t=>{if(!t)return 'aún no';const s=Math.round((Date.now()-t)/1000);return s<60?'hace unos segundos':s<3600?`hace ${Math.round(s/60)} min`:`hace ${Math.round(s/3600)} h`};
+  let syHtml;
+  if(sy.status==='nocfg')syHtml='<p>No configurada: faltan los datos de Firebase en <b>firebase-config.js</b>. Mientras tanto la app funciona solo en este dispositivo.</p>';
+  else if(sy.status==='nosdk')syHtml='<p>No se pudo cargar Firebase. Abre la app con internet una vez para que se guarde en el dispositivo.</p>';
+  else if(sy.status==='error')syHtml=`<p>Error al iniciar Firebase: ${esc(sy.err)}</p>`;
+  else if(!sy.uid)syHtml=`<p>Entra con tu correo para sincronizar con tus otros dispositivos.</p>
+    <label>Correo</label><input id="sy-mail" type="email" autocomplete="username" autocapitalize="none" autocorrect="off">
+    <label>Contraseña</label><input id="sy-pass" type="password" autocomplete="current-password">
+    <p id="sy-msg" class="hint"></p><button class="btn" id="sy-login">Iniciar sesión</button>`;
+  else syHtml=`<p style="color:var(--ok);font-weight:700">● Conectado como ${esc(sy.email)}</p>
+    <p>${sy.pending?`Subiendo… ${sy.pending} cambio${sy.pending===1?'':'s'} por enviar`:'Todo al día ✓'}${navigator.onLine?'':' · sin internet (se enviará al volver)'}</p>
+    <p>Última actividad: ${hace(sy.last)}</p>
+    ${sy.err?`<p class="hint">Aviso: ${esc(sy.err)}</p>`:''}
+    <div class="tags" style="margin:8px 0"><button class="tg ${sy.syncNames?'on':''}" data-sn="${sy.syncNames?'0':'1'}">Sincronizar nombres: ${sy.syncNames?'Sí':'No'}</button><button class="tg ${sy.syncPhotos?'on':''}" data-sp="${sy.syncPhotos?'0':'1'}">Sincronizar fotos: ${sy.syncPhotos?'Sí':'No'}</button></div>
+    <p>El interruptor de nombres solo controla el campo Nombre. Los comentarios, pendientes y etiquetas se sincronizan tal como los escribas. Al volver a activar los nombres se recuperan los de la nube.</p>
+    <p>Las fotos de la hoja de signos se suben a tu cuenta de Firebase y se bajan en tus otros dispositivos; se borran a los ${DIAS_FOTO} días también en la nube. Si la hoja trae el nombre del paciente, quedará en la foto. En datos del celular, apaga las fotos.</p>
+    <button class="btn" id="sy-now">Sincronizar ahora</button><button class="btn sec" id="sy-out">Cerrar sesión</button>`;
   $('#main').innerHTML=`<div class="top"><div class="datebar"><div class="d">Ajustes y respaldo</div></div></div>
+  <div class="box"><h3>Sincronización</h3>${syHtml}</div>
   <div class="box"><h3>Etiquetas de eventos</h3>
     <p>Son los chips que aparecen en cada paciente. Mantén la lista corta para que el pase sea rápido.</p>
     ${tags.map((g,i)=>`<div class="tgrow"><span>${esc(g)}</span><button class="x" data-tgi="${i}" aria-label="Quitar">×</button></div>`).join('')||'<p>Sin etiquetas.</p>'}
@@ -264,7 +310,7 @@ async function renderResp(){
     <p>Ligera (recomendada): escala de grises y menor tamaño, aprox. 100-150 KB por foto. Normal: a color, aprox. 300 KB. Aplica a las fotos nuevas.</p>
     <div class="tags"><button class="tg ${modo==='ligera'?'on':''}" data-fq="ligera">Ligera</button><button class="tg ${modo==='normal'?'on':''}" data-fq="normal">Normal</button></div></div>
   <div class="box"><h3>Almacenamiento</h3>
-    <p>${pats.length} paciente${pats.length===1?'':'s'} guardado${pats.length===1?'':'s'} · ${ents.length} registro${ents.length===1?'':'s'} de sesión</p>
+    <p>${pats.length} paciente${pats.length===1?'':'s'} guardado${pats.length===1?'':'s'} · ${ents.filter(x=>!x.deleted).length} registro${ents.filter(x=>!x.deleted).length===1?'':'s'} de sesión</p>
     <p>${phs.length} foto${phs.length===1?'':'s'} de hoja de signos: ${mb(bytes)}. Se borran solas a los ${DIAS_FOTO} días.</p>
     ${est&&est.quota?`<p>Uso total de la app: ${mb(est.usage||0)}</p>`:''}
     <p>Almacenamiento persistente: ${per===true?'sí ✓':per===false?'no concedido (instala la app en la pantalla de inicio)':'no disponible'}</p>
@@ -329,7 +375,7 @@ async function openAdd(){
     const k=normExp(exp.value);const known=pats.find(p=>p.expediente===k);
     if(known){
       if(!nom.value.trim()||auto){nom.value=known.nombre||'';auto=true}
-      const o=known.pendientes.filter(x=>!x.hecho);
+      const o=pAct(known);
       hint.textContent=o.length?`Paciente conocido · ${o.length} pendiente${o.length>1?'s':''} abierto${o.length>1?'s':''}: ${o.map(x=>x.texto).join('; ')}`:'Paciente conocido';
     }else hint.textContent='';
     if(src===nom)auto=false;
@@ -347,8 +393,8 @@ async function addEntry(expRaw,nom,tur,sil){
   const exp=normExp(expRaw);if(!exp){toast('Falta el expediente');return}
   nom=nom.trim();sil=sil.trim();
   let pat=await get('patients',exp);
-  if(!pat)pat={expediente:exp,nombre:'',pendientes:[],updatedAt:now()};
-  if(nom&&nom!==pat.nombre){pat.nombre=nom;pat.updatedAt=now()}
+  if(!pat)pat={expediente:exp,nombre:'',pendientes:[],updatedAt:now(),pu:now()};
+  if(nom&&nom!==pat.nombre){pat.nombre=nom;pat.updatedAt=now();pat.pu=now()}
   await put('patients',pat);
   const ents=await byDate(S.fecha);
   const dup=ents.find(e=>e.expediente===exp);
@@ -369,7 +415,7 @@ async function openEntry(id){
   await settle();
   const e=await get('entries',id);if(!e)return;
   if(!e.fotos)e.fotos=[];if(!e.extras)e.extras={};if(!e.tags)e.tags=[];
-  const pat=(await get('patients',e.expediente))||{expediente:e.expediente,nombre:'',pendientes:[],updatedAt:now()};
+  let pat=(await get('patients',e.expediente))||{expediente:e.expediente,nombre:'',pendientes:[],updatedAt:0,pu:0};
   const catalogo=await getTags();
   const urls=[];
   const ex=e.extras;
@@ -390,17 +436,21 @@ async function openEntry(id){
     <button class="dng" id="e-del">Quitar de la lista</button>`);
   S.sel=e.id;refreshList();
   const q=s=>$(s,sh);
-  let tm=null,dirtyPat=false;
+  let tm=null;
+  const freshPat=async()=>(await get('patients',e.expediente))||{expediente:e.expediente,nombre:'',pendientes:[],updatedAt:0,pu:0};
   const sv=ok=>{const s=q('#e-sv');if(!s)return;s.textContent=ok?'Guardado ✓':'No se pudo guardar';s.className='sv on'+(ok?'':' err');clearTimeout(sv.t);if(ok)sv.t=setTimeout(()=>s.classList.remove('on'),1500)};
   const flushRaw=async()=>{clearTimeout(tm);tm=null;
     e.comentario=q('#e-com').value;e.sillon=q('#e-sil').value.trim();
     e.extras={peso:q('#x-peso').value,gan:q('#x-gan').value,ta:q('#x-ta').value,otro:q('#x-otro').value};
     e.updatedAt=now();await put('entries',e);
-    const nn=q('#e-nom').value.trim();if(nn!==pat.nombre){pat.nombre=nn;dirtyPat=true}
-    const ac=q('#e-ac').value,av=q('#e-av').value.trim();
-    if(ac!==(pat.acceso||'')||av!==(pat.aviso||'')){pat.acceso=ac;pat.aviso=av;dirtyPat=true}
-    if(dirtyPat){pat.updatedAt=now();await put('patients',pat);dirtyPat=false}
+    // el perfil se escribe sobre la copia más reciente del paciente (por si otro dispositivo cambió pendientes)
+    const nn=q('#e-nom').value.trim(),ac=q('#e-ac').value,av=q('#e-av').value.trim();
+    const cur=await freshPat();
+    if(nn!==(cur.nombre||'')||ac!==(cur.acceso||'')||av!==(cur.aviso||'')){
+      cur.nombre=nn;cur.acceso=ac;cur.aviso=av;cur.pu=now();cur.updatedAt=now();await put('patients',cur)}
+    pat=cur;
     refreshList()};
+  const mutPat=async fn=>{const cur=await freshPat();fn(cur);cur.updatedAt=now();await put('patients',cur);pat=cur};
   const flush=async()=>{try{await flushRaw();sv(true)}catch(err){logErr('guardar',err);sv(false);throw err}};
   const later=()=>{clearTimeout(tm);tm=setTimeout(()=>flush().catch(()=>{}),400)};
   sheetCb=async()=>{try{await flush()}finally{urls.forEach(u=>URL.revokeObjectURL(u))}};
@@ -423,23 +473,50 @@ async function openEntry(id){
   q('#e-tur').onchange=async ev=>{const v=+ev.target.value;ev.target.blur();e.turno=v;S.turno=v;lsSet('turno',v);await flush().catch(()=>{})};
   const drawNota=()=>{const b=q('#e-nota');b.className='notabig'+(e.nota?' ok':'');b.textContent=e.nota?'✓ Nota hecha':'○ Nota pendiente — toca para marcar'};
   q('#e-nota').onclick=async()=>{e.nota=!e.nota;drawNota();await flush().catch(()=>{})};drawNota();
-  live={e,flush,drawNota};
-
   const drawPend=()=>{
     const row=x=>`<div class="pr ${x.hecho?'dn':''}"><button class="ck ${x.hecho?'on':''}" data-pt="${x.id}">${x.hecho?'✓':''}</button><span>${esc(x.texto)}</span><button class="x" data-px="${x.id}">×</button></div>`;
-    const open=pat.pendientes.filter(x=>!x.hecho),done=pat.pendientes.filter(x=>x.hecho);
+    const open=pAct(pat),done=pDone(pat);
     q('#e-pend').innerHTML=(open.length?open.map(row).join(''):'<div class="mu">Sin pendientes abiertos</div>')+(done.length?`<details><summary>Resueltos (${done.length})</summary>${done.map(row).join('')}</details>`:'');
   };
   drawPend();
   q('#e-pend').addEventListener('click',async ev=>{
     const t=ev.target.closest('[data-pt]'),x=ev.target.closest('[data-px]');
-    if(t){const p=pat.pendientes.find(z=>z.id===t.dataset.pt);p.hecho=!p.hecho;p.hechoEn=p.hecho?now():null}
-    else if(x){pat.pendientes=pat.pendientes.filter(z=>z.id!==x.dataset.px)}
-    else return;
-    dirtyPat=true;await flush().catch(()=>{});drawPend();
+    if(!t&&!x)return;
+    try{
+      await mutPat(p=>{
+        if(t){const it=p.pendientes.find(z=>z.id===t.dataset.pt);if(it){it.hecho=!it.hecho;it.hechoEn=it.hecho?now():null;it.updatedAt=now()}}
+        else{const it=p.pendientes.find(z=>z.id===x.dataset.px);if(it){it.del=true;it.updatedAt=now()}}
+      });
+      sv(true);
+    }catch(err){logErr('pendiente',err);sv(false)}
+    drawPend();refreshList();
   });
   const addP=async()=>{const i=q('#e-pin');const t=i.value.trim();if(!t)return;
-    pat.pendientes.push({id:uid(),texto:t,hecho:false,creado:now()});i.value='';dirtyPat=true;await flush().catch(()=>{});drawPend()};
+    try{await mutPat(p=>{p.pendientes.push({id:uid(),texto:t,hecho:false,creado:now(),updatedAt:now()})});i.value='';sv(true)}catch(err){logErr('pendiente',err);sv(false)}
+    drawPend();refreshList()};
+  // cambios que llegan de otro dispositivo mientras esta hoja está abierta
+  live={e,flush,drawNota,
+    setE:r=>{
+      e.nota=!!r.nota;e.tags=r.tags||[];e.turno=r.turno;e.updatedAt=r.updatedAt;e.deleted=!!r.deleted;
+      if(r.fotos)e.fotos=r.fotos;
+      if(sheetEl!==sh)return;
+      drawNota();drawTags();q('#e-tur').value=String(e.turno);
+      const fo=document.activeElement;
+      if(fo!==q('#e-com')){q('#e-com').value=r.comentario||'';e.comentario=r.comentario||''}
+      if(fo!==q('#e-sil')){q('#e-sil').value=r.sillon||'';e.sillon=r.sillon||''}
+    },
+    // llegó o se borró una foto desde otro dispositivo: se vuelve a leer la lista de fotos de esta sesión
+    refreshFotos:async()=>{
+      const cur=await get('entries',e.id);if(cur)e.fotos=cur.fotos||[];
+      if(sheetEl===sh)await drawFotos();
+    },
+    setPat:p=>{
+      pat=p;if(sheetEl!==sh)return;drawPend();
+      const fo=document.activeElement;
+      if(fo!==q('#e-nom'))q('#e-nom').value=p.nombre||'';
+      if(fo!==q('#e-av'))q('#e-av').value=p.aviso||'';
+      if(fo!==q('#e-ac'))q('#e-ac').value=p.acceso||'';
+    }};
   q('#e-padd').onclick=addP;q('#e-pin').addEventListener('keydown',ev=>{if(ev.key==='Enter'){ev.preventDefault();addP()}});
 
   const drawFotos=async()=>{
@@ -457,7 +534,7 @@ async function openEntry(id){
   };
   await drawFotos();
   q('#e-fotos').addEventListener('click',ev=>{const t=ev.target.closest('[data-ph]');if(!t)return;
-    viewPhoto(t.dataset.u,async()=>{await del('photos',t.dataset.ph);e.fotos=e.fotos.filter(i=>i!==t.dataset.ph);await flush().catch(()=>{});await drawFotos()})});
+    viewPhoto(t.dataset.u,async()=>{const ph=await get('photos',t.dataset.ph);await del('photos',t.dataset.ph);SYNC.dropPhoto(ph);e.fotos=e.fotos.filter(i=>i!==t.dataset.ph);await flush().catch(()=>{});await drawFotos()})});
   q('#e-file').onchange=async ev=>{
     const files=[...ev.target.files];ev.target.value='';if(!files.length)return;
     toast('Guardando foto…');
@@ -465,14 +542,17 @@ async function openEntry(id){
     for(const f of files){try{
       const blob=await compress(f,modo);const ph={id:uid(),blob,created:now(),entry:e.id,expediente:e.expediente};
       await put('photos',ph);e.fotos.push(ph.id);
+      SYNC.pushPhoto(ph).then(r=>{if(r==='pesada')toast('Foto muy pesada: se queda solo en este dispositivo')}).catch(()=>{});
     }catch(err){logErr('foto',err);toast('No se pudo procesar la foto')}}
     await flush().catch(()=>{});await drawFotos();toast('Foto guardada');
   };
   q('#e-del').onclick=async()=>{
     if(!confirm('¿Quitar a este paciente de la lista de esta fecha? Se borran sus fotos de hoja de signos; el paciente y sus pendientes se conservan.'))return;
     sheetCb=null;clearTimeout(tm);
-    for(const fid of e.fotos)await del('photos',fid);
-    await del('entries',e.id);urls.forEach(u=>URL.revokeObjectURL(u));closeSheet();
+    for(const fid of e.fotos){const ph=await get('photos',fid);await del('photos',fid);SYNC.dropPhoto(ph)}
+    // el borrado es una marca (deleted) para que también se sincronice a los demás dispositivos
+    e.deleted=true;e.fotos=[];e.updatedAt=now();await put('entries',e);
+    urls.forEach(u=>URL.revokeObjectURL(u));closeSheet();
   };
 }
 
@@ -534,7 +614,8 @@ async function purge(){
   for(const p of await all('photos'))if(p.created<lim){await del('photos',p.id);gone.add(p.id);n++}
   if(gone.size)for(const e of await all('entries')){
     const k=(e.fotos||[]).filter(i=>!gone.has(i));
-    if(k.length!==(e.fotos||[]).length){e.fotos=k;e.updatedAt=now();await put('entries',e)}}
+    // las fotos son locales: limpiar la lista no cuenta como cambio para la sincronización
+    if(k.length!==(e.fotos||[]).length){e.fotos=k;await put('entries',e,{nosync:true})}}
   return n;
 }
 
@@ -555,8 +636,11 @@ async function exportar(conFotos){
 }
 async function importar(file){
   const d=JSON.parse(await file.text());if(!d||d.app!=='pase-hd')throw new Error('Archivo no válido');
-  const merge=async(st,arr,key)=>{let n=0;for(const r of arr||[]){const cur=await get(st,r[key]);if(!cur||(r.updatedAt||0)>(cur.updatedAt||0)){await put(st,r);n++}}return n};
-  const a=await merge('patients',d.patients,'expediente'),b=await merge('entries',d.entries,'id');
+  let a=0,b=0;
+  for(const r of d.patients||[]){const cur=await get('patients',r.expediente);const m=mergePat(cur,r);
+    if(!cur||JSON.stringify(m)!==JSON.stringify(cur)){await put('patients',m);a++}}
+  for(const r of d.entries||[]){const cur=await get('entries',r.id);
+    if(!cur||(r.updatedAt||0)>(cur.updatedAt||0)){await put('entries',{...r,fotos:cur&&cur.fotos?cur.fotos:(r.fotos||[])});b++}}
   if(Array.isArray(d.tags)){const m=await getTags();for(const g of d.tags)if(!m.includes(g))m.push(g);await setTags(m)}
   for(const ph of d.photos||[])if(!(await get('photos',ph.id))){
     const blob=await (await fetch(ph.data)).blob();await put('photos',{id:ph.id,blob,created:ph.created,entry:ph.entry,expediente:ph.expediente})}
@@ -573,6 +657,7 @@ document.addEventListener('pointerup',ev=>{
   if(c&&c===pdTarget&&sheetEl){closeSheet()}
 },true);
 document.addEventListener('keydown',ev=>{
+  if(ev.key==='Enter'&&ev.target&&ev.target.id==='sy-pass'){ev.preventDefault();const b=$('#sy-login');if(b)b.click();return}
   if(ev.key==='Escape'){
     if($('#vw').classList.contains('on')){$('#v-x').onclick();return}
     if(sheetEl){ev.preventDefault();closeSheet()}
@@ -606,7 +691,7 @@ document.addEventListener('click',async ev=>{
     if(live&&live.e.id===nt.dataset.nota){live.e.nota=!live.e.nota;live.drawNota();await live.flush().catch(()=>{});render();return}
     const e=await get('entries',nt.dataset.nota);e.nota=!e.nota;e.updatedAt=now();await put('entries',e);render();return}
   const pt=t.closest('[data-pt][data-pe]');
-  if(pt){const p=await get('patients',pt.dataset.pe);const x=p.pendientes.find(z=>z.id===pt.dataset.pt);x.hecho=true;x.hechoEn=now();p.updatedAt=now();await put('patients',p);render();toast('Pendiente resuelto');return}
+  if(pt){const p=await get('patients',pt.dataset.pe);const x=p.pendientes.find(z=>z.id===pt.dataset.pt);x.hecho=true;x.hechoEn=now();x.updatedAt=now();p.updatedAt=now();await put('patients',p);render();toast('Pendiente resuelto');return}
   const op=t.closest('[data-open]');
   if(op){
     const e=await get('entries',op.dataset.open);
@@ -617,13 +702,23 @@ document.addEventListener('click',async ev=>{
   if(tgd){const a=await getTags();a.splice(+tgd.dataset.tgi,1);await setTags(a);render();return}
   if(t.id==='tg-add'){const v=$('#tg-in').value.trim();if(!v)return;const a=await getTags();if(!a.includes(v)){a.push(v);await setTags(a)}render();return}
   if(t.id==='tg-def'){if(confirm('¿Restaurar la lista de etiquetas por defecto?')){await setTags(DEF_TAGS.slice());render()}return}
+  if(t.id==='sy-login'){
+    const m=$('#sy-mail').value.trim(),p=$('#sy-pass').value,msg=$('#sy-msg');
+    if(!m||!p){msg.textContent='Escribe tu correo y contraseña';return}
+    msg.textContent='Entrando…';
+    try{await SYNC.login(m,p)}catch(err){msg.textContent=err.message}
+    return}
+  if(t.id==='sy-out'){if(confirm('¿Cerrar sesión? Tus datos se quedan en este dispositivo.')){await SYNC.logout();render()}return}
+  if(t.id==='sy-now'){await SYNC.syncNow();toast('Sincronizando…');render();return}
+  const sn=t.closest('[data-sn]');if(sn){await SYNC.setNames(sn.dataset.sn==='1');render();return}
+  const sp=t.closest('[data-sp]');if(sp){await SYNC.setPhotos(sp.dataset.sp==='1');render();return}
   const fq=t.closest('[data-fq]');
   if(fq){await put('meta',{k:'foto',v:fq.dataset.fq});render();toast('Calidad: '+(fq.dataset.fq==='normal'?'normal':'ligera'));return}
   if(t.id==='er-copy'){const txt=JSON.stringify(readErrs(),null,1);
     try{await navigator.clipboard.writeText(txt);toast('Copiado')}catch(err){prompt('Copia este texto:',txt)}return}
   if(t.id==='er-clear'){lsSet('errlog','[]');render();return}
-  if(t.id==='r-del'){if(confirm('¿Borrar TODAS las fotos de hojas de signos?')){
-    for(const p of await all('photos'))await del('photos',p.id);
+  if(t.id==='r-del'){if(confirm('¿Borrar TODAS las fotos de hojas de signos? Si la sincronización de fotos está activa, también se borran en tus otros dispositivos.')){
+    for(const p of await all('photos')){await del('photos',p.id);SYNC.dropPhoto(p)}
     for(const e of await all('entries'))if(e.fotos&&e.fotos.length){e.fotos=[];e.updatedAt=now();await put('entries',e)}
     toast('Fotos borradas');render()}return}
   if(t.id==='r-exp'){const ok=await exportar($('#r-fot').checked);if(ok){toast('Respaldo listo');render()}return}
@@ -633,12 +728,236 @@ document.addEventListener('change',async ev=>{
     try{const r=await importar(f);toast(`Importado: ${r.a} pacientes, ${r.b} registros`);render()}catch(err){logErr('importar',err);alert('No se pudo importar: '+err.message)}}
 });
 
+/* ---------- Sincronización con Firebase (opcional) ----------
+   Cada dispositivo sigue guardando todo local. Aquí solo se suben los cambios y se bajan los de los demás.
+   Cada registro (paciente, pendiente, sesión, etiquetas) lleva updatedAt: gana el cambio más reciente.
+   Las fotos NO se sincronizan (viven solo en el dispositivo donde se tomaron). */
+const SYNC=(()=>{
+  const st={uid:null,email:'',status:'init',pending:0,denied:0,last:0,err:'',syncNames:true,syncPhotos:true,remote:{},unsubs:[],chain:Promise.resolve(),first:{},forceNames:false,fs:null,auth:null};
+  const DIAS_ENT=45;
+  const cfgOk=()=>{try{const c=window.FIREBASE_CONFIG;return !!(c&&c.apiKey&&c.projectId&&!/PEGA_AQUI/.test(JSON.stringify(c)))}catch(e){return false}};
+  const typing=()=>{const a=document.activeElement;return !!(a&&/^sy-/.test(a.id||''))};
+  const changed=()=>{clearTimeout(changed.t);changed.t=setTimeout(()=>{try{if(S.view==='resp'&&!sheetEl&&!typing())render().catch(()=>{})}catch(e){}},200)};
+  const ref=(coll,id)=>{const c=st.fs.collection('users').doc(st.uid).collection(coll);return id==null?c:c.doc(coll==='meta'?id:encodeURIComponent(id))};
+  const enq=fn=>{st.chain=st.chain.then(fn).catch(e=>logErr('sync',e));return st.chain};
+  const fail=(err,n=1)=>{if(err&&err.code==='permission-denied')st.denied+=n;else logErr('subir',err)};
+
+  /* --- registros --- */
+  const recPat=p=>{const r={expediente:p.expediente,acceso:p.acceso||'',aviso:p.aviso||'',updatedAt:patStamp(p)};if(st.syncNames)r.nombre=p.nombre||'';return r};
+  const recPend=(p,x)=>({id:x.id,expediente:p.expediente,texto:x.texto,hecho:!!x.hecho,hechoEn:x.hechoEn||null,creado:x.creado||0,del:!!x.del,updatedAt:pStamp(x)});
+  const recEnt=e=>{const r={...e};delete r.fotos;r.deleted=!!e.deleted;r.updatedAt=e.updatedAt||0;return r};
+  // Fotos: ya vienen comprimidas (ligeras ~100-150 KB); van dentro del documento como texto base64.
+  // Un documento de Firestore admite ~1 MB, por eso se descarta lo que pase de este límite.
+  const MAX_FOTO=950000;
+  async function recPhoto(ph){
+    const data=await blobToData(ph.blob);
+    if(data.length>MAX_FOTO)return null;
+    return {id:ph.id,entry:ph.entry||'',expediente:ph.expediente||'',created:ph.created||0,deleted:false,data,updatedAt:ph.created||0};
+  }
+  function itemsFor(name,v){
+    if(name==='patients'){const a=[['patients',v.expediente,recPat(v)]];for(const x of v.pendientes||[])a.push(['pendientes',x.id,recPend(v,x)]);return a}
+    if(name==='entries')return [['entries',v.id,recEnt(v)]];
+    if(name==='meta'&&v.k==='tags')return [['meta','tags',{v:v.v,updatedAt:v.updatedAt||0}]];
+    return [];
+  }
+  const due=it=>{const k=it[0]+'~'+it[1],s=it[2].updatedAt;return st.remote[k]===undefined||s>st.remote[k]};
+
+  /* --- subir --- */
+  function write(it){
+    st.remote[it[0]+'~'+it[1]]=it[2].updatedAt;st.pending++;
+    return ref(it[0],it[1]).set(it[2],{merge:true})
+      .then(()=>{st.last=now()})
+      .catch(fail)
+      .then(()=>{st.pending--;changed()});
+  }
+  function push(name,v){if(!st.uid||!st.fs)return;for(const it of itemsFor(name,v))if(due(it))write(it)}
+  async function pushPhoto(ph){
+    if(!st.uid||!st.fs||!st.syncPhotos||!ph)return;
+    try{
+      const rec=await recPhoto(ph);
+      if(!rec){logErr('foto','Foto demasiado pesada para sincronizar');return 'pesada'}
+      const it=['photos',ph.id,rec];if(due(it))write(it);
+    }catch(e){logErr('foto',e)}
+  }
+  // borrar una foto = dejar una marca (sin imagen) para que los demás dispositivos también la quiten
+  function dropPhoto(ph){
+    if(!st.uid||!st.fs||!st.syncPhotos||!ph)return;
+    write(['photos',ph.id,{id:ph.id,entry:ph.entry||'',expediente:ph.expediente||'',created:ph.created||0,deleted:true,data:'',updatedAt:now()}]);
+  }
+  // la nube solo conserva las fotos de los últimos 7 días, igual que los dispositivos
+  async function purgeRemote(){
+    if(!st.uid||!st.fs||!st.syncPhotos)return;
+    try{
+      const snap=await ref('photos').where('created','<',now()-DIAS_FOTO*DAY).get();
+      snap.forEach(d=>{d.ref.delete().catch(fail)});
+    }catch(e){logErr('limpiar nube',e)}
+  }
+  async function pushAll(){
+    if(!st.uid||!st.fs)return;
+    const items=[];
+    for(const p of await all('patients'))items.push(...itemsFor('patients',p));
+    const cut=todayStr(new Date(Date.now()-DIAS_ENT*DAY));
+    for(const e of await all('entries'))if((e.fecha||'')>=cut)items.push(...itemsFor('entries',e));
+    const t=await get('meta','tags');
+    if(t){if(!t.updatedAt){t.updatedAt=now();await put('meta',t,{nosync:true})}items.push(...itemsFor('meta',t))}
+    items.filter(due).forEach(write);
+    if(st.syncPhotos){ // fotos que ya estaban en este dispositivo y la nube todavía no tiene
+      const lim=now()-DIAS_FOTO*DAY;
+      for(const k of await rq(store('photos').getAllKeys())){
+        if(st.remote['photos~'+k]!==undefined)continue;
+        const ph=await get('photos',k);if(!ph||(ph.created||0)<lim)continue;
+        await pushPhoto(ph);
+      }
+    }
+  }
+
+  /* --- bajar --- */
+  async function applyRemote(name,r){
+    if(name==='patients'){
+      const cur=await get('patients',r.expediente),rs=r.updatedAt||0;
+      if(!st.forceNames&&cur&&patStamp(cur)>=rs)return null;
+      const p=cur||{expediente:r.expediente,nombre:'',pendientes:[],updatedAt:0};
+      if(st.syncNames&&typeof r.nombre==='string')p.nombre=r.nombre;
+      if('acceso' in r)p.acceso=r.acceso;if('aviso' in r)p.aviso=r.aviso;
+      p.pu=rs;p.updatedAt=Math.max(p.updatedAt||0,rs);
+      await put('patients',p,{nosync:true});return p;
+    }
+    if(name==='pendientes'){
+      let p=await get('patients',r.expediente);
+      if(!p)p={expediente:r.expediente,nombre:'',pendientes:[],updatedAt:0,pu:0};
+      const i=p.pendientes.findIndex(x=>x.id===r.id),rs=r.updatedAt||0;
+      if(i>=0&&pStamp(p.pendientes[i])>=rs)return null;
+      const item={id:r.id,texto:r.texto,hecho:!!r.hecho,hechoEn:r.hechoEn||null,creado:r.creado||0,updatedAt:rs,del:!!r.del};
+      if(i>=0)p.pendientes[i]=item;else p.pendientes.push(item);
+      p.updatedAt=Math.max(p.updatedAt||0,rs);
+      await put('patients',p,{nosync:true});return p;
+    }
+    if(name==='entries'){
+      const cur=await get('entries',r.id);
+      if(cur&&(cur.updatedAt||0)>=(r.updatedAt||0))return null;
+      // las fotos que ya llegaron antes que su sesión se enlazan aquí
+      const ids=await photoIdsOf(r.id);
+      const e={...r,fotos:[...new Set([...(cur&&cur.fotos||[]),...ids])]};
+      await put('entries',e,{nosync:true});return e;
+    }
+    if(name==='photos'){
+      const cur=await get('photos',r.id);
+      if(r.deleted){
+        if(cur)await del('photos',r.id);
+        const e=await get('entries',r.entry);
+        if(e&&(e.fotos||[]).includes(r.id)){e.fotos=e.fotos.filter(x=>x!==r.id);await put('entries',e,{nosync:true})}
+        return cur?{photo:true,entry:r.entry}:null;
+      }
+      if(cur||!r.data||(r.created||0)<now()-DIAS_FOTO*DAY)return null;
+      const blob=await (await fetch(r.data)).blob();
+      await putRaw('photos',{id:r.id,blob,created:r.created,entry:r.entry,expediente:r.expediente});
+      const e=await get('entries',r.entry);
+      if(e){if(!e.fotos)e.fotos=[];if(!e.fotos.includes(r.id)){e.fotos.push(r.id);await put('entries',e,{nosync:true})}}
+      return {photo:true,entry:r.entry};
+    }
+    if(name==='meta'&&r.v&&Array.isArray(r.v)){
+      const cur=await get('meta','tags');
+      if(cur&&(cur.updatedAt||0)>=(r.updatedAt||0))return null;
+      await put('meta',{k:'tags',v:r.v,updatedAt:r.updatedAt||0},{nosync:true});return {tags:true};
+    }
+    return null;
+  }
+  function afterApply(name,res){
+    try{
+      if(live){
+        if(name==='entries'&&res.id===live.e.id){if(res.deleted){live.e.deleted=true;closeSheet()}else live.setE(res)}
+        if(name==='photos'&&res.entry===live.e.id)live.refreshFotos();
+        if((name==='patients'||name==='pendientes')&&res.expediente===live.e.expediente)live.setPat(res);
+      }
+    }catch(e){logErr('sync',e)}
+    clearTimeout(afterApply.t);
+    afterApply.t=setTimeout(()=>{if(db&&!typing())render().catch(()=>{})},150);
+  }
+  function unlisten(){st.unsubs.forEach(u=>{try{u()}catch(e){}});st.unsubs=[]}
+  function listen(){
+    unlisten();st.first={};
+    const cut=todayStr(new Date(Date.now()-DIAS_ENT*DAY));
+    const defs=[['patients',ref('patients')],['pendientes',ref('pendientes')],['entries',ref('entries').where('fecha','>=',cut)],['meta',ref('meta')]];
+    if(st.syncPhotos)defs.push(['photos',ref('photos').where('created','>=',now()-DIAS_FOTO*DAY)]);
+    defs.forEach(([name,q])=>{
+      st.unsubs.push(q.onSnapshot(snap=>{
+        snap.docChanges().forEach(ch=>{
+          if(ch.type==='removed')return;
+          const d=ch.doc.data();
+          const id=name==='patients'?d.expediente:name==='meta'?ch.doc.id:d.id;
+          st.remote[name+'~'+id]=d.updatedAt||0;
+          enq(async()=>{
+            const res=await applyRemote(name,d);if(res)afterApply(name,res);
+            // al reactivar los nombres: si la nube no tiene nombre de este paciente pero aquí sí, se publica
+            if(name==='patients'&&st.forceNames&&st.syncNames&&typeof d.nombre!=='string'){
+              const p=await get('patients',d.expediente);
+              if(p&&p.nombre){p.pu=now();p.updatedAt=now();await put('patients',p)}
+            }
+          });
+        });
+        if(!st.first[name]){st.first[name]=true;if(defs.every(x=>st.first[x[0]])){enq(()=>pushAll());enq(()=>purgeRemote())}}
+        st.last=st.last||now();changed();
+      },err=>{st.err=(err&&err.code)||String(err);logErr('escuchar '+name,err);changed()}));
+    });
+  }
+
+  /* --- sesión --- */
+  const msgAuth=e=>{const c=(e&&e.code)||'';
+    return /invalid-credential|wrong-password|user-not-found|invalid-email/.test(c)?'Correo o contraseña incorrectos'
+      :/network/.test(c)?'Sin conexión a internet'
+      :/too-many/.test(c)?'Demasiados intentos, espera unos minutos'
+      :/unauthorized-domain/.test(c)?'Este dominio no está autorizado en Firebase'
+      :(e&&e.message)||'No se pudo iniciar sesión'};
+  function init(){
+    if(!cfgOk()){st.status='nocfg';changed();return}
+    if(typeof firebase==='undefined'){st.status='nosdk';changed();return}
+    try{
+      firebase.initializeApp(window.FIREBASE_CONFIG);
+      st.auth=firebase.auth();st.fs=firebase.firestore();
+      try{st.fs.settings({ignoreUndefinedProperties:true,experimentalAutoDetectLongPolling:true,merge:true})}catch(e){logErr('firestore',e)}
+      try{const p=st.fs.enablePersistence({synchronizeTabs:true});if(p&&p.catch)p.catch(e=>logErr('persistencia',e))}catch(e){logErr('persistencia',e)}
+    }catch(e){logErr('firebase',e);st.status='error';st.err=String((e&&e.message)||e);changed();return}
+    st.status='out';
+    st.auth.onAuthStateChanged(async u=>{
+      try{
+        if(u){const m=await get('meta','syncnames');st.syncNames=!(m&&m.v===false);
+          const m2=await get('meta','syncphotos');st.syncPhotos=!(m2&&m2.v===false);st.uid=u.uid;st.email=u.email||'';st.status='on';listen()}
+        else{unlisten();st.uid=null;st.email='';st.status='out'}
+      }catch(e){logErr('sesión',e)}
+      changed();
+    });
+    changed();
+  }
+  async function login(email,pass){
+    if(!st.auth)throw new Error('La sincronización no está disponible');
+    try{await st.auth.signInWithEmailAndPassword(email,pass)}catch(e){throw new Error(msgAuth(e))}
+  }
+  const logout=()=>st.auth?st.auth.signOut():Promise.resolve();
+  async function setNames(on){
+    st.syncNames=!!on;await put('meta',{k:'syncnames',v:!!on},{nosync:true});
+    if(st.uid){
+      if(on){st.forceNames=true;setTimeout(()=>{st.forceNames=false},20000)} // al activar: se recuperan los nombres de la nube
+      listen();
+    }
+    changed();
+  }
+  async function setPhotos(on){
+    st.syncPhotos=!!on;await put('meta',{k:'syncphotos',v:!!on},{nosync:true});
+    if(st.uid)listen(); // al encender se bajan las fotos de la nube y se suben las que solo están aquí
+    changed();
+  }
+  const syncNow=()=>{if(!st.uid)return Promise.resolve();listen();return enq(()=>pushAll())};
+  return {push,pushPhoto,dropPhoto,init,login,logout,setNames,setPhotos,syncNow,state:()=>st};
+})();
+
 /* ---------- Inicio ---------- */
 (async()=>{
   try{db=await openDB()}catch(e){logErr('abrir base',e);$('#main').innerHTML='<div class="empty">Este navegador no permite guardar datos locales (¿modo privado?).</div>';return}
   await purge();
   try{if(navigator.storage&&navigator.storage.persist)navigator.storage.persist()}catch(e){}
   await render();
+  // la sincronización arranca cuando terminan de cargar los scripts de Firebase
+  if(document.readyState==='complete')SYNC.init();else window.addEventListener('load',()=>SYNC.init());
   setInterval(()=>purge().catch(()=>{}),36e5);
   document.addEventListener('visibilitychange',async()=>{
     if(document.visibilityState!=='visible')return;

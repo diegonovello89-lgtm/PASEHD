@@ -1,5 +1,9 @@
-const V = 'pase-hd-v4';
-const FILES = ['./', './index.html', './manifest.webmanifest', './icon-180.png', './icon-192.png', './icon-512.png'];
+const V = 'pase-hd-v6';
+const FILES = [
+  './', './index.html', './manifest.webmanifest', './firebase-config.js',
+  './vendor/firebase-app-compat.js', './vendor/firebase-auth-compat.js', './vendor/firebase-firestore-compat.js',
+  './icon-180.png', './icon-192.png', './icon-512.png'
+];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(V).then(c => c.addAll(FILES)).then(() => self.skipWaiting()));
@@ -13,9 +17,11 @@ self.addEventListener('activate', e => {
   );
 });
 
-// Cache primero (rápido y offline); se actualiza en segundo plano para la próxima apertura.
+// Solo archivos propios de la app (cache primero: rápido y offline; se actualiza en segundo plano).
+// Todo lo que sea de otro dominio (Firebase/Google) pasa directo, sin tocarlo.
 self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET') return;
+  if (new URL(e.request.url).origin !== self.location.origin) return;
   e.respondWith(
     caches.match(e.request).then(hit => {
       const net = fetch(e.request).then(r => {
