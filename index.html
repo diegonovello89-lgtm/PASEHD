@@ -137,9 +137,7 @@ details{margin-top:12px}summary{padding:6px 0;color:var(--mu);font-weight:600}
 <div id="app"><div id="cols" data-v="hoy"><div id="main"></div><div id="pane"></div></div></div>
 <nav>
   <button data-v="hoy"><span>🩺</span>Pase</button>
-  <button data-v="archivo"><span>📁</span>Expedientes</button>
   <button data-v="pend"><span>⏳</span>Pendientes</button>
-  <button data-v="calc"><span>🧮</span>Calc</button>
   <button data-v="resp"><span>⚙️</span>Ajustes</button>
 </nav>
 <div id="ov"></div>
@@ -148,7 +146,7 @@ details{margin-top:12px}summary{padding:6px 0;color:var(--mu);font-weight:600}
 
 <script>
 'use strict';
-const VERSION='9.1';
+const VERSION='10.1';
 const TURNOS=[1,2,3,4,5];
 const DIAS_FOTO=7;
 const ACCESOS=['FAV','Injerto','Catéter tunelizado','Catéter temporal'];
@@ -318,6 +316,7 @@ async function renderResp(){
     <button class="btn" id="sy-now">Sincronizar ahora</button><button class="btn sec" id="sy-out">Cerrar sesión</button>`;
   $('#main').innerHTML=`<div class="top"><div class="datebar"><div class="d">Ajustes y respaldo</div></div></div>
   <div class="box"><h3>Sincronización</h3>${syHtml}</div>
+  <div class="box"><h3>📁 Expedientes</h3><p>Consulta, corrige y revisa el historial de los pacientes.</p><button class="btn sec" id="settings-archivo">Administrar expedientes</button></div>
   <div class="box"><h3>Etiquetas de eventos</h3>
     <p>Son los chips que aparecen en cada paciente. Mantén la lista corta para que el pase sea rápido.</p>
     ${tags.map((g,i)=>`<div class="tgrow"><span>${esc(g)}</span><button class="x" data-tgi="${i}" aria-label="Quitar">×</button></div>`).join('')||'<p>Sin etiquetas.</p>'}
@@ -449,13 +448,13 @@ async function openAdd(){
   await settle();
   const pats=await all('patients');
   const sh=openSheet(`<div class="sh-head"><b style="font-size:18px;padding-top:10px">Agregar paciente</b><button data-close>Cerrar</button></div>
-    <div class="lrow"><label>Expediente</label><button type="button" id="a-kb">ABC</button></div><input id="a-exp" inputmode="numeric" pattern="[0-9]*" autocomplete="off" autocapitalize="characters" autocorrect="off">
-    <label>Nombre</label><input id="a-nom" autocomplete="off">
+    <label>Buscar por número de expediente</label><input id="a-exp" type="text" inputmode="numeric" pattern="[0-9]*" enterkeyhint="next" autocomplete="off" autocorrect="off" placeholder="Número de expediente">
+    <label>Nombre (se completa si el expediente ya existe)</label><input id="a-nom" autocomplete="off">
     <div id="a-sug"></div>
     <div class="row"><div><label>Turno</label><select id="a-tur">${turnoOpts(S.turno)}</select></div>
     <div><label>Sillón</label><input id="a-sil" inputmode="numeric" autocomplete="off"></div></div>
     <div id="a-hint" class="hint"></div>
-    <button class="pri" id="a-ok">Agregar a la lista</button>`);
+    <label style="display:flex;align-items:center;gap:8px;margin:12px 0"><input id="a-rapid" type="checkbox" checked style="width:auto"> Captura rápida: continuar con el siguiente paciente</label><button class="pri" id="a-ok">Guardar paciente y sillón</button><div id="a-count" class="mu" aria-live="polite"></div>`);
   const exp=$('#a-exp',sh),nom=$('#a-nom',sh),sug=$('#a-sug',sh),hint=$('#a-hint',sh);
   let auto=false;
   const upd=(src)=>{
@@ -467,17 +466,28 @@ async function openAdd(){
       hint.textContent=o.length?`Paciente conocido · ${o.length} pendiente${o.length>1?'s':''} abierto${o.length>1?'s':''}: ${o.map(x=>x.texto).join('; ')}`:'Paciente conocido';
     }else hint.textContent='';
     if(src===nom)auto=false;
-    const m=q?pats.filter(p=>p.expediente.toLowerCase().startsWith(q)||String(p.nombre||'').toLowerCase().includes(q)).filter(p=>p.expediente!==k).slice(0,5):[];
+    const m=q?pats.filter(p=>p.expediente.toLowerCase().startsWith(q)).filter(p=>p.expediente!==k).slice(0,5):[];
     sug.innerHTML=m.map(p=>`<button data-sg="${esc(p.expediente)}">${esc(p.nombre||'(sin nombre)')} <small>· ${esc(p.expediente)}</small></button>`).join('');
   };
   exp.addEventListener('input',()=>upd(exp));nom.addEventListener('input',()=>upd(nom));
-  $('#a-kb',sh).onclick=ev=>{const num=exp.inputMode==='numeric';exp.inputMode=num?'text':'numeric';ev.target.textContent=num?'123':'ABC';exp.blur();setTimeout(()=>exp.focus(),30)};
+
   sug.addEventListener('click',ev=>{const b=ev.target.closest('[data-sg]');if(!b)return;const p=pats.find(x=>x.expediente===b.dataset.sg);exp.value=p.expediente;nom.value=p.nombre||'';auto=true;upd(exp);sug.innerHTML=''});
-  $('#a-ok',sh).onclick=()=>addEntry(exp.value,nom.value,+$('#a-tur',sh).value,$('#a-sil',sh).value).catch(err=>{logErr('agregar',err);toast('No se pudo agregar')});
+  let count=0;
+  const saveQuick=async()=>{
+    const rapid=$('#a-rapid',sh).checked;
+    const result=await addEntry(exp.value,nom.value,+$('#a-tur',sh).value,$('#a-sil',sh).value,rapid);
+    if(rapid&&result==='added'){
+      count++;$('#a-count',sh).textContent=`${count} paciente${count===1?'':'s'} agregado${count===1?'':'s'} en esta captura`;
+      exp.value='';nom.value='';$('#a-sil',sh).value='';sug.innerHTML='';hint.textContent='';auto=false;exp.focus();
+    }
+  };
+  $('#a-ok',sh).onclick=()=>saveQuick().catch(err=>{logErr('agregar',err);toast('No se pudo agregar')});
+  $('#a-sil',sh).addEventListener('keydown',ev=>{if(ev.key==='Enter'){ev.preventDefault();saveQuick().catch(err=>logErr('agregar',err))}});
+  exp.addEventListener('keydown',ev=>{if(ev.key==='Enter'){ev.preventDefault();$('#a-sil',sh).focus()}});
   setTimeout(()=>exp.focus(),50);
 }
 
-async function addEntry(expRaw,nom,tur,sil){
+async function addEntry(expRaw,nom,tur,sil,rapid=false){
   const exp=normExp(expRaw);if(!exp){toast('Falta el expediente');return}
   nom=nom.trim();sil=sil.trim();
   let pat=await get('patients',exp);
@@ -487,7 +497,7 @@ async function addEntry(expRaw,nom,tur,sil){
   const ents=await byDate(S.fecha);
   const dup=ents.find(e=>e.expediente===exp);
   if(dup){
-    if(dup.turno===tur){toast('Ya está en este turno');S.turno=tur;closeSheet();openEntry(dup.id);return}
+    if(dup.turno===tur){toast('Ya está en este turno');if(!rapid){S.turno=tur;closeSheet();openEntry(dup.id)}return 'duplicate'}
     if(confirm(`${pat.nombre||exp} ya está en la lista de esta fecha (turno ${dup.turno}${dup.sillon?', sillón '+dup.sillon:''}). ¿Moverlo al turno ${tur}?`)){
       dup.turno=tur;if(sil)dup.sillon=sil;dup.updatedAt=now();await put('entries',dup);S.turno=tur;lsSet('turno',tur);
       closeSheet();openEntry(dup.id);
@@ -496,7 +506,8 @@ async function addEntry(expRaw,nom,tur,sil){
   }
   const e={id:uid(),fecha:S.fecha,turno:tur,sillon:sil,expediente:exp,comentario:'',nota:false,fotos:[],tags:[],extras:{},creado:now(),updatedAt:now()};
   await put('entries',e);S.turno=tur;lsSet('turno',tur);
-  closeSheet();openEntry(e.id);
+  if(!rapid){closeSheet();openEntry(e.id)}else{toast('Paciente agregado');render().catch(()=>{})}
+  return 'added';
 }
 
 async function openEntry(id){
@@ -514,7 +525,7 @@ async function openEntry(id){
     <div class="row"><div><label>Asistencia</label><select id="e-as"><option value="pendiente">Por confirmar</option><option value="presente">Acudió</option><option value="ausente">No acudió</option></select></div><div><button type="button" class="btn sec" id="e-cal" style="margin-top:20px">🧮 Calculadora</button></div></div>
     <h4>📌 Seguimiento del paciente</h4>
     <div class="box" style="margin:8px 0"><b>📋 Pendientes activos</b><div id="e-pend"></div><div class="addrow"><input id="e-pin" placeholder="Nuevo pendiente…" enterkeyhint="done" autocomplete="off"><button id="e-padd">+</button></div></div>
-    <div class="box" style="margin:8px 0"><label for="e-fija">🗒️ Nota fija del paciente (permanece entre sesiones)</label><textarea id="e-fija" rows="4" placeholder="Información importante para el próximo pase…">${esc(pat.notaFija)}</textarea><small class="mu">No sustituye a la nota médica de la sesión.</small></div>
+
     <div class="box" style="margin:8px 0"><b>📷 Hojas de enfermería de sesiones anteriores</b><div id="e-prev-fotos">Buscando hojas recientes…</div><small class="mu">Las imágenes siguen caducando a los 7 días.</small></div>
     <button class="notabig" id="e-nota"></button>
     <details id="e-hist"><summary>📚 Historial de sesiones, notas y hojas anteriores</summary><div id="e-hist-list">Cargando…</div></details>
@@ -522,7 +533,7 @@ async function openEntry(id){
     <h4>Hoja de signos</h4><div class="thumbs" id="e-fotos"></div>
     <label class="btn" for="e-file">📷 Agregar foto</label><input id="e-file" type="file" accept="image/*" hidden multiple>
     <h4>Comentario</h4><textarea id="e-com" rows="4" placeholder="Comentarios del pase…">${esc(e.comentario)}</textarea>
-    <h4>Nota (texto plano)</h4><textarea id="e-nt" rows="7" maxlength="20000" spellcheck="false" autocapitalize="none" placeholder="Pega aquí la nota…">${esc(e.notaTxt)}</textarea>
+    <div class="box" style="margin:10px 0"><h4 style="margin-top:0">🗒️ Notas del paciente</h4><label for="e-fija">Nota fija · permanece para las próximas sesiones</label><textarea id="e-fija" rows="4" placeholder="Información que debe quedar visible en cada pase…">${esc(pat.notaFija)}</textarea><label for="e-nt" style="margin-top:12px">Nota de esta sesión · ${esc(fmtFecha(e.fecha))}</label><textarea id="e-nt" rows="7" maxlength="20000" spellcheck="false" autocapitalize="none" placeholder="Pega aquí la nota de la sesión…">${esc(e.notaTxt)}</textarea></div>
     <div class="ntrow"><button type="button" id="e-ntp">📋 Pegar</button><button type="button" id="e-ntc">Copiar</button><button type="button" id="e-ntx">Borrar</button><span class="ntc" id="e-ntn"></span></div>
 
     <details><summary>Datos de la sesión (opcional)</summary>
@@ -803,7 +814,7 @@ document.addEventListener('keydown',ev=>{
 /* Extensiones de gestión clínica: historial y lista anticipada */
 async function renderArchivo(){
  const pats=(await all('patients')).filter(p=>!p.deleted).sort((a,b)=>(a.nombre||'').localeCompare(b.nombre||''));
- $('#main').innerHTML=`<div class="top"><div class="datebar"><div class="d">Expedientes<small>${pats.length} pacientes guardados</small></div></div></div><div class="box"><input id="ar-q" placeholder="Buscar nombre o expediente" autocomplete="off"><div id="ar-list"></div></div>`;
+ $('#main').innerHTML=`<div class="top"><div class="datebar"><div class="d">Expedientes<small>${pats.length} pacientes guardados</small></div></div></div><div class="box"><button class="btn sec" id="archivo-volver" style="margin-bottom:12px">← Volver a Ajustes</button><input id="ar-q" placeholder="Buscar nombre o expediente" autocomplete="off"><div id="ar-list"></div></div>`;
  const draw=()=>{const q=($('#ar-q').value||'').toLowerCase();$('#ar-list').innerHTML=pats.filter(p=>(p.nombre||'').toLowerCase().includes(q)||p.expediente.toLowerCase().includes(q)).map(p=>`<div class="tgrow"><span><b>${esc(p.nombre||'(sin nombre)')}</b><small> · ${esc(p.expediente)}</small></span><button data-profile="${esc(p.expediente)}">Editar / historial</button></div>`).join('')||'<p>No hay coincidencias</p>'};$('#ar-q').oninput=draw;draw();
 }
 async function loadPreviousPhotos(exp,current,host){
@@ -848,6 +859,8 @@ document.addEventListener('click',async ev=>{
   const nav=t.closest('nav button');
   if(nav){if(sheetEl&&sheetDocked)closeSheet(true);S.view=nav.dataset.v;render();window.scrollTo(0,0);return}
   const kc=t.closest('[data-k]');if(kc){calcKey(kc.dataset.k);return}
+  if(t.id==='archivo-volver'){S.view='resp';await render();return}
+  if(t.id==='settings-archivo'){S.view='archivo';await render();window.scrollTo(0,0);return}
   if(t.closest('[data-add]')){openAdd();return}
   if(t.closest('[data-batch]')){openBatch();return}
   const profile=t.closest('[data-profile]');if(profile){openProfile(profile.dataset.profile);return}
