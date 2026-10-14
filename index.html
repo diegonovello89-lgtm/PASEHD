@@ -131,6 +131,7 @@ details{margin-top:12px}summary{padding:6px 0;color:var(--mu);font-weight:600}
   #cols[data-v=pend],#cols[data-v=resp],#cols[data-v=calc],#cols[data-v=archivo]{grid-template-columns:1fr;max-width:640px;margin:0 auto}
   #cols[data-v=pend] #pane,#cols[data-v=resp] #pane,#cols[data-v=calc] #pane,#cols[data-v=archivo] #pane{display:none}
 }
+.prev-text{white-space:pre-wrap;overflow-wrap:anywhere;font-size:.9em;max-height:190px;overflow:auto;background:var(--bg);border:1px solid var(--bd);border-radius:8px;padding:7px;margin:3px 0 6px}
 </style>
 </head>
 <body>
@@ -523,19 +524,20 @@ async function openEntry(id){
     <div class="row"><div><label>Turno</label><select id="e-tur">${turnoOpts(e.turno)}</select></div><div><label>Sillón</label><input id="e-sil" inputmode="numeric" value="${esc(e.sillon)}"></div></div>
     <div class="row"><div><label>Acceso (fijo del paciente)</label><select id="e-ac"><option value="">—</option>${ACCESOS.map(a=>`<option ${pat.acceso===a?'selected':''}>${esc(a)}</option>`).join('')}</select></div><div><label>Aviso fijo (alergia, serología…)</label><input id="e-av" placeholder="Ej. VHB+" value="${esc(pat.aviso)}"></div></div>
     <div class="row"><div><label>Asistencia</label><select id="e-as"><option value="pendiente">Por confirmar</option><option value="presente">Acudió</option><option value="ausente">No acudió</option></select></div><div><button type="button" class="btn sec" id="e-cal" style="margin-top:20px">🧮 Calculadora</button></div></div>
-    <h4>📌 Seguimiento del paciente</h4>
-    <div class="box" style="margin:8px 0"><b>📋 Pendientes activos</b><div id="e-pend"></div><div class="addrow"><input id="e-pin" placeholder="Nuevo pendiente…" enterkeyhint="done" autocomplete="off"><button id="e-padd">+</button></div></div>
-
-    <div class="box" style="margin:8px 0"><b>📷 Hojas de enfermería de sesiones anteriores</b><div id="e-prev-fotos">Buscando hojas recientes…</div><small class="mu">Las imágenes siguen caducando a los 7 días.</small></div>
+    <div class="box" style="margin:7px 0;padding:10px"><b>📌 Seguimiento · todo a la vista</b>
+      <div style="margin-top:7px"><b style="font-size:.9em">Pendientes activos</b><div id="e-pend"></div><div class="addrow"><input id="e-pin" placeholder="Agregar pendiente…" enterkeyhint="done" autocomplete="off"><button id="e-padd">+</button></div></div>
+      <label for="e-fija">Nota fija del paciente · editable</label><textarea id="e-fija" rows="3" placeholder="Información permanente para próximos pases…">${esc(pat.notaFija)}</textarea>
+      <div id="e-prev-info" style="margin-top:7px">Buscando última sesión…</div>
+      <div style="margin-top:7px"><b style="font-size:.9em">📷 Hojas de enfermería anteriores</b><div class="thumbs" id="e-prev-fotos">Buscando hojas recientes…</div><small class="mu">Disponibles hasta su eliminación a los 7 días.</small></div>
+      <label for="e-com">Comentario de esta sesión · editable</label><textarea id="e-com" rows="3" placeholder="Comentarios y seguimiento de hoy…">${esc(e.comentario)}</textarea>
+      <label for="e-nt">Nota de esta sesión · editable</label><textarea id="e-nt" rows="5" maxlength="20000" spellcheck="false" autocapitalize="none" placeholder="Nota clínica de hoy…">${esc(e.notaTxt)}</textarea>
+      <div class="ntrow"><button type="button" id="e-ntp">📋 Pegar</button><button type="button" id="e-ntc">Copiar</button><button type="button" id="e-ntx">Borrar</button><span class="ntc" id="e-ntn"></span></div>
+    </div>
     <button class="notabig" id="e-nota"></button>
-    <details id="e-hist"><summary>📚 Historial de sesiones, notas y hojas anteriores</summary><div id="e-hist-list">Cargando…</div></details>
+    <details id="e-hist"><summary>📚 Historial completo</summary><div id="e-hist-list">Cargando…</div></details>
     <h4>Eventos de hoy</h4><div class="tags" id="e-tags"></div>
-    <h4>Hoja de signos</h4><div class="thumbs" id="e-fotos"></div>
+    <h4>📷 Fotos de esta sesión</h4><div class="thumbs" id="e-fotos"></div>
     <label class="btn" for="e-file">📷 Agregar foto</label><input id="e-file" type="file" accept="image/*" hidden multiple>
-    <h4>Comentario</h4><textarea id="e-com" rows="4" placeholder="Comentarios del pase…">${esc(e.comentario)}</textarea>
-    <div class="box" style="margin:10px 0"><h4 style="margin-top:0">🗒️ Notas del paciente</h4><label for="e-fija">Nota fija · permanece para las próximas sesiones</label><textarea id="e-fija" rows="4" placeholder="Información que debe quedar visible en cada pase…">${esc(pat.notaFija)}</textarea><label for="e-nt" style="margin-top:12px">Nota de esta sesión · ${esc(fmtFecha(e.fecha))}</label><textarea id="e-nt" rows="7" maxlength="20000" spellcheck="false" autocapitalize="none" placeholder="Pega aquí la nota de la sesión…">${esc(e.notaTxt)}</textarea></div>
-    <div class="ntrow"><button type="button" id="e-ntp">📋 Pegar</button><button type="button" id="e-ntc">Copiar</button><button type="button" id="e-ntx">Borrar</button><span class="ntc" id="e-ntn"></span></div>
-
     <details><summary>Datos de la sesión (opcional)</summary>
       <div class="row"><div><label>Peso seco</label><input id="x-peso" value="${esc(ex.peso)}"></div><div><label>Ganancia interdialítica</label><input id="x-gan" value="${esc(ex.gan)}"></div></div>
       <div class="row"><div><label>TA</label><input id="x-ta" value="${esc(ex.ta)}"></div><div><label>Otros</label><input id="x-otro" value="${esc(ex.otro)}"></div></div></details>
@@ -545,6 +547,7 @@ async function openEntry(id){
   $('#e-as',sh).onchange=()=>{e.asistencia=$('#e-as',sh).value;flush().catch(()=>{})};
   $('#e-cal',sh).onclick=()=>openCalcFloating();
   loadHistory(e.expediente,e.id,sh);
+  loadPreviousInfo(e.expediente,e.id,sh);
   loadPreviousPhotos(e.expediente,e.id,sh);
   const q=s=>$(s,sh);
   let tm=null;
@@ -816,6 +819,14 @@ async function renderArchivo(){
  const pats=(await all('patients')).filter(p=>!p.deleted).sort((a,b)=>(a.nombre||'').localeCompare(b.nombre||''));
  $('#main').innerHTML=`<div class="top"><div class="datebar"><div class="d">Expedientes<small>${pats.length} pacientes guardados</small></div></div></div><div class="box"><button class="btn sec" id="archivo-volver" style="margin-bottom:12px">← Volver a Ajustes</button><input id="ar-q" placeholder="Buscar nombre o expediente" autocomplete="off"><div id="ar-list"></div></div>`;
  const draw=()=>{const q=($('#ar-q').value||'').toLowerCase();$('#ar-list').innerHTML=pats.filter(p=>(p.nombre||'').toLowerCase().includes(q)||p.expediente.toLowerCase().includes(q)).map(p=>`<div class="tgrow"><span><b>${esc(p.nombre||'(sin nombre)')}</b><small> · ${esc(p.expediente)}</small></span><button data-profile="${esc(p.expediente)}">Editar / historial</button></div>`).join('')||'<p>No hay coincidencias</p>'};$('#ar-q').oninput=draw;draw();
+}
+async function loadPreviousInfo(exp,current,host){
+ const target=$('#e-prev-info',host);if(!target)return;
+ const entries=(await all('entries')).filter(x=>!x.deleted&&x.expediente===exp&&x.id!==current).sort((a,b)=>(b.fecha||'').localeCompare(a.fecha||'')||(b.creado||0)-(a.creado||0));
+ const prev=entries[0];
+ if(!prev){target.innerHTML='<div class="mu">Sin sesión anterior registrada.</div>';return}
+ const note=prev.notaTxt||'',comment=prev.comentario||'';
+ target.innerHTML=`<div style="font-size:.9em"><b>🕘 Última sesión · ${esc(prev.fecha)} · sillón ${esc(prev.sillon||'—')}</b></div><label>Comentario anterior</label><div class="prev-text">${comment?esc(comment):'<span class="mu">Sin comentario anterior</span>'}</div><label>Nota anterior</label><div class="prev-text">${note?esc(note):'<span class="mu">Sin nota anterior</span>'}</div>`;
 }
 async function loadPreviousPhotos(exp,current,host){
  const target=$('#e-prev-fotos',host);if(!target)return;
