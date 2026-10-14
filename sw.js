@@ -1,8 +1,6 @@
-const V = 'pase-hd-v8';
+const V = 'pase-hd-v9';
 const FILES = [
-  './', './index.html', './manifest.webmanifest', './firebase-config.js',
-  './vendor/firebase-app-compat.js', './vendor/firebase-auth-compat.js', './vendor/firebase-firestore-compat.js',
-  './icon-180.png', './icon-192.png', './icon-512.png'
+  './', './index.html'
 ];
 
 self.addEventListener('install', e => {
