@@ -106,6 +106,7 @@ details{margin-top:12px}summary{padding:6px 0;color:var(--mu);font-weight:600}
 #vw .bar button{background:#fff2;color:#fff;border-radius:10px;padding:10px 14px;font-weight:600}
 #vw .sc{flex:1;overflow:auto;-webkit-overflow-scrolling:touch;touch-action:pan-x pan-y}
 #vw img{width:100%;max-width:none;display:block}
+@media (pointer:fine){#vw .sc{cursor:grab;user-select:none}#vw .sc.dragging{cursor:grabbing}#vw img{user-select:none;-webkit-user-drag:none}}
 .calc{max-width:420px;margin:8px auto 0}
 .cdisp{background:var(--card);border:1px solid var(--bd);border-radius:16px;padding:12px 16px;text-align:right;-webkit-user-select:none;user-select:none;min-height:96px;display:flex;flex-direction:column;justify-content:flex-end;overflow:hidden}
 .cexpr{color:var(--mu);font-size:15px;min-height:20px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -132,6 +133,12 @@ details{margin-top:12px}summary{padding:6px 0;color:var(--mu);font-weight:600}
   #cols[data-v=pend] #pane,#cols[data-v=resp] #pane,#cols[data-v=calc] #pane,#cols[data-v=archivo] #pane{display:none}
 }
 .prev-text{white-space:pre-wrap;overflow-wrap:anywhere;font-size:.9em;max-height:190px;overflow:auto;background:var(--bg);border:1px solid var(--bd);border-radius:8px;padding:7px;margin:3px 0 6px}
+  .compact-details{margin:5px 0;padding:6px 9px;border:1px solid var(--bd,#ddd);border-radius:9px}
+  .compact-details summary{font-size:13px;cursor:pointer;font-weight:600}
+  #e-prev-info .prev-text{max-height:100px;overflow:auto;font-size:12px;line-height:1.35}
+  #e-prev-fotos .th{width:86px;max-width:30%;vertical-align:top}
+  #e-prev-fotos .th img{max-height:85px;object-fit:cover}
+  #calc-floating .ckeys{touch-action:manipulation}
 </style>
 </head>
 <body>
@@ -147,7 +154,7 @@ details{margin-top:12px}summary{padding:6px 0;color:var(--mu);font-weight:600}
 
 <script>
 'use strict';
-const VERSION='10.1';
+const VERSION='10.6';
 const TURNOS=[1,2,3,4,5];
 const DIAS_FOTO=7;
 const ACCESOS=['FAV','Injerto','Catéter tunelizado','Catéter temporal'];
@@ -344,7 +351,7 @@ async function renderResp(){
     <p>Si algo falla, aquí queda el motivo. Puedes copiarlo y mandármelo.</p>
     ${errs.length?errs.map(x=>`<p style="font-size:12px;word-break:break-word">${esc(new Date(x.t).toLocaleTimeString('es-MX'))} · ${esc(x.d)}: ${esc(x.m)}</p>`).join(''):'<p>Sin errores registrados ✓</p>'}
     <button class="btn sec" id="er-copy">Copiar</button><button class="btn sec" id="er-clear">Borrar</button></div>
-  <div class="box"><h3>Notas</h3><p>Todo se guarda solo en este dispositivo. Sin conexión funciona normal una vez instalada. Si cambias de dispositivo o reinstalas, exporta antes.</p><p>Versión ${VERSION}</p></div>`;
+  <div class="box"><h3>Notas</h3><p>Los datos se guardan localmente y se sincronizan cuando Firebase está conectado. Realiza respaldos periódicos.</p><p>Versión ${VERSION}</p></div>`;
 }
 
 /* ---------- Calculadora simple (suma, resta, multiplicación, división, %, signo) ---------- */
@@ -521,30 +528,33 @@ async function openEntry(id){
   const ex=e.extras;
   const sh=openSheet(`
     <div class="sh-head"><div style="flex:1;min-width:0"><input id="e-nom" class="nm-in" placeholder="Nombre del paciente" value="${esc(pat.nombre)}"><div class="ex" style="margin-top:4px">Exp. ${esc(e.expediente)} · ${esc(fmtFecha(e.fecha))}</div></div><div class="sh-act"><button data-close tabindex="-1">Listo</button><span class="sv" id="e-sv"></span></div></div>
-    <div class="row"><div><label>Turno</label><select id="e-tur">${turnoOpts(e.turno)}</select></div><div><label>Sillón</label><input id="e-sil" inputmode="numeric" value="${esc(e.sillon)}"></div></div>
-    <div class="row"><div><label>Acceso (fijo del paciente)</label><select id="e-ac"><option value="">—</option>${ACCESOS.map(a=>`<option ${pat.acceso===a?'selected':''}>${esc(a)}</option>`).join('')}</select></div><div><label>Aviso fijo (alergia, serología…)</label><input id="e-av" placeholder="Ej. VHB+" value="${esc(pat.aviso)}"></div></div>
-    <div class="row"><div><label>Asistencia</label><select id="e-as"><option value="pendiente">Por confirmar</option><option value="presente">Acudió</option><option value="ausente">No acudió</option></select></div><div><button type="button" class="btn sec" id="e-cal" style="margin-top:20px">🧮 Calculadora</button></div></div>
-    <div class="box" style="margin:7px 0;padding:10px"><b>📌 Seguimiento · todo a la vista</b>
-      <div style="margin-top:7px"><b style="font-size:.9em">Pendientes activos</b><div id="e-pend"></div><div class="addrow"><input id="e-pin" placeholder="Agregar pendiente…" enterkeyhint="done" autocomplete="off"><button id="e-padd">+</button></div></div>
-      <label for="e-fija">Nota fija del paciente · editable</label><textarea id="e-fija" rows="3" placeholder="Información permanente para próximos pases…">${esc(pat.notaFija)}</textarea>
-      <div id="e-prev-info" style="margin-top:7px">Buscando última sesión…</div>
-      <div style="margin-top:7px"><b style="font-size:.9em">📷 Hojas de enfermería anteriores</b><div class="thumbs" id="e-prev-fotos">Buscando hojas recientes…</div><small class="mu">Disponibles hasta su eliminación a los 7 días.</small></div>
-      <label for="e-com">Comentario de esta sesión · editable</label><textarea id="e-com" rows="3" placeholder="Comentarios y seguimiento de hoy…">${esc(e.comentario)}</textarea>
-      <label for="e-nt">Nota de esta sesión · editable</label><textarea id="e-nt" rows="5" maxlength="20000" spellcheck="false" autocapitalize="none" placeholder="Nota clínica de hoy…">${esc(e.notaTxt)}</textarea>
-      <div class="ntrow"><button type="button" id="e-ntp">📋 Pegar</button><button type="button" id="e-ntc">Copiar</button><button type="button" id="e-ntx">Borrar</button><span class="ntc" id="e-ntn"></span></div>
+    <div class="row"><div><label>Sillón</label><input id="e-sil" inputmode="numeric" value="${esc(e.sillon)}"></div><div style="display:flex;align-items:end"><button type="button" class="btn sec" id="e-cal">Calculadora</button></div></div>
+    <div class="box" style="margin:7px 0;padding:9px">
+      <label for="e-com"><b>Comentario de hoy</b></label>
+      <textarea id="e-com" rows="3" placeholder="Comentario de esta sesión…">${esc(e.comentario)}</textarea>
+      <div id="e-prev-info" style="margin-top:5px">Buscando última sesión…</div>
+      <button type="button" class="btn sec" id="e-reuse" style="margin-top:5px;font-size:12px">Usar comentario anterior</button>
+      <div style="margin-top:9px"><b>Pendientes por sesión</b><div id="e-pend"></div><div class="addrow"><input id="e-pin" placeholder="Nuevo pendiente de hoy…" enterkeyhint="done" autocomplete="off"><button id="e-padd">Agregar</button></div></div>
+      <div style="margin-top:10px"><b>Fotos de hoy</b><div class="thumbs" id="e-fotos"></div><label class="btn" for="e-file" style="display:inline-block;margin-top:5px">Tomar o agregar foto</label><input id="e-file" type="file" accept="image/*" hidden multiple></div>
+      <div style="margin-top:9px"><b>Fotos anteriores</b><div class="thumbs" id="e-prev-fotos">Buscando hojas recientes…</div><small class="mu">Se eliminan según el plazo de 7 días.</small></div>
     </div>
+    <details class="compact-details"><summary>Notas del paciente</summary>
+      <label for="e-fija">Nota fija · permanece entre sesiones</label><textarea id="e-fija" rows="3" placeholder="Información para próximos pases…">${esc(pat.notaFija)}</textarea>
+      <label for="e-nt">Nota clínica de hoy</label><textarea id="e-nt" rows="5" maxlength="20000" spellcheck="false" autocapitalize="none" placeholder="Nota clínica…">${esc(e.notaTxt)}</textarea>
+      <div class="ntrow"><button type="button" id="e-ntp">Pegar</button><button type="button" id="e-ntc">Copiar</button><button type="button" id="e-ntx">Borrar</button><span class="ntc" id="e-ntn"></span></div>
+    </details>
+    <details class="compact-details"><summary>Datos del paciente y turno</summary>
+      <div class="row"><div><label>Turno</label><select id="e-tur">${turnoOpts(e.turno)}</select></div><div><label>Acceso fijo</label><select id="e-ac"><option value="">—</option>${ACCESOS.map(a=>`<option ${pat.acceso===a?'selected':''}>${esc(a)}</option>`).join('')}</select></div></div>
+      <label>Aviso fijo</label><input id="e-av" value="${esc(pat.aviso)}">
+    </details>
     <button class="notabig" id="e-nota"></button>
-    <details id="e-hist"><summary>📚 Historial completo</summary><div id="e-hist-list">Cargando…</div></details>
-    <h4>Eventos de hoy</h4><div class="tags" id="e-tags"></div>
-    <h4>📷 Fotos de esta sesión</h4><div class="thumbs" id="e-fotos"></div>
-    <label class="btn" for="e-file">📷 Agregar foto</label><input id="e-file" type="file" accept="image/*" hidden multiple>
+    <details id="e-hist"><summary>Historial completo</summary><div id="e-hist-list">Cargando…</div></details>
+    <details class="compact-details"><summary>Eventos de hoy</summary><div class="tags" id="e-tags"></div></details>
     <details><summary>Datos de la sesión (opcional)</summary>
       <div class="row"><div><label>Peso seco</label><input id="x-peso" value="${esc(ex.peso)}"></div><div><label>Ganancia interdialítica</label><input id="x-gan" value="${esc(ex.gan)}"></div></div>
       <div class="row"><div><label>TA</label><input id="x-ta" value="${esc(ex.ta)}"></div><div><label>Otros</label><input id="x-otro" value="${esc(ex.otro)}"></div></div></details>
     <button class="dng" id="e-del">Quitar de la lista</button>`);
   S.sel=e.id;refreshList();
-  $('#e-as',sh).value=e.asistencia||'pendiente';
-  $('#e-as',sh).onchange=()=>{e.asistencia=$('#e-as',sh).value;flush().catch(()=>{})};
   $('#e-cal',sh).onclick=()=>openCalcFloating();
   loadHistory(e.expediente,e.id,sh);
   loadPreviousInfo(e.expediente,e.id,sh);
@@ -554,7 +564,7 @@ async function openEntry(id){
   const freshPat=async()=>(await get('patients',e.expediente))||{expediente:e.expediente,nombre:'',pendientes:[],updatedAt:0,pu:0};
   const sv=ok=>{const s=q('#e-sv');if(!s)return;s.textContent=ok?'Guardado ✓':'No se pudo guardar';s.className='sv on'+(ok?'':' err');clearTimeout(sv.t);if(ok)sv.t=setTimeout(()=>s.classList.remove('on'),1500)};
   const flushRaw=async()=>{clearTimeout(tm);tm=null;
-    e.asistencia=q('#e-as').value;e.comentario=q('#e-com').value;e.notaTxt=q('#e-nt').value;e.sillon=q('#e-sil').value.trim();
+    e.comentario=q('#e-com').value;e.notaTxt=q('#e-nt').value;e.sillon=q('#e-sil').value.trim();
     e.extras={peso:q('#x-peso').value,gan:q('#x-gan').value,ta:q('#x-ta').value,otro:q('#x-otro').value};
     e.updatedAt=now();await put('entries',e);
     // el perfil se escribe sobre la copia más reciente del paciente (por si otro dispositivo cambió pendientes)
@@ -614,7 +624,9 @@ async function openEntry(id){
   const drawPend=()=>{
     const row=x=>`<div class="pr ${x.hecho?'dn':''}"><button class="ck ${x.hecho?'on':''}" data-pt="${x.id}">${x.hecho?'✓':''}</button><span>${esc(x.texto)}</span><button class="x" data-px="${x.id}">×</button></div>`;
     const open=pAct(pat),done=pDone(pat);
-    q('#e-pend').innerHTML=(open.length?open.map(row).join(''):'<div class="mu">Sin pendientes abiertos</div>')+(done.length?`<details><summary>Resueltos (${done.length})</summary>${done.map(row).join('')}</details>`:'');
+    const groups=new Map();
+    for(const x of open){const d=new Date(x.creado||x.updatedAt||now()).toLocaleDateString('es-MX',{year:'numeric',month:'short',day:'numeric'});if(!groups.has(d))groups.set(d,[]);groups.get(d).push(x)}
+    q('#e-pend').innerHTML=(open.length?[...groups].map(([fecha,items])=>`<div class="mu" style="font-size:11px;margin-top:5px">Desde ${esc(fecha)}</div>${items.map(row).join('')}`).join(''):'<div class="mu">Sin pendientes abiertos</div>')+(done.length?`<details><summary>Resueltos (${done.length})</summary>${done.map(row).join('')}</details>`:'');
   };
   drawPend();
   q('#e-pend').addEventListener('click',async ev=>{
@@ -657,6 +669,15 @@ async function openEntry(id){
       if(fo!==q('#e-fija'))q('#e-fija').value=p.notaFija||'';
       if(fo!==q('#e-ac'))q('#e-ac').value=p.acceso||'';
     }};
+  q('#e-reuse').onclick=async()=>{
+    const entries=(await all('entries')).filter(x=>!x.deleted&&x.expediente===e.expediente&&x.id!==e.id&&x.comentario)
+      .sort((a,b)=>(b.fecha||'').localeCompare(a.fecha||'')||(b.creado||0)-(a.creado||0));
+    if(!entries.length){toast('No hay comentario anterior');return}
+    const ta=q('#e-com');
+    if(ta.value.trim()&&!confirm('¿Reemplazar el comentario de hoy por el anterior?'))return;
+    ta.value=entries[0].comentario;ta.dispatchEvent(new Event('input',{bubbles:true}));
+    await flush();toast('Comentario anterior reutilizado');
+  };
   q('#e-padd').onclick=addP;q('#e-pin').addEventListener('keydown',ev=>{if(ev.key==='Enter'){ev.preventDefault();addP()}});
 
   const drawFotos=async()=>{
@@ -734,7 +755,7 @@ function setZoom(z){
   $('#v-zoom').textContent='🔍 '+(Math.round(z*10)/10)+'×';
 }
 function viewPhoto(url,onDelete){
-  $('#v-img').src=url;$('#vw').classList.add('on');vwDel=onDelete;setZoom(1);
+  $('#v-img').src=url;$('#vw').classList.add('on');vwDel=onDelete;vz=1;$('#v-img').style.width='100%';$('#vw .sc').scrollTo(0,0);setZoom(1);
 }
 $('#v-x').onclick=()=>{$('#vw').classList.remove('on');$('#v-img').removeAttribute('src');vwDel=null};
 $('#v-zoom').onclick=()=>setZoom(vz>=3.5?1:Math.floor(vz)+1);
@@ -744,6 +765,34 @@ $('#v-zoom').onclick=()=>setZoom(vz>=3.5?1:Math.floor(vz)+1);
   sc.addEventListener('touchstart',e=>{if(e.touches.length===2){d0=dist(e.touches);z0=vz}},{passive:true});
   sc.addEventListener('touchmove',e=>{if(e.touches.length===2&&d0){e.preventDefault();setZoom(z0*dist(e.touches)/d0)}},{passive:false});
   sc.addEventListener('touchend',()=>{d0=0});
+}
+// Escritorio: rueda para ampliar alrededor del cursor y arrastre para desplazar.
+{
+ const sc=$('#vw .sc'),im=$('#v-img');let drag=null;
+ sc.addEventListener('wheel',e=>{
+   if(!$('#vw').classList.contains('on'))return;
+   e.preventDefault();
+   const rect=sc.getBoundingClientRect();
+   const px=e.clientX-rect.left,py=e.clientY-rect.top;
+   const oldW=im.offsetWidth||1,oldH=im.offsetHeight||1;
+   const rx=(sc.scrollLeft+px)/oldW,ry=(sc.scrollTop+py)/oldH;
+   const next=Math.min(5,Math.max(1,vz*Math.exp(-e.deltaY*0.0015)));
+   vz=next;im.style.width=(next*100)+'%';
+   sc.scrollLeft=rx*im.offsetWidth-px;sc.scrollTop=ry*im.offsetHeight-py;
+   $('#v-zoom').textContent='Zoom '+(Math.round(next*10)/10)+'×';
+ },{passive:false});
+ sc.addEventListener('pointerdown',e=>{
+   if(e.pointerType==='touch'||e.button!==0||!$('#vw').classList.contains('on'))return;
+   drag={id:e.pointerId,x:e.clientX,y:e.clientY,left:sc.scrollLeft,top:sc.scrollTop};
+   sc.setPointerCapture(e.pointerId);sc.classList.add('dragging');e.preventDefault();
+ });
+ sc.addEventListener('pointermove',e=>{
+   if(!drag||e.pointerId!==drag.id)return;
+   sc.scrollLeft=drag.left-(e.clientX-drag.x);sc.scrollTop=drag.top-(e.clientY-drag.y);
+ });
+ const stop=e=>{if(drag&&e.pointerId===drag.id){drag=null;sc.classList.remove('dragging')}};
+ sc.addEventListener('pointerup',stop);sc.addEventListener('pointercancel',stop);sc.addEventListener('lostpointercapture',()=>{drag=null;sc.classList.remove('dragging')});
+ im.addEventListener('dragstart',e=>e.preventDefault());
 }
 // evita que el pellizco o el doble toque desajusten el tamaño de la app (Safari/iOS)
 ['gesturestart','gesturechange','gestureend'].forEach(g=>document.addEventListener(g,e=>e.preventDefault()));
@@ -817,8 +866,8 @@ document.addEventListener('keydown',ev=>{
 /* Extensiones de gestión clínica: historial y lista anticipada */
 async function renderArchivo(){
  const pats=(await all('patients')).filter(p=>!p.deleted).sort((a,b)=>(a.nombre||'').localeCompare(b.nombre||''));
- $('#main').innerHTML=`<div class="top"><div class="datebar"><div class="d">Expedientes<small>${pats.length} pacientes guardados</small></div></div></div><div class="box"><button class="btn sec" id="archivo-volver" style="margin-bottom:12px">← Volver a Ajustes</button><input id="ar-q" placeholder="Buscar nombre o expediente" autocomplete="off"><div id="ar-list"></div></div>`;
- const draw=()=>{const q=($('#ar-q').value||'').toLowerCase();$('#ar-list').innerHTML=pats.filter(p=>(p.nombre||'').toLowerCase().includes(q)||p.expediente.toLowerCase().includes(q)).map(p=>`<div class="tgrow"><span><b>${esc(p.nombre||'(sin nombre)')}</b><small> · ${esc(p.expediente)}</small></span><button data-profile="${esc(p.expediente)}">Editar / historial</button></div>`).join('')||'<p>No hay coincidencias</p>'};$('#ar-q').oninput=draw;draw();
+ $('#main').innerHTML=`<div class="top"><div class="datebar"><div class="d">Expedientes<small>${pats.length} pacientes guardados</small></div></div></div><div class="box"><button class="btn sec" id="archivo-volver" style="margin-bottom:12px">← Volver a Ajustes</button><input id="ar-q" placeholder="Buscar número de expediente" inputmode="numeric" pattern="[0-9]*" autocomplete="off"><div id="ar-list"></div></div>`;
+ const draw=()=>{const q=($('#ar-q').value||'').toLowerCase();$('#ar-list').innerHTML=pats.filter(p=>p.expediente.toLowerCase().includes(q)).map(p=>`<div class="tgrow"><span><b>${esc(p.nombre||'(sin nombre)')}</b><small> · ${esc(p.expediente)}</small></span><button data-profile="${esc(p.expediente)}">Editar / historial</button></div>`).join('')||'<p>No hay coincidencias</p>'};$('#ar-q').oninput=draw;draw();
 }
 async function loadPreviousInfo(exp,current,host){
  const target=$('#e-prev-info',host);if(!target)return;
@@ -826,7 +875,7 @@ async function loadPreviousInfo(exp,current,host){
  const prev=entries[0];
  if(!prev){target.innerHTML='<div class="mu">Sin sesión anterior registrada.</div>';return}
  const note=prev.notaTxt||'',comment=prev.comentario||'';
- target.innerHTML=`<div style="font-size:.9em"><b>🕘 Última sesión · ${esc(prev.fecha)} · sillón ${esc(prev.sillon||'—')}</b></div><label>Comentario anterior</label><div class="prev-text">${comment?esc(comment):'<span class="mu">Sin comentario anterior</span>'}</div><label>Nota anterior</label><div class="prev-text">${note?esc(note):'<span class="mu">Sin nota anterior</span>'}</div>`;
+ target.innerHTML=`<div style="font-size:.9em"><b>Última sesión · ${esc(prev.fecha)} · sillón ${esc(prev.sillon||'—')}</b></div><label>Comentario anterior</label><div class="prev-text">${comment?esc(comment):'<span class="mu">Sin comentario anterior</span>'}</div>${note?`<details><summary>Nota clínica anterior</summary><div class="prev-text">${esc(note)}</div></details>`:''}`;
 }
 async function loadPreviousPhotos(exp,current,host){
  const target=$('#e-prev-fotos',host);if(!target)return;
@@ -852,7 +901,7 @@ async function openProfile(exp){
  const sh=openSheet(`<div class="sh-head"><b>Editar expediente</b><button data-close>Cerrar</button></div><label>Expediente (identificador)</label><input id="pr-exp" value="${esc(p.expediente)}" readonly><p class="mu">El número de expediente no se cambia aquí para evitar separar notas y sesiones del paciente.</p><label>Nombre</label><input id="pr-nom" value="${esc(p.nombre)}"><label>Acceso vascular</label><select id="pr-ac"><option value="">—</option>${ACCESOS.map(a=>`<option ${p.acceso===a?'selected':''}>${esc(a)}</option>`).join('')}</select><label>Aviso fijo</label><input id="pr-av" value="${esc(p.aviso)}"><label>Nota fija</label><textarea id="pr-fija" rows="4">${esc(p.notaFija)}</textarea><button class="btn" id="pr-save">Guardar cambios</button><h4>Historial</h4><div id="e-hist-list"></div><button class="dng" id="pr-del">Eliminar expediente</button>`);
  loadHistory(exp,null,sh);
  $('#pr-save',sh).onclick=async()=>{const cur=await get('patients',exp);cur.nombre=$('#pr-nom',sh).value.trim();cur.acceso=$('#pr-ac',sh).value;cur.aviso=$('#pr-av',sh).value.trim();cur.notaFija=$('#pr-fija',sh).value;cur.updatedAt=now();cur.pu=now();await put('patients',cur);toast('Expediente actualizado');closeSheet()};
- $('#pr-del',sh).onclick=async()=>{const entries=(await all('entries')).filter(e=>e.expediente===exp&&!e.deleted);if(entries.length){alert(`Este expediente tiene ${entries.length} sesiones. Por seguridad no se elimina junto con sus notas. Primero debe resolverse la conservación de su historial.`);return}if(!confirm('¿Eliminar este expediente sin sesiones? Esta acción no se puede deshacer.'))return;await del('patients',exp);closeSheet();toast('Expediente eliminado localmente. Si usas Firebase, revisa la sincronización.')};
+ $('#pr-del',sh).onclick=async()=>{const entries=(await all('entries')).filter(e=>e.expediente===exp&&!e.deleted);if(entries.length){alert(`Este expediente tiene ${entries.length} sesiones. Por seguridad no se elimina junto con sus notas. Primero debe resolverse la conservación de su historial.`);return}if(!confirm('¿Eliminar este expediente sin sesiones? Esta acción no se puede deshacer.'))return;const cur=await get('patients',exp);cur.deleted=true;cur.updatedAt=now();cur.pu=now();await put('patients',cur);closeSheet();toast('Expediente marcado como eliminado; comprueba la sincronización.')};
 }
 async function openBatch(){
  const sh=openSheet(`<div class="sh-head"><b>Cargar lista de hemodiálisis</b><button data-close>Cerrar</button></div><p>Una línea por paciente: expediente, nombre, sillón. Se pueden usar tabulaciones, comas o punto y coma. Los pacientes quedarán como asistencia por confirmar.</p><label>Fecha de sesión</label><input id="ba-date" type="date" value="${esc(S.fecha)}"><label>Turno</label><select id="ba-turn">${turnoOpts(S.turno)}</select><textarea id="ba-lines" rows="12" placeholder="12345, María Pérez, 1&#10;67890, Juan López, 2"></textarea><button class="btn" id="ba-go">Cargar pacientes</button><p id="ba-msg"></p>`);
@@ -860,9 +909,13 @@ async function openBatch(){
 }
 function openCalcFloating(){
  const old=$('#calc-floating');if(old){old.remove();return}
- const box=document.createElement('div');box.id='calc-floating';box.style.cssText='position:fixed;z-index:9999;right:12px;bottom:12px;width:min(340px,calc(100vw - 24px));max-height:80vh;overflow:auto;background:var(--bg);color:var(--tx);border:2px solid var(--ac);border-radius:18px;padding:12px;box-shadow:0 8px 35px #0005';
+ if(document.activeElement&&document.activeElement.blur)document.activeElement.blur();
+ const overlay=document.createElement('div');overlay.id='calc-floating';
+ overlay.style.cssText='position:fixed;inset:0;z-index:99999;background:#0009;display:flex;align-items:center;justify-content:center;padding:12px;box-sizing:border-box;overscroll-behavior:contain';
  const keys=[['C','C'],['B','⌫'],['%','%'],['/','÷'],['7','7'],['8','8'],['9','9'],['*','×'],['4','4'],['5','5'],['6','6'],['-','−'],['1','1'],['2','2'],['3','3'],['+','+'],['pm','±'],['0','0'],['.','.'],['=','=']];
- box.innerHTML=`<div class="sh-head"><b>Calculadora</b><button id="cf-close">Cerrar</button></div><div class="cdisp"><div id="c-expr" class="cexpr"></div><div id="c-disp" class="cnum">0</div></div><div class="ckeys">${keys.map(([k,l])=>`<button class="kb" data-k="${k}">${l}</button>`).join('')}</div>`;document.body.appendChild(box);$('#cf-close',box).onclick=()=>box.remove();calcShow();
+ overlay.innerHTML=`<div style="width:min(350px,100%);max-height:90%;overflow:auto;background:var(--bg);color:var(--tx);border-radius:18px;padding:14px;box-sizing:border-box;box-shadow:0 8px 35px #0006"><div class="sh-head"><b>Calculadora</b><button type="button" id="cf-close">Cerrar</button></div><div class="cdisp"><div id="c-expr" class="cexpr"></div><div id="c-disp" class="cnum">0</div></div><div class="ckeys">${keys.map(([k,l])=>`<button type="button" class="kb" style="touch-action:manipulation" data-k="${k}">${l}</button>`).join('')}</div></div>`;
+ document.body.appendChild(overlay);calcReset();calcShow();
+ $('#cf-close',overlay).onclick=()=>overlay.remove();overlay.addEventListener('click',ev=>{if(ev.target===overlay)overlay.remove()});
 }
 
 document.addEventListener('click',async ev=>{
