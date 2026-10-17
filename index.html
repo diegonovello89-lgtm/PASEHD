@@ -157,6 +157,26 @@ details{margin-top:12px}summary{padding:6px 0;color:var(--mu);font-weight:600}
   #e-prev-fotos .th{width:86px;max-width:30%;vertical-align:top}
   #e-prev-fotos .th img{max-height:85px;object-fit:cover}
   #calc-floating .ckeys{touch-action:manipulation}
+
+/* v11.1: Dos vistas dentro de la ficha del paciente. */
+.patient-tabs{display:grid;grid-template-columns:1fr 1fr;gap:8px;position:sticky;top:71px;z-index:3;background:var(--bg);padding:8px 0 10px;border-bottom:1px solid var(--bd)}
+.patient-tab{padding:12px 6px;border:1px solid var(--bd);border-radius:12px;background:var(--card);font-weight:750;font-size:15px;color:var(--mu)}
+.patient-tab.on{background:var(--ac);border-color:var(--ac);color:var(--onac)}
+.patient-panel[hidden]{display:none!important}
+#e-clinic{border:0;margin:0;padding:2px 0}
+#e-clinic>summary{display:none}
+#e-panel-nota #e-nt{min-height:300px;font-size:16px;line-height:1.55;resize:vertical}
+#e-panel-nota .smart-review{font-size:15px;max-height:550px;line-height:1.6}
+#e-panel-nota .smart-mini{padding:10px 12px;font-size:13px}
+#e-panel-nota .smart-marker-tools{padding:12px}
+#e-panel-nota .smart-hint{font-size:13px}
+@media(min-width:900px){
+  #app:has(.patient-tab[data-ptab="nota"].on){max-width:1450px}
+  #cols:has(.patient-tab[data-ptab="nota"].on){grid-template-columns:minmax(290px,360px) minmax(0,1fr)}
+  #pane:has(.patient-tab[data-ptab="nota"].on) .sheet{max-height:calc(100vh - 95px)}
+  #e-panel-nota #e-nt{min-height:360px}
+}
+
 </style>
 </head>
 <body>
@@ -588,6 +608,8 @@ async function openEntry(id){
   const ex=e.extras;
   const sh=openSheet(`
     <div class="sh-head"><div style="flex:1;min-width:0"><input id="e-nom" class="nm-in" placeholder="Nombre del paciente" value="${esc(pat.nombre)}"><div class="ex" style="margin-top:4px">Exp. ${esc(e.expediente)} · ${esc(fmtFecha(e.fecha))}</div></div><div class="sh-act"><button data-close tabindex="-1">Listo</button><span class="sv" id="e-sv"></span></div></div>
+    <div class="patient-tabs" role="tablist" aria-label="Vista de paciente"><button type="button" class="patient-tab on" role="tab" aria-selected="true" aria-controls="e-panel-pase" data-ptab="pase">Pase</button><button type="button" class="patient-tab" role="tab" aria-selected="false" aria-controls="e-panel-nota" data-ptab="nota">Nota clínica</button></div>
+    <div class="patient-panel" id="e-panel-pase" role="tabpanel">
     <div class="row"><div><label>Sillón</label><input id="e-sil" inputmode="numeric" value="${esc(e.sillon)}"></div><div style="display:flex;align-items:end"><button type="button" class="btn sec" id="e-cal">Calculadora</button></div></div>
     <div class="box" style="margin:7px 0;padding:9px">
       <label for="e-com"><b>Comentario de hoy</b></label>
@@ -598,7 +620,8 @@ async function openEntry(id){
       <div style="margin-top:10px"><b>Fotos de hoy</b><div class="thumbs" id="e-fotos"></div><label class="btn" for="e-file" style="display:inline-block;margin-top:5px">Tomar o agregar foto</label><input id="e-file" type="file" accept="image/*" hidden multiple></div>
       <div style="margin-top:9px"><b>Fotos anteriores</b><div class="thumbs" id="e-prev-fotos">Buscando hojas recientes…</div><small class="mu">Se eliminan según el plazo de 7 días.</small></div>
     </div>
-     <details class="compact-details" id="e-clinic"><summary>Notas del paciente · reutilizar y actualizar</summary>
+    </div><div class="patient-panel" id="e-panel-nota" role="tabpanel" hidden>
+     <details class="compact-details" id="e-clinic" open><summary>Notas del paciente · reutilizar y actualizar</summary>
        <div class="smart-source" id="e-note-source">${e.notaOrigen?`Nota reutilizada de ${esc(e.notaOrigen)}. Comprueba los hallazgos y datos de la sesión anterior antes de copiarla.`:'Pega aquí la nota previa del sistema clínico. Una vez preparados los campos, se reutilizará automáticamente en las sesiones siguientes.'}</div>
        <details class="compact-details" id="e-smart"><summary>Actualización rápida · interrogatorio, exploración y UF</summary>
          <p class="smart-hint">Fecha de esta sesión: <b>${esc(e.fecha)}</b> · Turno: <b id="e-smart-turn">${esc(e.turno)}</b> (se cambia en «Datos del paciente y turno»). La sala permanece en el texto del machote.</p>
@@ -631,6 +654,7 @@ async function openEntry(id){
        <div class="ntrow"><button type="button" id="e-ntp">Pegar</button><button type="button" id="e-ntc">Copiar nota final</button><button type="button" id="e-ntx">Borrar</button><span class="ntc" id="e-ntn"></span></div>
        <details class="compact-details"><summary>Vista previa · texto para la clínica</summary><div id="e-nt-warning" class="smart-warning" style="display:none"></div><div id="e-nt-preview" class="smart-review"></div></details>
      </details>
+    </div><div class="patient-panel" id="e-panel-pase-aux">
     <details class="compact-details"><summary>Datos del paciente y turno</summary>
       <div class="row"><div><label>Turno</label><select id="e-tur">${turnoOpts(e.turno)}</select></div><div><label>Acceso fijo</label><select id="e-ac"><option value="">—</option>${ACCESOS.map(a=>`<option ${pat.acceso===a?'selected':''}>${esc(a)}</option>`).join('')}</select></div></div>
       <label>Aviso fijo</label><input id="e-av" value="${esc(pat.aviso)}">
@@ -641,8 +665,20 @@ async function openEntry(id){
     <details><summary>Datos de la sesión (opcional)</summary>
       <div class="row"><div><label>Peso seco</label><input id="x-peso" value="${esc(ex.peso)}"></div><div><label>Ganancia interdialítica</label><input id="x-gan" value="${esc(ex.gan)}"></div></div>
       <div class="row"><div><label>TA</label><input id="x-ta" value="${esc(ex.ta)}"></div><div><label>Otros</label><input id="x-otro" value="${esc(ex.otro)}"></div></div></details>
-    <button class="dng" id="e-del">Quitar de la lista</button>`);
+    <button class="dng" id="e-del">Quitar de la lista</button></div>`);
   S.sel=e.id;refreshList();
+  // Cambiar entre pase y nota sin desmontar los campos: evita perder cambios pendientes.
+  const setPatientTab=tab=>{
+    const nota=tab==='nota';
+    const pase=$('#e-panel-pase',sh),aux=$('#e-panel-pase-aux',sh),panelNota=$('#e-panel-nota',sh);
+    pase.hidden=nota;aux.hidden=nota;panelNota.hidden=!nota;
+    sh.querySelectorAll('[data-ptab]').forEach(b=>{const on=b.dataset.ptab===tab;b.classList.toggle('on',on);b.setAttribute('aria-selected',String(on))});
+    if(nota){const details=$('#e-clinic',sh);details.open=true;}
+    sh.scrollTop=0;
+  };
+  sh.querySelectorAll('[data-ptab]').forEach(b=>b.addEventListener('click',()=>setPatientTab(b.dataset.ptab)));
+  setPatientTab('pase');
+
   $('#e-cal',sh).onclick=()=>openCalcFloating();
   loadHistory(e.expediente,e.id,sh);
   loadPreviousInfo(e.expediente,e.id,sh);
