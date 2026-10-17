@@ -134,6 +134,24 @@ details{margin-top:12px}summary{padding:6px 0;color:var(--mu);font-weight:600}
 }
 .prev-text{white-space:pre-wrap;overflow-wrap:anywhere;font-size:.9em;max-height:190px;overflow:auto;background:var(--bg);border:1px solid var(--bd);border-radius:8px;padding:7px;margin:3px 0 6px}
   .compact-details{margin:5px 0;padding:6px 9px;border:1px solid var(--bd,#ddd);border-radius:9px}
+  .smart-hint{font-size:12px;color:var(--mu);line-height:1.45;margin:6px 0}
+  .smart-source{background:var(--ac2);border:1px solid var(--bd);border-radius:10px;padding:10px;margin:8px 0;font-size:12px;line-height:1.45}
+  .smart-marker-tools{border:1px solid var(--bd);background:var(--bg);border-radius:11px;padding:9px;margin:9px 0}
+  .smart-marker-tools b{font-size:13px}
+  .smart-marker-tools .smart-mini{background:var(--card)}
+  .smart-inline{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .smart-inline input[type=checkbox]{width:18px;height:18px;accent-color:var(--ac)}
+  .smart-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+  .smart-grid>*{min-width:0}
+  .smart-input{width:100%;background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:12px;font-size:16px}
+  .smart-mini{border:1px solid var(--bd);border-radius:9px;padding:7px 10px;background:var(--card);font-size:12px;font-weight:650;color:var(--ac)}
+  .smart-mini:active{background:var(--ac2)}
+  .smart-actions{display:flex;flex-wrap:wrap;gap:6px;margin-top:7px}
+  .smart-actions .smart-mini{flex:0 0 auto}
+  .smart-review{background:var(--bg);border:1px solid var(--bd);border-radius:10px;white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.5;padding:10px;margin-top:8px;max-height:310px;overflow:auto;font-size:13px;-webkit-user-select:text;user-select:text}
+  .smart-warning{background:var(--wabg);border:1px solid var(--wa);border-radius:10px;color:var(--wa);padding:8px 10px;font-size:12px;margin-top:8px;line-height:1.4}
+  .smart-sub{margin-top:10px;border-top:1px solid var(--bd);padding-top:9px}
+  @media(max-width:370px){.smart-grid{grid-template-columns:1fr}}
   .compact-details summary{font-size:13px;cursor:pointer;font-weight:600}
   #e-prev-info .prev-text{max-height:100px;overflow:auto;font-size:12px;line-height:1.35}
   #e-prev-fotos .th{width:86px;max-width:30%;vertical-align:top}
@@ -154,7 +172,7 @@ details{margin-top:12px}summary{padding:6px 0;color:var(--mu);font-weight:600}
 
 <script>
 'use strict';
-const VERSION='10.6';
+const VERSION='11.0 · nota reutilizable';
 const TURNOS=[1,2,3,4,5];
 const DIAS_FOTO=7;
 const ACCESOS=['FAV','Injerto','Catéter tunelizado','Catéter temporal'];
@@ -166,6 +184,46 @@ const uid=()=>(window.crypto&&crypto.randomUUID)?crypto.randomUUID():'id'+Date.n
 const now=()=>Date.now();
 const todayStr=(d=new Date())=>{const z=new Date(d.getTime()-d.getTimezoneOffset()*60000);return z.toISOString().slice(0,10)};
 const fmtFecha=s=>new Date(s+'T12:00:00').toLocaleDateString('es-MX',{weekday:'short',day:'numeric',month:'short'});
+// Los marcadores permanecen en el texto editable; al copiar se sustituyen sin modificar el machote.
+const SMART_TOKENS=['FECHA','TURNO','INTERROGATORIO','EXPLORACION','UF_PROGRAMADA','UF_TOLERADA'];
+const SMART_BASE=`NOTA DIARIA        [[FECHA]]        SALA 3        TURNO [[TURNO]]
+
+Paciente que acude a sesión programada de hemodiálisis con los diagnósticos descritos a continuación:
+
+[[INTERROGATORIO]]
+
+A la exploración física: [[EXPLORACION]]
+
+ANÁLISIS:
+Paciente en sesión de hemodiálisis con UF programada de [[UF_PROGRAMADA]] mL y UF tolerada de [[UF_TOLERADA]] mL.
+
+PLAN:
+`;
+const SMART_INGRESO='Al ingreso refiere encontrarse asintomático; niega disnea, fiebre, sangrado y melena durante el periodo interdialítico.';
+const SMART_EXPLORACION='Neurológicamente íntegro, sin ingurgitación yugular, campos pulmonares ventilados, abdomen blando y depresible, extremidades sin edema.';
+function notaProcesada(e){
+  const z=e.notaSmart||{};
+  const p=String(e.fecha||'').split('-');
+  const vals={FECHA:p.length===3?`${p[2]}/${p[1]}/${p[0]}`:'', TURNO:String(e.turno||''),
+    INTERROGATORIO:String(z.ingreso||'').trim(), EXPLORACION:String(z.exploracion||'').trim(),
+    UF_PROGRAMADA:String(z.ufProgramada||'').trim(),UF_TOLERADA:String(z.ufTolerada||'').trim()};
+  const pendientes=[];
+  const text=String(e.notaTxt||'').replace(/\[\[([A-Z_]+)\]\]/g,(token,key)=>{
+    if(!(key in vals)||!vals[key]){pendientes.push(token);return token}
+    return vals[key];
+  });
+  return {text,pendientes:[...new Set(pendientes)]};
+}
+// Solo se usa la última nota ANTERIOR del mismo paciente; se guarda una copia en la sesión nueva.
+async function ultimaNotaAntes(exp,fecha){
+  const notas=(await all('entries')).filter(x=>!x.deleted&&x.expediente===exp&&x.fecha<fecha&&String(x.notaTxt||'').trim());
+  notas.sort((a,b)=>b.fecha.localeCompare(a.fecha)||(b.creado||0)-(a.creado||0));
+  return notas[0]||null;
+}
+function copiaNotaPrevia(prev){
+  return prev?{notaTxt:prev.notaTxt,notaSmart:{...(prev.notaSmart||{})},notaOrigen:prev.fecha}
+             :{notaTxt:'',notaSmart:{},notaOrigen:''};
+}
 const normExp=s=>String(s||'').trim().toUpperCase();
 const lsGet=k=>{try{return localStorage.getItem(k)}catch(e){return null}};
 const lsSet=(k,v)=>{try{localStorage.setItem(k,v)}catch(e){}};
@@ -512,7 +570,9 @@ async function addEntry(expRaw,nom,tur,sil,rapid=false){
     }
     return;
   }
-  const e={id:uid(),fecha:S.fecha,turno:tur,sillon:sil,expediente:exp,comentario:'',nota:false,fotos:[],tags:[],extras:{},creado:now(),updatedAt:now()};
+  const prev=await ultimaNotaAntes(exp,S.fecha);
+  const e={id:uid(),fecha:S.fecha,turno:tur,sillon:sil,expediente:exp,comentario:'',nota:false,
+    ...copiaNotaPrevia(prev),fotos:[],tags:[],extras:{},creado:now(),updatedAt:now()};
   await put('entries',e);S.turno=tur;lsSet('turno',tur);
   if(!rapid){closeSheet();openEntry(e.id)}else{toast('Paciente agregado');render().catch(()=>{})}
   return 'added';
@@ -538,11 +598,39 @@ async function openEntry(id){
       <div style="margin-top:10px"><b>Fotos de hoy</b><div class="thumbs" id="e-fotos"></div><label class="btn" for="e-file" style="display:inline-block;margin-top:5px">Tomar o agregar foto</label><input id="e-file" type="file" accept="image/*" hidden multiple></div>
       <div style="margin-top:9px"><b>Fotos anteriores</b><div class="thumbs" id="e-prev-fotos">Buscando hojas recientes…</div><small class="mu">Se eliminan según el plazo de 7 días.</small></div>
     </div>
-    <details class="compact-details"><summary>Notas del paciente</summary>
-      <label for="e-fija">Nota fija · permanece entre sesiones</label><textarea id="e-fija" rows="3" placeholder="Información para próximos pases…">${esc(pat.notaFija)}</textarea>
-      <label for="e-nt">Nota clínica de hoy</label><textarea id="e-nt" rows="5" maxlength="20000" spellcheck="false" autocapitalize="none" placeholder="Nota clínica…">${esc(e.notaTxt)}</textarea>
-      <div class="ntrow"><button type="button" id="e-ntp">Pegar</button><button type="button" id="e-ntc">Copiar</button><button type="button" id="e-ntx">Borrar</button><span class="ntc" id="e-ntn"></span></div>
-    </details>
+     <details class="compact-details" id="e-clinic"><summary>Notas del paciente · reutilizar y actualizar</summary>
+       <div class="smart-source" id="e-note-source">${e.notaOrigen?`Nota reutilizada de ${esc(e.notaOrigen)}. Comprueba los hallazgos y datos de la sesión anterior antes de copiarla.`:'Pega aquí la nota previa del sistema clínico. Una vez preparados los campos, se reutilizará automáticamente en las sesiones siguientes.'}</div>
+       <details class="compact-details" id="e-smart"><summary>Actualización rápida · interrogatorio, exploración y UF</summary>
+         <p class="smart-hint">Fecha de esta sesión: <b>${esc(e.fecha)}</b> · Turno: <b id="e-smart-turn">${esc(e.turno)}</b> (se cambia en «Datos del paciente y turno»). La sala permanece en el texto del machote.</p>
+         <label for="e-sm-ing"><b>Interrogatorio al ingreso e interdialítico</b></label>
+         <textarea id="e-sm-ing" rows="3" placeholder="Escribe lo referido por el paciente...">${esc((e.notaSmart||{}).ingreso||'')}</textarea>
+         <div class="smart-actions"><button type="button" class="smart-mini" id="e-sm-ing-base">Texto habitual</button>${['Niega disnea','Niega fiebre','Niega sangrado','Niega melena'].map((v,i)=>`<button type="button" class="smart-mini" data-sm-ing="${i}">${v}</button>`).join('')}</div>
+         <div class="smart-sub"><label for="e-sm-exp"><b>Exploración física</b></label>
+         <textarea id="e-sm-exp" rows="4" placeholder="Hallazgos de esta sesión...">${esc((e.notaSmart||{}).exploracion||'')}</textarea>
+         <div class="smart-actions"><button type="button" class="smart-mini" id="e-sm-exp-base">Texto habitual</button>${['Sin ingurgitación yugular','Con ingurgitación yugular','Sin edema','Edema en extremidades','Campos pulmonares ventilados','Estertores bibasales','Catéter sin datos de infección','FAVI con frémito'].map((v,i)=>`<button type="button" class="smart-mini" data-sm-exp="${i}">${v}</button>`).join('')}</div></div>
+         <div class="smart-sub"><b style="font-size:13px">Ultrafiltración</b>
+           <div class="smart-grid"><div><label for="e-sm-ufp">Programada (mL)</label><input class="smart-input" id="e-sm-ufp" type="number" inputmode="decimal" min="0" step="any" value="${esc((e.notaSmart||{}).ufProgramada||'')}"></div><div><label for="e-sm-uft">Tolerada (mL)</label><input class="smart-input" id="e-sm-uft" type="number" inputmode="decimal" min="0" step="any" value="${esc((e.notaSmart||{}).ufTolerada||'')}"></div></div>
+           <label class="smart-inline" style="margin-top:9px"><input id="e-sm-link" type="checkbox" ${(e.notaSmart||{}).ufLigada===false?'':'checked'}> Usar la misma cifra hasta que la modifique</label>
+           <p class="smart-hint">Al escribir la UF programada se copia a la tolerada. Puedes cambiar la tolerada directamente si es distinta.</p>
+         </div>
+         <p class="smart-warning">Los textos habituales y las etiquetas son atajos de escritura, no hallazgos confirmados. Verifica todo antes de copiar la nota al sistema clínico.</p>
+       </details>
+       <details class="compact-details"><summary>Nota fija · permanece entre sesiones</summary>
+         <label for="e-fija">Información del paciente para próximos pases</label><textarea id="e-fija" rows="3" placeholder="Información para próximos pases…">${esc(pat.notaFija)}</textarea>
+       </details>
+       <label for="e-nt"><b>Nota base de esta sesión</b></label>
+       <p class="smart-hint">Aquí va la nota REAL traída del sistema clínico o reutilizada de la sesión anterior. Puedes editar cualquier frase manualmente. Los campos que marques se actualizarán sin borrar el resto.</p>
+       <div class="smart-actions"><button type="button" class="smart-mini" id="e-nt-clinica">Pegar nota de la clínica (reemplazar)</button><button type="button" class="smart-mini" id="e-nt-prev">Recuperar nota anterior</button><button type="button" class="smart-mini" id="e-nt-base">Machote vacío (opcional)</button></div>
+       <div class="smart-marker-tools"><b>Preparar nota en computadora · una sola vez</b>
+         <p class="smart-hint">Selecciona con el ratón ÚNICAMENTE el texto que va a variar (por ejemplo, el párrafo completo de exploración o solo «1600» en la UF) y pulsa el campo correspondiente. <b>La selección queda guardada como valor inicial</b>, no se borra.</p>
+         <div class="smart-actions"><button type="button" class="smart-mini" id="e-nt-header">Marcar fecha y turno del encabezado</button></div>
+         <div class="smart-actions">${SMART_TOKENS.map(k=>`<button type="button" class="smart-mini" data-sm-token="${k}" title="Sustituir selección por [[${k}]]">${({FECHA:'Fecha',TURNO:'Turno',INTERROGATORIO:'Interrogatorio',EXPLORACION:'Exploración',UF_PROGRAMADA:'UF programada',UF_TOLERADA:'UF tolerada'})[k]}</button>`).join('')}</div>
+         <p class="smart-hint">Si no seleccionas nada, el botón insertará un marcador vacío en la posición del cursor. La sala y el resto de la nota no se modifican.</p>
+       </div>
+       <textarea id="e-nt" rows="12" maxlength="20000" spellcheck="false" autocapitalize="none" placeholder="Pega aquí la nota REAL de la última sesión de la clínica…">${esc(e.notaTxt)}</textarea>
+       <div class="ntrow"><button type="button" id="e-ntp">Pegar</button><button type="button" id="e-ntc">Copiar nota final</button><button type="button" id="e-ntx">Borrar</button><span class="ntc" id="e-ntn"></span></div>
+       <details class="compact-details"><summary>Vista previa · texto para la clínica</summary><div id="e-nt-warning" class="smart-warning" style="display:none"></div><div id="e-nt-preview" class="smart-review"></div></details>
+     </details>
     <details class="compact-details"><summary>Datos del paciente y turno</summary>
       <div class="row"><div><label>Turno</label><select id="e-tur">${turnoOpts(e.turno)}</select></div><div><label>Acceso fijo</label><select id="e-ac"><option value="">—</option>${ACCESOS.map(a=>`<option ${pat.acceso===a?'selected':''}>${esc(a)}</option>`).join('')}</select></div></div>
       <label>Aviso fijo</label><input id="e-av" value="${esc(pat.aviso)}">
@@ -565,6 +653,8 @@ async function openEntry(id){
   const sv=ok=>{const s=q('#e-sv');if(!s)return;s.textContent=ok?'Guardado ✓':'No se pudo guardar';s.className='sv on'+(ok?'':' err');clearTimeout(sv.t);if(ok)sv.t=setTimeout(()=>s.classList.remove('on'),1500)};
   const flushRaw=async()=>{clearTimeout(tm);tm=null;
     e.comentario=q('#e-com').value;e.notaTxt=q('#e-nt').value;e.sillon=q('#e-sil').value.trim();
+    e.notaSmart={ingreso:q('#e-sm-ing').value,exploracion:q('#e-sm-exp').value,
+      ufProgramada:q('#e-sm-ufp').value,ufTolerada:q('#e-sm-uft').value,ufLigada:q('#e-sm-link').checked};
     e.extras={peso:q('#x-peso').value,gan:q('#x-gan').value,ta:q('#x-ta').value,otro:q('#x-otro').value};
     e.updatedAt=now();await put('entries',e);
     // el perfil se escribe sobre la copia más reciente del paciente (por si otro dispositivo cambió pendientes)
@@ -578,12 +668,155 @@ async function openEntry(id){
   const flush=async()=>{try{await flushRaw();sv(true)}catch(err){logErr('guardar',err);sv(false);throw err}};
   const later=()=>{clearTimeout(tm);tm=setTimeout(()=>flush().catch(()=>{}),400)};
   sheetCb=async()=>{try{await flush()}finally{urls.forEach(u=>URL.revokeObjectURL(u));const prev=q('#e-prev-fotos');if(prev&&prev._photoUrls)prev._photoUrls.forEach(u=>URL.revokeObjectURL(u))}};
-  ['#e-com','#e-nt','#e-sil','#e-nom','#e-av','#e-fija','#x-peso','#x-gan','#x-ta','#x-otro'].forEach(s=>q(s).addEventListener('input',later));
+   ['#e-com','#e-nt','#e-sil','#e-nom','#e-av','#e-fija','#x-peso','#x-gan','#x-ta','#x-otro','#e-sm-ing','#e-sm-exp','#e-sm-ufp','#e-sm-uft'].forEach(s=>q(s).addEventListener('input',later));
   q('#e-ac').addEventListener('change',ev=>{later();ev.target.blur()});
   // Nota en texto plano: cuadro para pegar (el textarea siempre pega solo texto, sin formato)
   const ntCount=()=>{const v=q('#e-nt').value;q('#e-ntn').textContent=v?v.length.toLocaleString('es-MX')+' caracteres':''};
-  ntCount();q('#e-nt').addEventListener('input',ntCount);
-  q('#e-ntp').onclick=async()=>{
+   const updateNotePreview=()=>{
+     const snap={...e,notaTxt:q('#e-nt').value,
+       notaSmart:{ingreso:q('#e-sm-ing').value,exploracion:q('#e-sm-exp').value,
+         ufProgramada:q('#e-sm-ufp').value,ufTolerada:q('#e-sm-uft').value}};
+     const v=notaProcesada(snap),w=q('#e-nt-warning');
+     q('#e-nt-preview').textContent=v.text||'Todavía no hay nota. Puedes pegar tu machote o crear uno básico.';
+     w.style.display=v.pendientes.length?'block':'none';
+     w.textContent=v.pendientes.length?'Campos sin completar: '+v.pendientes.join(', ')+'. Revisa antes de copiar.':'';
+   };
+   const touchNote=el=>el.dispatchEvent(new Event('input',{bubbles:true}));
+   ntCount();q('#e-nt').addEventListener('input',()=>{ntCount();updateNotePreview()});
+   ['#e-sm-ing','#e-sm-exp','#e-sm-ufp','#e-sm-uft'].forEach(id=>q(id).addEventListener('input',updateNotePreview));
+   // La UF tolerada sigue a la programada salvo que se cambie expresamente.
+   q('#e-sm-ufp').addEventListener('input',()=>{
+     if(q('#e-sm-link').checked){q('#e-sm-uft').value=q('#e-sm-ufp').value;touchNote(q('#e-sm-uft'))}
+   });
+   q('#e-sm-uft').addEventListener('input',()=>{
+     if(q('#e-sm-ufp').value!==q('#e-sm-uft').value&&q('#e-sm-link').checked){q('#e-sm-link').checked=false;later()}
+   });
+   q('#e-sm-link').onchange=()=>{
+     if(q('#e-sm-link').checked){q('#e-sm-uft').value=q('#e-sm-ufp').value;touchNote(q('#e-sm-uft'))}
+     later();updateNotePreview();
+   };
+   const appendPhrase=(field,phrase)=>{
+     const ta=q(field),s=ta.value.trim();
+     ta.value=s?(s.replace(/[.\s]+$/,'')+'. '+phrase+'.'):phrase+'.';
+     touchNote(ta);
+   };
+   const setStandard=(field,base)=>{
+     const ta=q(field);
+     if(ta.value.trim()&&!confirm('¿Sustituir el contenido de este apartado por el texto habitual?'))return;
+     ta.value=base;touchNote(ta);
+   };
+   q('#e-sm-ing-base').onclick=()=>setStandard('#e-sm-ing',SMART_INGRESO);
+   q('#e-sm-exp-base').onclick=()=>setStandard('#e-sm-exp',SMART_EXPLORACION);
+   const PHRASES_ING=['Niega disnea','Niega fiebre','Niega sangrado','Niega melena'];
+   const PHRASES_EXP=['Sin ingurgitación yugular','Con ingurgitación yugular','Sin edema','Edema en extremidades','Campos pulmonares ventilados','Estertores bibasales','Catéter sin datos de infección','FAVI con frémito'];
+   const addFinding=phrase=>{
+     const ta=q('#e-sm-exp'),opuestos={
+       'Sin ingurgitación yugular':'Con ingurgitación yugular',
+       'Con ingurgitación yugular':'Sin ingurgitación yugular',
+       'Sin edema':'Edema en extremidades',
+       'Edema en extremidades':'Sin edema'};
+     const opposite=opuestos[phrase];
+     if(opposite&&ta.value.toLocaleLowerCase('es-MX').includes(opposite.toLocaleLowerCase('es-MX'))){
+       if(!confirm('Se detectó un hallazgo contrario: «'+opposite+'». ¿Sustituirlo por «'+phrase+'»?'))return;
+       const pos=ta.value.toLocaleLowerCase('es-MX').indexOf(opposite.toLocaleLowerCase('es-MX'));
+       ta.value=ta.value.slice(0,pos)+phrase+ta.value.slice(pos+opposite.length);
+       touchNote(ta);return;
+     }
+     appendPhrase('#e-sm-exp',phrase);
+   };
+   // Convierte una selección DE LA NOTA REAL en marcador; conserva exactamente el texto seleccionado.
+   const markSelected=key=>{
+     const ta=q('#e-nt'),a=ta.selectionStart,b=ta.selectionEnd,selected=ta.value.slice(a,b);
+     const token='[['+key+']]';
+     if(selected===token){toast('Este fragmento ya es un campo inteligente');return}
+     if(selected&&/\[\[[A-Z_]+\]\]/.test(selected)){
+       toast('Selecciona texto normal, sin incluir otros marcadores');return;
+     }
+     if(selected&&key.startsWith('UF_')&&!/^\s*\d+(?:[.,]\d+)?\s*$/.test(selected)){
+       toast('Para UF selecciona solo la cifra, sin mL ni otras palabras');return;
+     }
+     if(selected&&key==='TURNO'&&!/^\s*[1-5]\s*$/.test(selected)){
+       toast('Selecciona solo el número del turno, sin la palabra TURNO');return;
+     }
+     if(selected&&key==='FECHA'&&!/^\s*\d{1,2}[\/.\-]\d{1,2}[\/.\-]\d{4}\s*$/.test(selected)){
+       toast('Selecciona solo la fecha en formato día/mes/año');return;
+     }
+     if(selected&&(key==='INTERROGATORIO'||key==='EXPLORACION')){
+       const field=q(key==='INTERROGATORIO'?'#e-sm-ing':'#e-sm-exp');
+       field.value=selected;touchNote(field);
+     }
+     if(selected&&key.startsWith('UF_')){
+       const value=selected.trim().replace(',','.');
+       if(key==='UF_PROGRAMADA'){
+         q('#e-sm-ufp').value=value;
+         touchNote(q('#e-sm-ufp'));
+       }else{
+         if(!q('#e-sm-ufp').value.trim()){
+           q('#e-sm-ufp').value=value;
+           touchNote(q('#e-sm-ufp'));
+         }
+         q('#e-sm-uft').value=value;touchNote(q('#e-sm-uft'));
+       }
+     }
+     ta.value=ta.value.slice(0,a)+token+ta.value.slice(b);
+     ta.focus();ta.setSelectionRange(a+token.length,a+token.length);touchNote(ta);
+     toast(selected?'Campo vinculado; texto original conservado':'Marcador insertado; completa su valor');
+   };
+   q('#e-nt-header').onclick=()=>{
+     const ta=q('#e-nt'),lines=ta.value.split('\n'),first=lines[0]||'';
+     if(!/^\s*NOTA(?:\s+DIARIA)?\b/i.test(first)){
+       toast('No encuentro encabezado «NOTA DIARIA» en la primera línea');return;
+     }
+     let h=first;
+     if(!h.includes('[[FECHA]]'))h=h.replace(/\b\d{1,2}[\/.\-]\d{1,2}[\/.\-]\d{4}\b/,'[[FECHA]]');
+     if(!h.includes('[[TURNO]]'))h=h.replace(/(\bTURNO\s*:?\s*)[1-5]\b/i,(_,p)=>p+'[[TURNO]]');
+     if(first===h){toast('No hay fecha ni turno reconocibles en el encabezado');return}
+     lines[0]=h;ta.value=lines.join('\n');touchNote(ta);
+     toast('Fecha y turno vinculados; sala intacta');
+   };
+   sh.addEventListener('click',ev=>{
+     const i=ev.target.closest('[data-sm-ing]'),x=ev.target.closest('[data-sm-exp]'),k=ev.target.closest('[data-sm-token]');
+     if(i)appendPhrase('#e-sm-ing',PHRASES_ING[+i.dataset.smIng]);
+     if(x)addFinding(PHRASES_EXP[+x.dataset.smExp]);
+     if(k)markSelected(k.dataset.smToken);
+   });
+   q('#e-nt-base').onclick=()=>{
+     const ta=q('#e-nt');
+     if(ta.value.trim()&&!confirm('Esto sustituirá el texto actual de la nota. ¿Continuar?'))return;
+     ta.value=SMART_BASE;e.notaOrigen='';updateSource();touchNote(ta);q('#e-smart').open=true;
+     toast('Machote listo. Completa los apartados del paciente.');
+   };
+   q('#e-nt-prev').onclick=async()=>{
+     const prev=await ultimaNotaAntes(e.expediente,e.fecha);
+     if(!prev){toast('No hay nota anterior a esta fecha');return}
+     const ta=q('#e-nt');
+     if(ta.value.trim()&&!confirm('¿Reemplazar la nota de ESTA sesión por la nota anterior? Se conservará el historial.'))return;
+     ta.value=prev.notaTxt;
+     const z=prev.notaSmart||{};
+     q('#e-sm-ing').value=z.ingreso||'';q('#e-sm-exp').value=z.exploracion||'';
+     q('#e-sm-ufp').value=z.ufProgramada||'';q('#e-sm-uft').value=z.ufTolerada||'';
+     q('#e-sm-link').checked=z.ufLigada!==false;
+     e.notaOrigen=prev.fecha;
+     updateSource();touchNote(ta);updateNotePreview();
+     toast('Nota anterior recuperada; revisa datos de hoy');
+   };
+   const updateSource=()=>{
+     const info=q('#e-note-source');
+     info.textContent=e.notaOrigen?'Base reutilizada de la sesión '+e.notaOrigen+'. Verifica interrogatorio, exploración, UF y demás datos históricos antes de entregar.':'La nota corresponde a esta sesión. Los cambios se conservarán para reutilizarlos en la siguiente.';
+   };
+   updateSource();updateNotePreview();
+   q('#e-nt-clinica').onclick=async()=>{
+     let txt='';
+     try{txt=await navigator.clipboard.readText()}catch(err){toast('El navegador no permite leer el portapapeles: pega con Ctrl+V dentro de la nota');q('#e-nt').focus();return}
+     if(!txt.trim()){toast('El portapapeles está vacío');return}
+     if(q('#e-nt').value.trim()&&!confirm('¿Reemplazar el texto de esta sesión por la nota copiada de la clínica?'))return;
+     q('#e-nt').value=txt;
+     q('#e-sm-ing').value='';q('#e-sm-exp').value='';
+     q('#e-sm-ufp').value='';q('#e-sm-uft').value='';q('#e-sm-link').checked=true;
+     e.notaOrigen='';updateSource();touchNote(q('#e-nt'));updateNotePreview();
+     toast('Nota de clínica pegada. Ahora marca los fragmentos variables.');
+   };
+   q('#e-ntp').onclick=async()=>{
     const ta=q('#e-nt');
     try{
       const txt=await navigator.clipboard.readText();
@@ -594,11 +827,18 @@ async function openEntry(id){
       ta.dispatchEvent(new Event('input',{bubbles:true}));toast('Pegado');
     }catch(err){ta.focus();toast('Mantén presionado en el cuadro y elige Pegar')}
   };
-  q('#e-ntc').onclick=async()=>{
-    const ta=q('#e-nt');if(!ta.value){toast('No hay nada que copiar');return}
-    try{await navigator.clipboard.writeText(ta.value);toast('Nota copiada')}
-    catch(err){try{ta.focus();ta.select();document.execCommand('copy');toast('Nota copiada')}catch(e2){toast('No se pudo copiar')}}
-  };
+   q('#e-ntc').onclick=async()=>{
+     const ta=q('#e-nt');if(!ta.value){toast('No hay nada que copiar');return}
+     const v=notaProcesada({...e,notaTxt:ta.value,notaSmart:{ingreso:q('#e-sm-ing').value,
+       exploracion:q('#e-sm-exp').value,ufProgramada:q('#e-sm-ufp').value,ufTolerada:q('#e-sm-uft').value}});
+     if(v.pendientes.length&&!confirm('Hay marcadores sin completar ('+v.pendientes.join(', ')+'). ¿Copiar de todas formas para terminarlos en la computadora?'))return;
+     if(e.notaOrigen&&!confirm('Esta nota reutiliza texto y valores de '+e.notaOrigen+'. ¿Ya revisaste que lo correspondiente a HOY sea correcto?'))return;
+     try{await navigator.clipboard.writeText(v.text);toast('Nota final copiada')}
+     catch(err){try{const sel=window.getSelection(),range=document.createRange(),preview=q('#e-nt-preview');
+       const parent=preview.parentNode,open=parent.open;parent.open=true;range.selectNodeContents(preview);sel.removeAllRanges();sel.addRange(range);
+       if(!document.execCommand('copy'))throw new Error('copy');sel.removeAllRanges();parent.open=open;toast('Nota final copiada')}
+       catch(e2){toast('No se pudo copiar; usa Vista previa para seleccionar el texto')}}
+   };
   q('#e-ntx').onclick=()=>{
     const ta=q('#e-nt');if(!ta.value)return;
     if(!confirm('¿Borrar el texto de la nota?'))return;
@@ -618,7 +858,7 @@ async function openEntry(id){
     e.tags=e.tags.includes(g)?e.tags.filter(x=>x!==g):[...e.tags,g];
     await flush().catch(()=>{});drawTags();
   });
-  q('#e-tur').onchange=async ev=>{const v=+ev.target.value;ev.target.blur();e.turno=v;S.turno=v;lsSet('turno',v);await flush().catch(()=>{})};
+   q('#e-tur').onchange=async ev=>{const v=+ev.target.value;ev.target.blur();e.turno=v;S.turno=v;lsSet('turno',v);q('#e-smart-turn').textContent=String(v);updateNotePreview();await flush().catch(()=>{})};
   const drawNota=()=>{const b=q('#e-nota');b.className='notabig'+(e.nota?' ok':'');b.textContent=e.nota?'Nota hecha':'Marcar nota hecha'};
   q('#e-nota').onclick=async()=>{e.nota=!e.nota;drawNota();await flush().catch(()=>{})};drawNota();
   const drawPend=()=>{
@@ -647,14 +887,23 @@ async function openEntry(id){
   // cambios que llegan de otro dispositivo mientras esta hoja está abierta
   live={e,flush,drawNota,
     setE:r=>{
-      e.nota=!!r.nota;e.tags=r.tags||[];e.turno=r.turno;e.updatedAt=r.updatedAt;e.deleted=!!r.deleted;
+      e.nota=!!r.nota;e.tags=r.tags||[];e.turno=r.turno;e.updatedAt=r.updatedAt;e.deleted=!!r.deleted;e.notaOrigen=r.notaOrigen||'';
       if(r.fotos)e.fotos=r.fotos;
       if(sheetEl!==sh)return;
       drawNota();drawTags();q('#e-tur').value=String(e.turno);
       const fo=document.activeElement;
       if(fo!==q('#e-com')){q('#e-com').value=r.comentario||'';e.comentario=r.comentario||''}
-      if(fo!==q('#e-nt')){q('#e-nt').value=r.notaTxt||'';e.notaTxt=r.notaTxt||'';ntCount()}
-      if(fo!==q('#e-sil')){q('#e-sil').value=r.sillon||'';e.sillon=r.sillon||''}
+       if(fo!==q('#e-nt')){q('#e-nt').value=r.notaTxt||'';e.notaTxt=r.notaTxt||'';ntCount()}
+       const smartInputs=['#e-sm-ing','#e-sm-exp','#e-sm-ufp','#e-sm-uft'];
+       if(!smartInputs.some(s=>fo===q(s))){
+         const z=r.notaSmart||{};e.notaSmart=z;
+         q('#e-sm-ing').value=z.ingreso||'';q('#e-sm-exp').value=z.exploracion||'';
+         q('#e-sm-ufp').value=z.ufProgramada||'';q('#e-sm-uft').value=z.ufTolerada||'';
+         q('#e-sm-link').checked=z.ufLigada!==false;
+       }
+       q('#e-smart-turn').textContent=String(e.turno);
+       updateSource();updateNotePreview();
+       if(fo!==q('#e-sil')){q('#e-sil').value=r.sillon||'';e.sillon=r.sillon||''}
     },
     // llegó o se borró una foto desde otro dispositivo: se vuelve a leer la lista de fotos de esta sesión
     refreshFotos:async()=>{
@@ -888,7 +1137,7 @@ async function loadPreviousInfo(exp,current,host){
  const entries=(await all('entries')).filter(x=>!x.deleted&&x.expediente===exp&&x.id!==current).sort((a,b)=>(b.fecha||'').localeCompare(a.fecha||'')||(b.creado||0)-(a.creado||0));
  const prev=entries[0];
  if(!prev){target.innerHTML='<div class="mu">Sin sesión anterior registrada.</div>';return}
- const note=prev.notaTxt||'',comment=prev.comentario||'';
+ const note=notaProcesada(prev).text,comment=prev.comentario||'';
  target.innerHTML=`<div style="font-size:.9em"><b>Última sesión · ${esc(prev.fecha)} · sillón ${esc(prev.sillon||'—')}</b></div><label>Comentario anterior</label><div class="prev-text">${comment?esc(comment):'<span class="mu">Sin comentario anterior</span>'}</div>${note?`<details><summary>Nota clínica anterior</summary><div class="prev-text">${esc(note)}</div></details>`:''}`;
 }
 async function loadPreviousPhotos(exp,current,host){
@@ -907,7 +1156,7 @@ async function loadPreviousPhotos(exp,current,host){
 async function loadHistory(exp,current,host){
  const target=$('#e-hist-list',host);if(!target)return;
  const entries=(await all('entries')).filter(x=>!x.deleted&&x.expediente===exp&&x.id!==current).sort((a,b)=>b.fecha.localeCompare(a.fecha));
- target.innerHTML=entries.length?entries.map(x=>`<div class="box" style="margin:8px 0"><b>${esc(x.fecha)} · Turno ${esc(x.turno)}</b><p>Asistencia: ${esc(x.asistencia||'sin registrar')} · Nota ${x.nota?'hecha':'pendiente'}</p>${x.comentario?`<p>${esc(x.comentario)}</p>`:''}${x.notaTxt?`<details><summary>Ver nota previa</summary><pre style="white-space:pre-wrap;overflow-wrap:anywhere">${esc(x.notaTxt)}</pre></details>`:''}<button type="button" data-hopen="${esc(x.id)}">Abrir sesión</button>${(x.fotos||[]).length?`<p>📷 ${x.fotos.length} hoja(s) registradas (pueden caducar a los 7 días)</p>`:''}</div>`).join(''):'<p>No hay sesiones anteriores.</p>';
+ target.innerHTML=entries.length?entries.map(x=>`<div class="box" style="margin:8px 0"><b>${esc(x.fecha)} · Turno ${esc(x.turno)}</b><p>Asistencia: ${esc(x.asistencia||'sin registrar')} · Nota ${x.nota?'hecha':'pendiente'}</p>${x.comentario?`<p>${esc(x.comentario)}</p>`:''}${x.notaTxt?`<details><summary>Ver nota previa</summary><pre style="white-space:pre-wrap;overflow-wrap:anywhere">${esc(notaProcesada(x).text)}</pre></details>`:''}<button type="button" data-hopen="${esc(x.id)}">Abrir sesión</button>${(x.fotos||[]).length?`<p>📷 ${x.fotos.length} hoja(s) registradas (pueden caducar a los 7 días)</p>`:''}</div>`).join(''):'<p>No hay sesiones anteriores.</p>';
  target.onclick=ev=>{const b=ev.target.closest('[data-hopen]');if(b)openEntry(b.dataset.hopen)};
 }
 async function openProfile(exp){
@@ -919,7 +1168,7 @@ async function openProfile(exp){
 }
 async function openBatch(){
  const sh=openSheet(`<div class="sh-head"><b>Cargar lista de hemodiálisis</b><button data-close>Cerrar</button></div><p>Una línea por paciente: expediente, nombre, sillón. Se pueden usar tabulaciones, comas o punto y coma. Los pacientes quedarán como asistencia por confirmar.</p><label>Fecha de sesión</label><input id="ba-date" type="date" value="${esc(S.fecha)}"><label>Turno</label><select id="ba-turn">${turnoOpts(S.turno)}</select><textarea id="ba-lines" rows="12" placeholder="12345, María Pérez, 1&#10;67890, Juan López, 2"></textarea><button class="btn" id="ba-go">Cargar pacientes</button><p id="ba-msg"></p>`);
- $('#ba-go',sh).onclick=async()=>{const fecha=$('#ba-date',sh).value,turno=+$('#ba-turn',sh).value;const lines=$('#ba-lines',sh).value.split(/\r?\n/).map(x=>x.trim()).filter(Boolean);if(!fecha||!lines.length){toast('Indica fecha y pacientes');return}const old=await byDate(fecha);let added=0,skipped=0;for(const line of lines){const parts=line.includes('\t')?line.split('\t'):line.split(/[;,]/);const exp=normExp(parts[0]);if(!exp){skipped++;continue}if(old.some(e=>e.expediente===exp)){skipped++;continue}let p=await get('patients',exp);if(!p)p={expediente:exp,nombre:(parts[1]||'').trim(),pendientes:[],updatedAt:now(),pu:now()};else if(!p.nombre&&parts[1]){p.nombre=parts[1].trim();p.updatedAt=now()}await put('patients',p);const e={id:uid(),fecha,turno,sillon:(parts[2]||'').trim(),expediente:exp,comentario:'',nota:false,notaTxt:'',asistencia:'pendiente',fotos:[],tags:[],extras:{},creado:now(),updatedAt:now()};await put('entries',e);old.push(e);added++}S.fecha=fecha;S.turno=turno;closeSheet();toast(`${added} agregados; ${skipped} omitidos`)};
+ $('#ba-go',sh).onclick=async()=>{const fecha=$('#ba-date',sh).value,turno=+$('#ba-turn',sh).value;const lines=$('#ba-lines',sh).value.split(/\r?\n/).map(x=>x.trim()).filter(Boolean);if(!fecha||!lines.length){toast('Indica fecha y pacientes');return}const old=await byDate(fecha);let added=0,skipped=0;for(const line of lines){const parts=line.includes('\t')?line.split('\t'):line.split(/[;,]/);const exp=normExp(parts[0]);if(!exp){skipped++;continue}if(old.some(e=>e.expediente===exp)){skipped++;continue}let p=await get('patients',exp);if(!p)p={expediente:exp,nombre:(parts[1]||'').trim(),pendientes:[],updatedAt:now(),pu:now()};else if(!p.nombre&&parts[1]){p.nombre=parts[1].trim();p.updatedAt=now()}await put('patients',p);const prev=await ultimaNotaAntes(exp,fecha);const e={id:uid(),fecha,turno,sillon:(parts[2]||'').trim(),expediente:exp,comentario:'',nota:false,...copiaNotaPrevia(prev),asistencia:'pendiente',fotos:[],tags:[],extras:{},creado:now(),updatedAt:now()};await put('entries',e);old.push(e);added++}S.fecha=fecha;S.turno=turno;closeSheet();toast(`${added} agregados; ${skipped} omitidos`)};
 }
 function openCalcFloating(){
  const old=$('#calc-floating');if(old){old.remove();return}
