@@ -105,7 +105,7 @@ details{margin-top:12px}summary{padding:6px 0;color:var(--mu);font-weight:600}
 #vw .bar{display:flex;gap:8px;justify-content:space-between;padding:calc(10px + env(safe-area-inset-top)) 12px 10px}
 #vw .bar button{background:#fff2;color:#fff;border-radius:10px;padding:10px 14px;font-weight:600}
 #vw .sc{flex:1;overflow:auto;-webkit-overflow-scrolling:touch;touch-action:pan-x pan-y}
-#vw img{width:100%;max-width:none;display:block}
+#vw img{width:100%;max-width:none;display:block;pointer-events:none}
 @media (pointer:fine){#vw .sc{cursor:grab;user-select:none}#vw .sc.dragging{cursor:grabbing}#vw img{user-select:none;-webkit-user-drag:none}}
 .calc{max-width:420px;margin:8px auto 0}
 .cdisp{background:var(--card);border:1px solid var(--bd);border-radius:16px;padding:12px 16px;text-align:right;-webkit-user-select:none;user-select:none;min-height:96px;display:flex;flex-direction:column;justify-content:flex-end;overflow:hidden}
@@ -765,6 +765,20 @@ $('#v-zoom').onclick=()=>setZoom(vz>=3.5?1:Math.floor(vz)+1);
   sc.addEventListener('touchstart',e=>{if(e.touches.length===2){d0=dist(e.touches);z0=vz}},{passive:true});
   sc.addEventListener('touchmove',e=>{if(e.touches.length===2&&d0){e.preventDefault();setZoom(z0*dist(e.touches)/d0)}},{passive:false});
   sc.addEventListener('touchend',()=>{d0=0});
+  // En móvil, un dedo desplaza la foto ampliada sin mover la pantalla de fondo.
+  let pan=null;
+  sc.addEventListener('touchstart',e=>{
+    if(e.touches.length===1&&vz>1.01)pan={x:e.touches[0].clientX,y:e.touches[0].clientY,l:sc.scrollLeft,t:sc.scrollTop};
+    else pan=null;
+  },{passive:true});
+  sc.addEventListener('touchmove',e=>{
+    if(e.touches.length!==1||!pan||vz<=1.01)return;
+    e.preventDefault();
+    sc.scrollLeft=pan.l+pan.x-e.touches[0].clientX;
+    sc.scrollTop=pan.t+pan.y-e.touches[0].clientY;
+  },{passive:false});
+  sc.addEventListener('touchend',()=>{pan=null});
+  sc.addEventListener('touchcancel',()=>{pan=null});
 }
 // Escritorio: rueda para ampliar alrededor del cursor y arrastre para desplazar.
 {

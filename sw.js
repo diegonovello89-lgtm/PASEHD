@@ -1,4 +1,4 @@
-const V = 'pase-hd-v10-6';
+const V = 'pase-hd-v10-7';
 const FILES = [
   './', './index.html'
 ];
