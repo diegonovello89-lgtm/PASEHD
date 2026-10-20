@@ -139,6 +139,21 @@ details{margin-top:12px}summary{padding:6px 0;color:var(--mu);font-weight:600}
   #e-prev-fotos .th{width:86px;max-width:30%;vertical-align:top}
   #e-prev-fotos .th img{max-height:85px;object-fit:cover}
   #calc-floating .ckeys{touch-action:manipulation}
+
+/* Pase compacto: navegación en una sola línea y sin saltos en iPhone */
+.visit-head{align-items:center;gap:7px;flex-wrap:nowrap;min-width:0}
+.visit-identity{flex:1 1 0;min-width:0;overflow:hidden}
+.visit-identity .nm-in{width:100%;max-width:100%;min-width:0;padding:7px 8px;font-size:17px!important}
+.visit-identity .ex{font-size:11px;margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.visit-actions{display:flex;align-items:center;flex:0 0 auto;gap:5px;min-width:0}
+.visit-switch{display:flex;align-items:center;gap:2px;border:1px solid var(--bd);border-radius:11px;background:var(--card);padding:2px}
+.visit-switch .ib{width:30px;height:32px;min-width:30px;min-height:32px;padding:0!important;border:0;background:transparent;border-radius:8px;font-size:22px;line-height:1}
+.visit-switch .ib:disabled{opacity:.25}
+.visit-counter{font-size:11px;color:var(--mu);white-space:nowrap;min-width:24px;text-align:center}
+.visit-done{padding:7px 9px!important;border-radius:10px!important;font-size:12px!important;min-height:36px!important;white-space:nowrap}
+.visit-head .sv{position:absolute;right:12px;top:100%;font-size:10px}
+.visit-notes .row{margin-top:8px}
+@media(max-width:365px){.visit-identity .nm-in{font-size:15px!important}.visit-switch .ib{width:27px;min-width:27px}.visit-actions{gap:3px}}
 </style>
 </head>
 <body>
@@ -532,7 +547,7 @@ async function openEntry(id){
   const urls=[];
   const ex=e.extras;
   const sh=openSheet(`
-    <div class="sh-head"><div style="flex:1;min-width:0"><input id="e-nom" class="nm-in" placeholder="Nombre del paciente" value="${esc(pat.nombre)}"><div class="ex" style="margin-top:4px">Exp. ${esc(e.expediente)} · ${esc(fmtFecha(e.fecha))}</div></div><div class="sh-act" style="display:flex;align-items:center;gap:5px;flex-wrap:wrap;justify-content:flex-end"><button type="button" class="ib" id="e-prev" aria-label="Paciente anterior" title="Paciente anterior" ${prevId?'':'disabled'} style="min-width:34px;min-height:34px;padding:5px 9px">‹</button><span style="font-size:11px;white-space:nowrap;opacity:.7">${idx+1}/${vecinos.length}</span><button type="button" class="ib" id="e-next" aria-label="Paciente siguiente" title="Paciente siguiente" ${nextId?'':'disabled'} style="min-width:34px;min-height:34px;padding:5px 9px">›</button><button data-close tabindex="-1">Listo</button><span class="sv" id="e-sv"></span></div></div>
+    <div class="sh-head visit-head"><div class="visit-identity"><input id="e-nom" class="nm-in" placeholder="Nombre del paciente" value="${esc(pat.nombre)}"><div class="ex">Exp. ${esc(e.expediente)} · ${esc(fmtFecha(e.fecha))}</div></div><div class="visit-actions"><div class="visit-switch"><button type="button" class="ib" id="e-prev" aria-label="Paciente anterior" title="Paciente anterior" ${prevId?'':'disabled'}>‹</button><span class="visit-counter">${idx+1}/${vecinos.length}</span><button type="button" class="ib" id="e-next" aria-label="Paciente siguiente" title="Paciente siguiente" ${nextId?'':'disabled'}>›</button></div><button type="button" class="visit-done" data-close tabindex="-1" aria-label="Cerrar valoración">Listo</button></div><span class="sv" id="e-sv"></span></div>
     <div class="row"><div><label>Sillón</label><input id="e-sil" inputmode="numeric" value="${esc(e.sillon)}"></div><div style="display:flex;align-items:end"><button type="button" class="btn sec" id="e-cal">Calculadora</button></div></div>
     <div class="box" style="margin:7px 0;padding:9px">
       <label for="e-com"><b>Comentario de hoy</b></label>
@@ -543,21 +558,17 @@ async function openEntry(id){
       <div style="margin-top:10px"><b>Fotos de hoy</b><div class="thumbs" id="e-fotos"></div><label class="btn" for="e-file" style="display:inline-block;margin-top:5px">Tomar o agregar foto</label><input id="e-file" type="file" accept="image/*" hidden multiple></div>
       <div style="margin-top:9px"><b>Fotos anteriores</b><div class="thumbs" id="e-prev-fotos">Buscando hojas recientes…</div><small class="mu">Se eliminan según el plazo de 7 días.</small></div>
     </div>
-    <details class="compact-details"><summary>Notas del paciente</summary>
-      <label for="e-fija">Nota fija · permanece entre sesiones</label><textarea id="e-fija" rows="3" placeholder="Información para próximos pases…">${esc(pat.notaFija)}</textarea>
-      <label for="e-nt">Nota clínica de hoy</label><textarea id="e-nt" rows="5" maxlength="20000" spellcheck="false" autocapitalize="none" placeholder="Nota clínica…">${esc(e.notaTxt)}</textarea>
-      <div class="ntrow"><button type="button" id="e-ntp">Pegar</button><button type="button" id="e-ntc">Copiar</button><button type="button" id="e-ntx">Borrar</button><span class="ntc" id="e-ntn"></span></div>
+    <details class="compact-details visit-notes"><summary>Notas · 4 campos</summary>
+      <div class="row"><div><label for="x-peso">Peso seco</label><input id="x-peso" value="${esc(ex.peso)}"></div><div><label for="x-gan">Ganancia interdialítica</label><input id="x-gan" value="${esc(ex.gan)}"></div></div>
+      <div class="row"><div><label for="x-ta">TA</label><input id="x-ta" value="${esc(ex.ta)}"></div><div><label for="x-otro">Otros</label><input id="x-otro" value="${esc(ex.otro)}"></div></div>
+      <small class="mu">Se conservan los datos de la sesión mediante guardado automático.</small>
     </details>
     <details class="compact-details"><summary>Datos del paciente y turno</summary>
       <div class="row"><div><label>Turno</label><select id="e-tur">${turnoOpts(e.turno)}</select></div><div><label>Acceso fijo</label><select id="e-ac"><option value="">—</option>${ACCESOS.map(a=>`<option ${pat.acceso===a?'selected':''}>${esc(a)}</option>`).join('')}</select></div></div>
       <label>Aviso fijo</label><input id="e-av" value="${esc(pat.aviso)}">
     </details>
-    <button class="notabig" id="e-nota"></button>
     <details id="e-hist"><summary>Historial completo</summary><div id="e-hist-list">Cargando…</div></details>
     <details class="compact-details"><summary>Eventos de hoy</summary><div class="tags" id="e-tags"></div></details>
-    <details><summary>Datos de la sesión (opcional)</summary>
-      <div class="row"><div><label>Peso seco</label><input id="x-peso" value="${esc(ex.peso)}"></div><div><label>Ganancia interdialítica</label><input id="x-gan" value="${esc(ex.gan)}"></div></div>
-      <div class="row"><div><label>TA</label><input id="x-ta" value="${esc(ex.ta)}"></div><div><label>Otros</label><input id="x-otro" value="${esc(ex.otro)}"></div></div></details>
     <button class="dng" id="e-del">Quitar de la lista</button>`);
   S.sel=e.id;refreshList();
   $('#e-cal',sh).onclick=()=>openCalcFloating();
@@ -566,14 +577,15 @@ async function openEntry(id){
   loadPreviousPhotos(e.expediente,e.id,sh);
   const q=s=>$(s,sh);
   let tm=null;
+  let curNotaFija=pat.notaFija||'';
   const freshPat=async()=>(await get('patients',e.expediente))||{expediente:e.expediente,nombre:'',pendientes:[],updatedAt:0,pu:0};
   const sv=ok=>{const s=q('#e-sv');if(!s)return;s.textContent=ok?'Guardado ✓':'No se pudo guardar';s.className='sv on'+(ok?'':' err');clearTimeout(sv.t);if(ok)sv.t=setTimeout(()=>s.classList.remove('on'),1500)};
   const flushRaw=async()=>{clearTimeout(tm);tm=null;
-    e.comentario=q('#e-com').value;e.notaTxt=q('#e-nt').value;e.sillon=q('#e-sil').value.trim();
+    e.comentario=q('#e-com').value;e.sillon=q('#e-sil').value.trim();
     e.extras={peso:q('#x-peso').value,gan:q('#x-gan').value,ta:q('#x-ta').value,otro:q('#x-otro').value};
     e.updatedAt=now();await put('entries',e);
     // el perfil se escribe sobre la copia más reciente del paciente (por si otro dispositivo cambió pendientes)
-    const nn=q('#e-nom').value.trim(),ac=q('#e-ac').value,av=q('#e-av').value.trim(),nf=q('#e-fija').value;
+    const nn=q('#e-nom').value.trim(),ac=q('#e-ac').value,av=q('#e-av').value.trim(),nf=curNotaFija;
     const cur=await freshPat();
     if(nn!==(cur.nombre||'')||ac!==(cur.acceso||'')||av!==(cur.aviso||'')||nf!==(cur.notaFija||'')){
       cur.nombre=nn;cur.acceso=ac;cur.aviso=av;cur.notaFija=nf;cur.pu=now();cur.updatedAt=now();await put('patients',cur)}
@@ -602,32 +614,8 @@ async function openEntry(id){
   q('#e-next').onclick=()=>goToPatient(nextId);
 
   sheetCb=async()=>{try{await flush()}finally{urls.forEach(u=>URL.revokeObjectURL(u));const prev=q('#e-prev-fotos');if(prev&&prev._photoUrls)prev._photoUrls.forEach(u=>URL.revokeObjectURL(u))}};
-  ['#e-com','#e-nt','#e-sil','#e-nom','#e-av','#e-fija','#x-peso','#x-gan','#x-ta','#x-otro'].forEach(s=>q(s).addEventListener('input',later));
+  ['#e-com','#e-sil','#e-nom','#e-av','#x-peso','#x-gan','#x-ta','#x-otro'].forEach(s=>q(s).addEventListener('input',later));
   q('#e-ac').addEventListener('change',ev=>{later();ev.target.blur()});
-  // Nota en texto plano: cuadro para pegar (el textarea siempre pega solo texto, sin formato)
-  const ntCount=()=>{const v=q('#e-nt').value;q('#e-ntn').textContent=v?v.length.toLocaleString('es-MX')+' caracteres':''};
-  ntCount();q('#e-nt').addEventListener('input',ntCount);
-  q('#e-ntp').onclick=async()=>{
-    const ta=q('#e-nt');
-    try{
-      const txt=await navigator.clipboard.readText();
-      if(!txt){toast('El portapapeles está vacío');return}
-      const s=typeof ta.selectionStart==='number'?ta.selectionStart:ta.value.length,en=typeof ta.selectionEnd==='number'?ta.selectionEnd:s;
-      ta.value=ta.value.slice(0,s)+txt+ta.value.slice(en);
-      try{ta.setSelectionRange(s+txt.length,s+txt.length)}catch(err){}
-      ta.dispatchEvent(new Event('input',{bubbles:true}));toast('Pegado');
-    }catch(err){ta.focus();toast('Mantén presionado en el cuadro y elige Pegar')}
-  };
-  q('#e-ntc').onclick=async()=>{
-    const ta=q('#e-nt');if(!ta.value){toast('No hay nada que copiar');return}
-    try{await navigator.clipboard.writeText(ta.value);toast('Nota copiada')}
-    catch(err){try{ta.focus();ta.select();document.execCommand('copy');toast('Nota copiada')}catch(e2){toast('No se pudo copiar')}}
-  };
-  q('#e-ntx').onclick=()=>{
-    const ta=q('#e-nt');if(!ta.value)return;
-    if(!confirm('¿Borrar el texto de la nota?'))return;
-    ta.value='';ta.dispatchEvent(new Event('input',{bubbles:true}));
-  };
   // al salir de cualquier campo se guarda enseguida
   sh.addEventListener('focusout',()=>{clearTimeout(tm);tm=setTimeout(()=>flush().catch(()=>{}),60)});
   const drawTags=()=>{
@@ -643,8 +631,7 @@ async function openEntry(id){
     await flush().catch(()=>{});drawTags();
   });
   q('#e-tur').onchange=async ev=>{const v=+ev.target.value;ev.target.blur();e.turno=v;S.turno=v;lsSet('turno',v);await flush().catch(()=>{})};
-  const drawNota=()=>{const b=q('#e-nota');b.className='notabig'+(e.nota?' ok':'');b.textContent=e.nota?'Nota hecha':'Marcar nota hecha'};
-  q('#e-nota').onclick=async()=>{e.nota=!e.nota;drawNota();await flush().catch(()=>{})};drawNota();
+  const drawNota=()=>{}; // Se conserva el estado histórico sin mostrar controles adicionales.
   const drawPend=()=>{
     const row=x=>`<div class="pr ${x.hecho?'dn':''}"><button class="ck ${x.hecho?'on':''}" data-pt="${x.id}">${x.hecho?'✓':''}</button><span>${esc(x.texto)}</span><button class="x" data-px="${x.id}">×</button></div>`;
     const open=pAct(pat),done=pDone(pat);
@@ -677,7 +664,7 @@ async function openEntry(id){
       drawNota();drawTags();q('#e-tur').value=String(e.turno);
       const fo=document.activeElement;
       if(fo!==q('#e-com')){q('#e-com').value=r.comentario||'';e.comentario=r.comentario||''}
-      if(fo!==q('#e-nt')){q('#e-nt').value=r.notaTxt||'';e.notaTxt=r.notaTxt||'';ntCount()}
+      if(typeof r.notaTxt==='string')e.notaTxt=r.notaTxt;
       if(fo!==q('#e-sil')){q('#e-sil').value=r.sillon||'';e.sillon=r.sillon||''}
     },
     // llegó o se borró una foto desde otro dispositivo: se vuelve a leer la lista de fotos de esta sesión
@@ -690,7 +677,7 @@ async function openEntry(id){
       const fo=document.activeElement;
       if(fo!==q('#e-nom'))q('#e-nom').value=p.nombre||'';
       if(fo!==q('#e-av'))q('#e-av').value=p.aviso||'';
-      if(fo!==q('#e-fija'))q('#e-fija').value=p.notaFija||'';
+      curNotaFija=p.notaFija||'';
       if(fo!==q('#e-ac'))q('#e-ac').value=p.acceso||'';
     }};
   q('#e-reuse').onclick=async()=>{
