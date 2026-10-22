@@ -171,6 +171,14 @@ details{margin-top:12px}summary{padding:6px 0;color:var(--mu);font-weight:600}
 .nr textarea{margin-top:6px;font-size:15px;line-height:1.4}
 .nr .tags{margin-top:6px}.nr .tg{padding:7px 11px;font-size:13px}
 .nr label{margin:8px 0 3px}
+.sh-sticky{position:sticky;top:0;z-index:4;background:var(--bg);margin:-14px -14px 8px;padding:14px 14px 8px;box-shadow:0 1px 0 var(--bd)}
+.sh-sticky .sh-head{position:static;margin:0;padding:0;box-shadow:none}
+.stabs2{display:grid;grid-template-columns:1fr 1fr auto;gap:6px;margin-top:8px}
+.stabs2 button{height:38px;border-radius:10px;background:var(--card);border:1px solid var(--bd);font-weight:700;font-size:14px;color:var(--mu);padding:0 12px}
+.stabs2 button.on{background:var(--ac);color:var(--onac);border-color:var(--ac)}
+.stabs2 .notabtn{border:2px solid var(--wa);background:var(--wabg);color:var(--wa)}
+.stabs2 .notabtn.ok{border-color:var(--ok);background:var(--okbg);color:var(--ok)}
+.sp{display:none}.sp.on{display:block}
 </style>
 </head>
 <body>
@@ -186,7 +194,7 @@ details{margin-top:12px}summary{padding:6px 0;color:var(--mu);font-weight:600}
 
 <script>
 'use strict';
-const VERSION='10.7';
+const VERSION='10.8';
 const TURNOS=[1,2,3,4,5];
 const DIAS_FOTO=7;
 const ACCESOS=['FAV','Injerto','Catéter tunelizado','Catéter temporal'];
@@ -609,24 +617,11 @@ async function openEntry(id){
   const urls=[];
   const ex=e.extras;
   const sh=openSheet(`
+    <div class="sh-sticky">
     <div class="sh-head visit-head"><div class="visit-identity"><input id="e-nom" class="nm-in" placeholder="Nombre del paciente" value="${esc(pat.nombre)}"><div class="ex">Exp. ${esc(e.expediente)} · ${esc(fmtFecha(e.fecha))}</div></div><div class="visit-actions"><div class="visit-switch"><button type="button" class="ib" id="e-prev" aria-label="Paciente anterior" title="Paciente anterior" ${prevId?'':'disabled'}>‹</button><span class="visit-counter">${idx+1}/${vecinos.length}</span><button type="button" class="ib" id="e-next" aria-label="Paciente siguiente" title="Paciente siguiente" ${nextId?'':'disabled'}>›</button></div><button type="button" class="visit-done" data-close tabindex="-1" aria-label="Cerrar valoración">Listo</button></div><span class="sv" id="e-sv"></span></div>
+      <div class="stabs2"><button type="button" data-st="pase">Pase</button><button type="button" data-st="nota">Nota rápida</button><button type="button" class="notabtn" id="e-nota"></button></div></div>
+    <div class="sp" data-pn="pase">
     <div class="row"><div><label>Sillón</label><input id="e-sil" inputmode="numeric" value="${esc(e.sillon)}"></div><div style="display:flex;align-items:end"><button type="button" class="btn sec" id="e-cal">Calculadora</button></div></div>
-    <details id="e-nr" class="compact-details nr" ${lsGet('nrOpen')==='1'?'open':''}><summary>Nota rápida · copiar campos</summary>
-      <div class="blk"><div class="bh"><b>Fecha</b><button type="button" class="cp" data-cp="fecha" data-lbl="fecha">Copiar</button></div><div class="pv" id="nr-fecha"></div></div>
-      <div class="blk"><div class="bh"><b>Sala y turno</b><button type="button" class="cp" data-cp="sala" data-lbl="sala y turno">Copiar</button></div>
-        <label for="nr-sala">Sala</label><input id="nr-sala" inputmode="numeric" autocomplete="off"><div class="pv" id="nr-salatxt"></div></div>
-      <div class="blk"><div class="bh"><b>Padecimiento actual</b><button type="button" class="cp" data-cp="pa" data-lbl="padecimiento actual">Copiar</button></div>
-        <div class="seg"><button type="button" data-pam="asin">Asintomático</button><button type="button" data-pam="sint">Con síntomas</button></div>
-        <div class="tags" id="nr-sint"></div><input id="nr-sotro" placeholder="Otro síntoma…" autocomplete="off" style="margin-top:6px">
-        <textarea id="nr-pa" rows="3"></textarea>
-        <label>Sexo del paciente (ajusta asintomático/a)</label><div class="seg"><button type="button" data-sx="F">Mujer</button><button type="button" data-sx="M">Hombre</button></div></div>
-      <div class="blk"><div class="bh"><b>Exploración física (opcional)</b><button type="button" class="cp" data-cp="exf" data-lbl="exploración física">Copiar</button></div>
-        <textarea id="nr-exf" rows="6"></textarea>
-        <div class="ntrow"><button type="button" id="nr-exf-def">Guardar como predeterminada</button><button type="button" id="nr-exf-rst">Restaurar</button></div></div>
-      <div class="blk"><div class="bh"><b>UF programada y tolerada</b><button type="button" class="cp" data-cp="uf" data-lbl="UF">Copiar</button></div>
-        <div class="row"><div><label for="nr-ufp">Programada (mL)</label><input id="nr-ufp" inputmode="numeric" autocomplete="off"></div><div><label for="nr-uft">Tolerada (mL)</label><input id="nr-uft" inputmode="numeric" autocomplete="off"></div></div>
-        <button type="button" class="mini" id="nr-ufeq" style="margin-top:8px">Tolerada = programada</button><div class="pv" id="nr-uftxt"></div></div>
-    </details>
     <div class="box" style="margin:7px 0;padding:9px">
       <label for="e-com"><b>Comentario de hoy</b></label>
       <textarea id="e-com" rows="3" placeholder="Comentario de esta sesión…">${esc(e.comentario)}</textarea>
@@ -647,7 +642,26 @@ async function openEntry(id){
     </details>
     <details id="e-hist"><summary>Historial completo</summary><div id="e-hist-list">Cargando…</div></details>
     <details class="compact-details"><summary>Eventos de hoy</summary><div class="tags" id="e-tags"></div></details>
-    <button class="dng" id="e-del">Quitar de la lista</button>`);
+    <button class="dng" id="e-del">Quitar de la lista</button>
+    </div>
+    <div class="sp" data-pn="nota">
+    <div id="e-nr" class="nr">
+      <div class="blk"><div class="bh"><b>Fecha</b><button type="button" class="cp" data-cp="fecha" data-lbl="fecha">Copiar</button></div><div class="pv" id="nr-fecha"></div></div>
+      <div class="blk"><div class="bh"><b>Sala y turno</b><button type="button" class="cp" data-cp="sala" data-lbl="sala y turno">Copiar</button></div>
+        <label for="nr-sala">Sala</label><input id="nr-sala" inputmode="numeric" autocomplete="off"><div class="pv" id="nr-salatxt"></div></div>
+      <div class="blk"><div class="bh"><b>Padecimiento actual</b><button type="button" class="cp" data-cp="pa" data-lbl="padecimiento actual">Copiar</button></div>
+        <div class="seg"><button type="button" data-pam="asin">Asintomático</button><button type="button" data-pam="sint">Con síntomas</button></div>
+        <div class="tags" id="nr-sint"></div><input id="nr-sotro" placeholder="Otro síntoma…" autocomplete="off" style="margin-top:6px">
+        <textarea id="nr-pa" rows="3"></textarea>
+        <label>Sexo del paciente (ajusta asintomático/a)</label><div class="seg"><button type="button" data-sx="F">Mujer</button><button type="button" data-sx="M">Hombre</button></div></div>
+      <div class="blk"><div class="bh"><b>Exploración física (opcional)</b><button type="button" class="cp" data-cp="exf" data-lbl="exploración física">Copiar</button></div>
+        <textarea id="nr-exf" rows="6"></textarea>
+        <div class="ntrow"><button type="button" id="nr-exf-def">Guardar como predeterminada</button><button type="button" id="nr-exf-rst">Restaurar</button></div></div>
+      <div class="blk"><div class="bh"><b>UF programada y tolerada</b><button type="button" class="cp" data-cp="uf" data-lbl="UF">Copiar</button></div>
+        <div class="row"><div><label for="nr-ufp">Programada (mL)</label><input id="nr-ufp" inputmode="numeric" autocomplete="off"></div><div><label for="nr-uft">Tolerada (mL)</label><input id="nr-uft" inputmode="numeric" autocomplete="off"></div></div>
+        <button type="button" class="mini" id="nr-ufeq" style="margin-top:8px">Tolerada = programada</button><div class="pv" id="nr-uftxt"></div></div>
+    </div>
+    </div>`);
   S.sel=e.id;refreshList();
   $('#e-cal',sh).onclick=()=>openCalcFloating();
   loadHistory(e.expediente,e.id,sh);
@@ -656,6 +670,14 @@ async function openEntry(id){
   const q=s=>$(s,sh);
   let tm=null;
   let curNotaFija=pat.notaFija||'';
+  // pestañas: Pase | Nota rápida (al cambiar de paciente con ‹ › se conserva la pestaña)
+  const showTab=n=>{
+    sh.querySelectorAll('[data-pn]').forEach(p=>p.classList.toggle('on',p.dataset.pn===n));
+    sh.querySelectorAll('[data-st]').forEach(b=>b.classList.toggle('on',b.dataset.st===n));
+    sh.scrollTop=0;S.etab=n;
+  };
+  sh.addEventListener('click',ev=>{const b=ev.target.closest('[data-st]');if(b)showTab(b.dataset.st)});
+  showTab(S.keepTab&&S.etab?S.etab:'pase');S.keepTab=false;
   // ---- Nota rápida: solo los campos que cambian en la nota; cada uno con su botón de copiar
   const nr=Object.assign({},e.nr||{});
   let sexo=pat.sexo||'';
@@ -713,6 +735,7 @@ async function openEntry(id){
       // Persistir cambios antes de cerrar; si falla, quedarse en este expediente.
       await flush();
       await closeSheet(true);
+      S.keepTab=true;
       await openEntry(target);
     }catch(err){
       logErr('cambiar paciente',err);
@@ -727,7 +750,6 @@ async function openEntry(id){
   ['#e-com','#e-sil','#e-nom','#e-av','#x-peso','#x-gan','#x-ta','#x-otro'].forEach(s=>q(s).addEventListener('input',later));
   ['#nr-sala','#nr-pa','#nr-exf','#nr-ufp','#nr-uft'].forEach(s=>q(s).addEventListener('input',()=>{drawNR();later()}));
   q('#nr-sotro').addEventListener('input',()=>{const was=paAuto();nr.sotro=q('#nr-sotro').value;if(was)q('#nr-pa').value=genPA();later()});
-  q('#e-nr').addEventListener('toggle',()=>lsSet('nrOpen',q('#e-nr').open?'1':'0'));
   q('#e-nr').addEventListener('click',async ev=>{
     const cp=ev.target.closest('[data-cp]');
     if(cp){
@@ -763,7 +785,8 @@ async function openEntry(id){
     await flush().catch(()=>{});drawTags();
   });
   q('#e-tur').onchange=async ev=>{const v=+ev.target.value;ev.target.blur();e.turno=v;S.turno=v;lsSet('turno',v);drawNR();await flush().catch(()=>{})};
-  const drawNota=()=>{}; // Se conserva el estado histórico sin mostrar controles adicionales.
+  const drawNota=()=>{const b=q('#e-nota');b.className='notabtn'+(e.nota?' ok':'');b.textContent=e.nota?'✓ Nota hecha':'○ Nota pendiente'};
+  q('#e-nota').onclick=async()=>{e.nota=!e.nota;drawNota();await flush().catch(()=>{})};drawNota();
   const drawPend=()=>{
     const row=x=>`<div class="pr ${x.hecho?'dn':''}"><button class="ck ${x.hecho?'on':''}" data-pt="${x.id}">${x.hecho?'✓':''}</button><span>${esc(x.texto)}</span><button class="x" data-px="${x.id}">×</button></div>`;
     const open=pAct(pat),done=pDone(pat);
