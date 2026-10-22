@@ -194,7 +194,7 @@ details{margin-top:12px}summary{padding:6px 0;color:var(--mu);font-weight:600}
 
 <script>
 'use strict';
-const VERSION='10.8';
+const VERSION='10.10';
 const TURNOS=[1,2,3,4,5];
 const DIAS_FOTO=7;
 const ACCESOS=['FAV','Injerto','Catéter tunelizado','Catéter temporal'];
@@ -213,6 +213,7 @@ const lsSet=(k,v)=>{try{localStorage.setItem(k,v)}catch(e){}};
 
 /* ---------- Registro de errores (se ve en Ajustes) ---------- */
 function readErrs(){try{const a=JSON.parse(lsGet('errlog')||'[]');return Array.isArray(a)?a:[]}catch(e){return[]}}
+const crumb=m=>{try{localStorage.setItem('crumb',JSON.stringify({t:Date.now(),s:m}))}catch(e){}};
 function logErr(donde,err){
   try{
     const a=readErrs();
@@ -319,6 +320,7 @@ async function renderHoy(){
         <button class="ib" data-batch title="Cargar lista del turno">☷ Lista</button><button class="ib pl" data-add aria-label="Agregar paciente">＋</button></div>
       <div class="tabs">${tabs}</div>
       <div class="sbar"><input id="s-q" type="search" placeholder="Buscar paciente por nombre o expediente" autocomplete="off" autocorrect="off" enterkeyhint="search" value="${esc(S.q||'')}"><div id="s-res" class="sres"></div></div></div>
+    ${lsGet('safe')==='1'?'<div class="banner"><div>Modo seguro: la app se cerró sola al iniciar la última vez. La sincronización y la limpieza de fotos están en pausa. <button type="button" class="mini" data-resume style="margin-top:6px">Reanudar</button></div></div>':''}
     ${showBanner?`<div class="banner"><div>Para que iOS no borre tus datos, instala la app: botón Compartir → <b>Agregar a pantalla de inicio</b>, y úsala siempre desde ese ícono.</div><button data-bn>×</button></div>`:''}
     ${cards||`<div class="empty">Sin pacientes en el turno ${S.turno}.</div>`}
     <button class="addend" data-add>＋ Agregar paciente</button>`;
@@ -337,9 +339,10 @@ async function renderPend(){
      ${g.o.map(x=>`<div class="pr"><button class="ck" data-pt="${x.id}" data-pe="${esc(g.p.expediente)}"></button><span>${esc(x.texto)}</span></div>`).join('')}</div>`}).join('')||`<div class="empty">No hay pendientes abiertos 🎉</div>`);
 }
 
+const photoStats=()=>new Promise((res,rej)=>{let n=0,b=0;const r=store('photos').openCursor();r.onsuccess=()=>{const c=r.result;if(c){n++;b+=c.value.blob?c.value.blob.size:0;c.continue()}else res({n,b})};r.onerror=()=>rej(r.error)});
 async function renderResp(){
-  const [phs,pats,ents]=await Promise.all([all('photos'),all('patients'),all('entries')]);
-  const bytes=phs.reduce((s,x)=>s+(x.blob?x.blob.size:0),0);
+  const [phs,pats,ents]=await Promise.all([photoStats(),all('patients'),all('entries')]);
+  const bytes=phs.b;
   let est=null,per=null;
   try{est=await navigator.storage.estimate()}catch(e){}
   try{per=await navigator.storage.persisted()}catch(e){}
@@ -379,7 +382,7 @@ async function renderResp(){
     <div class="tags"><button class="tg ${modo==='ligera'?'on':''}" data-fq="ligera">Ligera</button><button class="tg ${modo==='normal'?'on':''}" data-fq="normal">Normal</button></div></div>
   <div class="box"><h3>Almacenamiento</h3>
     <p>${pats.length} paciente${pats.length===1?'':'s'} guardado${pats.length===1?'':'s'} · ${ents.filter(x=>!x.deleted).length} registro${ents.filter(x=>!x.deleted).length===1?'':'s'} de sesión</p>
-    <p>${phs.length} foto${phs.length===1?'':'s'} de hoja de signos: ${mb(bytes)}. Se borran solas a los ${DIAS_FOTO} días.</p>
+    <p>${phs.n} foto${phs.n===1?'':'s'} de hoja de signos: ${mb(bytes)}. Se borran solas a los ${DIAS_FOTO} días.</p>
     ${est&&est.quota?`<p>Uso total de la app: ${mb(est.usage||0)}</p>`:''}
     <p>Almacenamiento persistente: ${per===true?'sí ✓':per===false?'no concedido (instala la app en la pantalla de inicio)':'no disponible'}</p>
     <button class="btn sec" id="r-del">Borrar todas las fotos ahora</button></div>
@@ -604,6 +607,7 @@ async function addEntry(expRaw,nom,tur,sil,rapid=false){
 }
 
 async function openEntry(id){
+  crumb('abre ficha');
   await settle();
   const e=await get('entries',id);if(!e)return;
   if(!e.fotos)e.fotos=[];if(!e.extras)e.extras={};if(!e.tags)e.tags=[];
@@ -710,12 +714,18 @@ async function openEntry(id){
   const paAuto=()=>q('#nr-pa').value===genPA();
   const freshPat=async()=>(await get('patients',e.expediente))||{expediente:e.expediente,nombre:'',pendientes:[],updatedAt:0,pu:0};
   const sv=ok=>{const s=q('#e-sv');if(!s)return;s.textContent=ok?'Guardado ✓':'No se pudo guardar';s.className='sv on'+(ok?'':' err');clearTimeout(sv.t);if(ok)sv.t=setTimeout(()=>s.classList.remove('on'),1500)};
-  const flushRaw=async()=>{clearTimeout(tm);tm=null;
+  const collect=()=>{
     e.comentario=q('#e-com').value;e.sillon=q('#e-sil').value.trim();
     e.extras={peso:q('#x-peso').value,gan:q('#x-gan').value,ta:q('#x-ta').value,otro:q('#x-otro').value};
     e.nr={sala:q('#nr-sala').value.trim(),pam:nr.pam,sint:nr.sint,sotro:q('#nr-sotro').value,pa:q('#nr-pa').value,exf:q('#nr-exf').value,ufp:q('#nr-ufp').value.trim(),uft:q('#nr-uft').value.trim()};
+  };
+  const sig=()=>JSON.stringify([e.comentario||'',e.sillon||'',e.extras,e.nr,!!e.nota,e.tags,e.turno,e.asistencia||'',e.fotos]);
+  collect();let savedSig=sig();
+  const flushRaw=async()=>{clearTimeout(tm);tm=null;
+    collect();
     if(e.nr.sala)lsSet('sala',e.nr.sala);
-    e.updatedAt=now();await put('entries',e);
+    // solo se escribe (y se sincroniza) si algo cambió: abrir y cerrar una ficha no debe pisar cambios hechos en otro dispositivo
+    const s2=sig();if(s2!==savedSig){const prevSig=savedSig;savedSig=s2;e.updatedAt=now();try{await put('entries',e)}catch(err){savedSig=prevSig;throw err}}
     // el perfil se escribe sobre la copia más reciente del paciente (por si otro dispositivo cambió pendientes)
     const nn=q('#e-nom').value.trim(),ac=q('#e-ac').value,av=q('#e-av').value.trim(),nf=curNotaFija,sx=sexo;
     const cur=await freshPat();
@@ -815,6 +825,7 @@ async function openEntry(id){
     setE:r=>{
       e.nota=!!r.nota;e.tags=r.tags||[];e.turno=r.turno;e.updatedAt=r.updatedAt;e.deleted=!!r.deleted;
       if(r.fotos)e.fotos=r.fotos;
+      savedSig=sig();
       if(sheetEl!==sh)return;
       drawNota();drawTags();q('#e-tur').value=String(e.turno);
       const fo=document.activeElement;
@@ -822,6 +833,7 @@ async function openEntry(id){
       if(typeof r.notaTxt==='string')e.notaTxt=r.notaTxt;
       if(r.nr&&!q('#e-nr').contains(document.activeElement)){Object.assign(nr,r.nr);e.nr=r.nr;fillNR();drawNR()}
       if(fo!==q('#e-sil')){q('#e-sil').value=r.sillon||'';e.sillon=r.sillon||''}
+      savedSig=sig();
     },
     // llegó o se borró una foto desde otro dispositivo: se vuelve a leer la lista de fotos de esta sesión
     refreshFotos:async()=>{
@@ -980,13 +992,16 @@ $('#v-zoom').onclick=()=>setZoom(vz>=3.5?1:Math.floor(vz)+1);
 $('#v-del').onclick=async()=>{if(!vwDel||!confirm('¿Borrar esta foto?'))return;const f=vwDel;$('#v-x').onclick();await f()};
 
 async function purge(){
-  const lim=now()-DIAS_FOTO*DAY;let n=0;const gone=new Set();
-  for(const p of await all('photos'))if(p.created<lim){await del('photos',p.id);gone.add(p.id);n++}
-  if(gone.size)for(const e of await all('entries')){
+  const lim=now()-DIAS_FOTO*DAY;const old=[];
+  await new Promise((res,rej)=>{const r=store('photos').openCursor();r.onsuccess=()=>{const c=r.result;if(c){if((c.value.created||0)<lim)old.push(c.key);c.continue()}else res()};r.onerror=()=>rej(r.error)});
+  if(!old.length)return 0;
+  const gone=new Set(old);
+  for(const k of old)await del('photos',k);
+  for(const e of await all('entries')){
     const k=(e.fotos||[]).filter(i=>!gone.has(i));
     // las fotos son locales: limpiar la lista no cuenta como cambio para la sincronización
     if(k.length!==(e.fotos||[]).length){e.fotos=k;await put('entries',e,{nosync:true})}}
-  return n;
+  return old.length;
 }
 
 /* ---------- Respaldo ---------- */
@@ -1065,10 +1080,13 @@ async function loadPreviousInfo(exp,current,host){
 async function loadPreviousPhotos(exp,current,host){
  const target=$('#e-prev-fotos',host);if(!target)return;
  const entries=(await all('entries')).filter(x=>!x.deleted&&x.expediente===exp&&x.id!==current).sort((a,b)=>b.fecha.localeCompare(a.fecha));
- const photos=await all('photos');const limit=now()-DIAS_FOTO*DAY;
+ const limit=now()-DIAS_FOTO*DAY;
  const items=[];
- for(const entry of entries){for(const ph of photos){if(ph.entry===entry.id&&ph.created>=limit&&ph.blob)items.push({entry,ph})}}
- if(!items.length){target.textContent='No hay hojas anteriores disponibles dentro de los últimos 7 días.';return}
+ for(const entry of entries.slice(0,12)){
+  for(const ph of await rq(store('photos').index('entry').getAll(entry.id)))if((ph.created||0)>=limit&&ph.blob)items.push({entry,ph});
+  if(items.length>=6)break;
+ }
+ if(!items.length){target.textContent='No hay hojas anteriores disponibles dentro de los últimos '+DIAS_FOTO+' días.';return}
  const urls=[];target.innerHTML='';
  for(const {entry,ph} of items){const u=URL.createObjectURL(ph.blob);urls.push(u);const b=document.createElement('button');b.type='button';b.className='th';b.style.margin='5px';const img=document.createElement('img');img.src=u;img.alt='Hoja de enfermería anterior';const small=document.createElement('small');small.textContent=entry.fecha+' · Turno '+entry.turno;b.append(img,small);b.onclick=()=>viewPhoto(u,()=>{});target.appendChild(b)}
  // Conservar las URLs mientras la ficha está abierta; liberar al cerrar.
@@ -1108,6 +1126,7 @@ document.addEventListener('click',async ev=>{
   const shb=t.closest('[data-shist]');if(shb){const x=shb.dataset.shist;clearSearch();openProfile(x);return}
   const srr=t.closest('[data-sexp]');if(srr){pickPatient(srr.dataset.sexp).catch(err=>logErr('buscar',err));return}
   const snw=t.closest('[data-snew]');if(snw){const v=snw.dataset.snew;clearSearch();openAdd(/\d/.test(v)&&!/\s/.test(v)?{exp:v}:{nombre:v});return}
+  if(t.closest('[data-resume]')){lsSet('safe','0');location.reload();return}
   const nav=t.closest('nav button');
   if(nav){if(sheetEl&&sheetDocked)closeSheet(true);S.view=nav.dataset.v;render();window.scrollTo(0,0);return}
   const kc=t.closest('[data-k]');if(kc){calcKey(kc.dataset.k);return}
@@ -1227,6 +1246,7 @@ const SYNC=(()=>{
   }
   // la nube solo conserva las fotos de los últimos 7 días, igual que los dispositivos
   async function purgeRemote(){
+    crumb('sync limpia nube');
     if(!st.uid||!st.fs||!st.syncPhotos)return;
     try{
       const snap=await ref('photos').where('created','<',now()-DIAS_FOTO*DAY).get();
@@ -1234,6 +1254,7 @@ const SYNC=(()=>{
     }catch(e){logErr('limpiar nube',e)}
   }
   async function pushAll(){
+    crumb('sync sube todo');
     if(!st.uid||!st.fs)return;
     const items=[];
     for(const p of await all('patients'))items.push(...itemsFor('patients',p));
@@ -1254,6 +1275,7 @@ const SYNC=(()=>{
 
   /* --- bajar --- */
   async function applyRemote(name,r){
+    crumb('sync aplica '+name);
     if(name==='patients'){
       const cur=await get('patients',r.expediente),rs=r.updatedAt||0;
       if(!st.forceNames&&cur&&patStamp(cur)>=rs)return null;
@@ -1316,12 +1338,14 @@ const SYNC=(()=>{
   }
   function unlisten(){st.unsubs.forEach(u=>{try{u()}catch(e){}});st.unsubs=[]}
   function listen(){
+    crumb('sync escucha');
     unlisten();st.first={};
     const cut=todayStr(new Date(Date.now()-DIAS_ENT*DAY));
     const defs=[['patients',ref('patients')],['pendientes',ref('pendientes')],['entries',ref('entries').where('fecha','>=',cut)],['meta',ref('meta')]];
     if(st.syncPhotos)defs.push(['photos',ref('photos').where('created','>=',now()-DIAS_FOTO*DAY)]);
     defs.forEach(([name,q])=>{
       st.unsubs.push(q.onSnapshot(snap=>{
+        crumb('sync recibe '+name+' '+snap.docChanges().length);
         snap.docChanges().forEach(ch=>{
           if(ch.type==='removed')return;
           const d=ch.doc.data();
@@ -1350,6 +1374,7 @@ const SYNC=(()=>{
       :/unauthorized-domain/.test(c)?'Este dominio no está autorizado en Firebase'
       :(e&&e.message)||'No se pudo iniciar sesión'};
   function init(){
+    crumb('sync inicia');
     if(!cfgOk()){st.status='nocfg';changed();return}
     if(typeof firebase==='undefined'){st.status='nosdk';changed();return}
     try{
@@ -1393,16 +1418,26 @@ const SYNC=(()=>{
 
 /* ---------- Inicio ---------- */
 (async()=>{
+  // Si la app se cerró durante el inicio anterior, arranca en modo seguro (sin sincronización ni limpieza) hasta que la reanudes.
+  try{const pc=JSON.parse(lsGet('crumb')||'null');if(pc&&pc.s!=='segundo plano')logErr('cierre previo','Último evento antes de cerrarse: '+pc.s+' ('+new Date(pc.t).toLocaleTimeString('es-MX')+'). Si la cerraste tú, ignóralo.')}catch(e){}
+  document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')crumb('segundo plano')});window.addEventListener('pagehide',()=>crumb('segundo plano'));
+  crumb('inicio');
+  const bootOk=()=>lsSet('booting','0');
+  if(lsGet('booting')==='1'){lsSet('safe','1');logErr('inicio','La app se cerró durante el inicio anterior: modo seguro')}
+  lsSet('booting','1');setTimeout(bootOk,8000);window.addEventListener('pagehide',bootOk);
+  const safe=lsGet('safe')==='1';
   try{db=await openDB()}catch(e){logErr('abrir base',e);$('#main').innerHTML='<div class="empty">Este navegador no permite guardar datos locales (¿modo privado?).</div>';return}
-  await purge();
   try{if(navigator.storage&&navigator.storage.persist)navigator.storage.persist()}catch(e){}
   await render();
-  // la sincronización arranca cuando terminan de cargar los scripts de Firebase
-  if(document.readyState==='complete')SYNC.init();else window.addEventListener('load',()=>SYNC.init());
-  setInterval(()=>purge().catch(()=>{}),36e5);
+  if(!safe){
+    purge().catch(e=>logErr('limpiar fotos',e));
+    // la sincronización arranca cuando terminan de cargar los scripts de Firebase
+    if(document.readyState==='complete')SYNC.init();else window.addEventListener('load',()=>SYNC.init());
+    setInterval(()=>purge().catch(()=>{}),36e5);
+  }
   document.addEventListener('visibilitychange',async()=>{
     if(document.visibilityState!=='visible')return;
-    await purge().catch(()=>{});
+    if(!safe)await purge().catch(()=>{});
     if(S.hoy&&S.fecha!==todayStr())S.fecha=todayStr();
     if(!sheetEl)render();
   });
