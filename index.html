@@ -171,6 +171,38 @@ details{margin-top:12px}summary{padding:6px 0;color:var(--mu);font-weight:600}
 .nr textarea{margin-top:6px;font-size:15px;line-height:1.4}
 .nr .tags{margin-top:6px}.nr .tg{padding:7px 11px;font-size:13px}
 .nr label{margin:8px 0 3px}
+.sh-sticky{position:sticky;top:0;z-index:4;background:var(--bg);margin:-14px -14px 8px;padding:14px 14px 8px;box-shadow:0 1px 0 var(--bd)}
+.sh-sticky .sh-head{position:static;margin:0;padding:0;box-shadow:none}
+.stabs2{display:grid;grid-template-columns:1fr 1fr auto;gap:6px;margin-top:8px}
+.stabs2 button{height:38px;border-radius:10px;background:var(--card);border:1px solid var(--bd);font-weight:700;font-size:14px;color:var(--mu);padding:0 12px}
+.stabs2 button.on{background:var(--ac);color:var(--onac);border-color:var(--ac)}
+.stabs2 .notabtn{border:2px solid var(--wa);background:var(--wabg);color:var(--wa)}
+.stabs2 .notabtn.ok{border-color:var(--ok);background:var(--okbg);color:var(--ok)}
+.sp{display:none}.sp.on{display:block}
+.nrgrid{display:block}
+.nrfoto{margin-top:8px}
+.nrimgs{max-height:180px;overflow:auto;border:1px solid var(--bd);border-radius:10px;background:var(--card);margin-top:6px}
+.nrimg{width:100%;display:block;cursor:zoom-in}
+.nrimg.big{width:240%;max-width:none;cursor:zoom-out}
+.row3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.row3 input{padding:10px 8px}
+.nr .cp2{padding:8px 12px;border-radius:10px;border:1px solid var(--ac);background:var(--card);color:var(--ac);font-weight:700;font-size:13px}
+.nr .gan{font-size:18px;font-weight:700;padding:10px 0}
+@media(min-width:900px){
+  .nrgrid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px;align-items:start}
+  .nrfoto{position:sticky;top:112px}
+  .nrimgs{max-height:calc(100vh - 280px)}
+}
+.vwm{flex:1;display:flex;flex-direction:column;min-height:0}
+.vwm .sc{flex:1;min-height:0}
+#vw-side{background:var(--card);color:var(--tx);padding:10px 12px calc(10px + env(safe-area-inset-bottom));max-height:46vh;overflow:auto}
+#vw-side .g{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+#vw-side label{display:block;font-size:12px;color:var(--mu);margin-top:6px}
+#vw-side input{width:100%;padding:10px 8px;font-size:17px}
+#vw-side .gan{font-size:18px;font-weight:700;padding:10px 0}
+#vw-side h4{margin:10px 0 0;font-size:13px;display:flex;justify-content:space-between;align-items:center}
+#vw-side .cp{padding:6px 12px;border-radius:10px;background:var(--ac);color:#fff;font-weight:700;font-size:13px}
+@media(min-width:800px){.vwm{flex-direction:row}#vw-side{width:340px;max-height:none;flex:none}}
 </style>
 </head>
 <body>
@@ -181,12 +213,23 @@ details{margin-top:12px}summary{padding:6px 0;color:var(--mu);font-weight:600}
   <button data-v="resp"><span>⚙️</span>Ajustes</button>
 </nav>
 <div id="ov"></div>
-<div id="vw"><div class="bar"><button id="v-zoom">🔍 Zoom</button><button id="v-del">🗑 Borrar</button><button id="v-x">Cerrar</button></div><div class="sc"><img id="v-img" alt="Hoja de signos"></div></div>
+<div id="vw"><div class="bar"><button id="v-zoom">🔍 Zoom</button><button id="v-del">🗑 Borrar</button><button id="v-x">Cerrar</button></div><div class="vwm"><div class="sc"><img id="v-img" alt="Hoja de signos"></div>
+<div id="vw-side" style="display:none">
+ <h4>Encabezado <span><button type="button" class="cp" data-vcp="enc">Copiar</button> <button type="button" class="cp" data-vcp="fecha">Solo fecha</button></span></h4>
+ <div class="g"><div><label>Sala</label><input data-vk="sala" inputmode="numeric" autocomplete="off"></div><div style="grid-column:span 2"><label>Vista previa</label><div id="vx-enc" style="font-size:13px;padding:8px 0;white-space:pre-wrap"></div></div></div>
+ <h4>Prediálisis (en el orden de la hoja)</h4>
+ <div class="g"><div><label>Peso seco</label><input data-vk="seco" inputmode="decimal" autocomplete="off"></div><div><label>Peso inicial</label><input data-vk="ing" inputmode="decimal" autocomplete="off"></div><div><label>Peso ganado</label><input data-vk="gan" inputmode="decimal" autocomplete="off"></div></div>
+ <div class="g"><div><label>F. cardiaca</label><input data-vk="fc" inputmode="numeric" autocomplete="off"></div><div><label>T/A sist.</label><input data-vk="tas" inputmode="numeric" autocomplete="off"></div><div><label>T/A diast.</label><input data-vk="tad" inputmode="numeric" autocomplete="off"></div></div>
+ <div class="g"><div><label>F. respiratoria</label><input data-vk="fr" inputmode="numeric" autocomplete="off"></div><div><label>Temperatura</label><input data-vk="tp" inputmode="decimal" autocomplete="off"></div><div><label>Saturación O2</label><input data-vk="sp" inputmode="numeric" autocomplete="off"></div></div>
+ <h4>Ultrafiltración (mL)</h4>
+ <div class="g"><div><label>Programada</label><input data-vk="ufp" inputmode="numeric" autocomplete="off"></div><div><label>Tolerada</label><input data-vk="uft" inputmode="numeric" autocomplete="off" placeholder="igual"></div><div></div></div>
+ <h4>Copiar <span><button type="button" class="cp" data-vcp="sv">Signos</button> <button type="button" class="cp" data-vcp="pe">Pesos</button> <button type="button" class="cp" data-vcp="uf">UF</button></span></h4>
+</div></div></div>
 <div id="toast"></div>
 
 <script>
 'use strict';
-const VERSION='10.7';
+const VERSION='11.6';
 const TURNOS=[1,2,3,4,5];
 const DIAS_FOTO=7;
 const ACCESOS=['FAV','Injerto','Catéter tunelizado','Catéter temporal'];
@@ -205,6 +248,7 @@ const lsSet=(k,v)=>{try{localStorage.setItem(k,v)}catch(e){}};
 
 /* ---------- Registro de errores (se ve en Ajustes) ---------- */
 function readErrs(){try{const a=JSON.parse(lsGet('errlog')||'[]');return Array.isArray(a)?a:[]}catch(e){return[]}}
+const crumb=m=>{try{localStorage.setItem('crumb',JSON.stringify({t:Date.now(),s:m}))}catch(e){}};
 function logErr(donde,err){
   try{
     const a=readErrs();
@@ -311,6 +355,7 @@ async function renderHoy(){
         <button class="ib" data-batch title="Cargar lista del turno">☷ Lista</button><button class="ib pl" data-add aria-label="Agregar paciente">＋</button></div>
       <div class="tabs">${tabs}</div>
       <div class="sbar"><input id="s-q" type="search" placeholder="Buscar paciente por nombre o expediente" autocomplete="off" autocorrect="off" enterkeyhint="search" value="${esc(S.q||'')}"><div id="s-res" class="sres"></div></div></div>
+    ${lsGet('safe')==='1'?'<div class="banner"><div>Modo seguro: la app se cerró sola al iniciar la última vez. La sincronización y la limpieza de fotos están en pausa. <button type="button" class="mini" data-resume style="margin-top:6px">Reanudar</button></div></div>':''}
     ${showBanner?`<div class="banner"><div>Para que iOS no borre tus datos, instala la app: botón Compartir → <b>Agregar a pantalla de inicio</b>, y úsala siempre desde ese ícono.</div><button data-bn>×</button></div>`:''}
     ${cards||`<div class="empty">Sin pacientes en el turno ${S.turno}.</div>`}
     <button class="addend" data-add>＋ Agregar paciente</button>`;
@@ -329,9 +374,10 @@ async function renderPend(){
      ${g.o.map(x=>`<div class="pr"><button class="ck" data-pt="${x.id}" data-pe="${esc(g.p.expediente)}"></button><span>${esc(x.texto)}</span></div>`).join('')}</div>`}).join('')||`<div class="empty">No hay pendientes abiertos 🎉</div>`);
 }
 
+const photoStats=()=>new Promise((res,rej)=>{let n=0,b=0;const r=store('photos').openCursor();r.onsuccess=()=>{const c=r.result;if(c){n++;b+=c.value.blob?c.value.blob.size:0;c.continue()}else res({n,b})};r.onerror=()=>rej(r.error)});
 async function renderResp(){
-  const [phs,pats,ents]=await Promise.all([all('photos'),all('patients'),all('entries')]);
-  const bytes=phs.reduce((s,x)=>s+(x.blob?x.blob.size:0),0);
+  const [phs,pats,ents]=await Promise.all([photoStats(),all('patients'),all('entries')]);
+  const bytes=phs.b;
   let est=null,per=null;
   try{est=await navigator.storage.estimate()}catch(e){}
   try{per=await navigator.storage.persisted()}catch(e){}
@@ -371,7 +417,7 @@ async function renderResp(){
     <div class="tags"><button class="tg ${modo==='ligera'?'on':''}" data-fq="ligera">Ligera</button><button class="tg ${modo==='normal'?'on':''}" data-fq="normal">Normal</button></div></div>
   <div class="box"><h3>Almacenamiento</h3>
     <p>${pats.length} paciente${pats.length===1?'':'s'} guardado${pats.length===1?'':'s'} · ${ents.filter(x=>!x.deleted).length} registro${ents.filter(x=>!x.deleted).length===1?'':'s'} de sesión</p>
-    <p>${phs.length} foto${phs.length===1?'':'s'} de hoja de signos: ${mb(bytes)}. Se borran solas a los ${DIAS_FOTO} días.</p>
+    <p>${phs.n} foto${phs.n===1?'':'s'} de hoja de signos: ${mb(bytes)}. Se borran solas a los ${DIAS_FOTO} días.</p>
     ${est&&est.quota?`<p>Uso total de la app: ${mb(est.usage||0)}</p>`:''}
     <p>Almacenamiento persistente: ${per===true?'sí ✓':per===false?'no concedido (instala la app en la pantalla de inicio)':'no disponible'}</p>
     <button class="btn sec" id="r-del">Borrar todas las fotos ahora</button></div>
@@ -596,6 +642,7 @@ async function addEntry(expRaw,nom,tur,sil,rapid=false){
 }
 
 async function openEntry(id){
+  crumb('abre ficha');
   await settle();
   const e=await get('entries',id);if(!e)return;
   if(!e.fotos)e.fotos=[];if(!e.extras)e.extras={};if(!e.tags)e.tags=[];
@@ -609,24 +656,11 @@ async function openEntry(id){
   const urls=[];
   const ex=e.extras;
   const sh=openSheet(`
+    <div class="sh-sticky">
     <div class="sh-head visit-head"><div class="visit-identity"><input id="e-nom" class="nm-in" placeholder="Nombre del paciente" value="${esc(pat.nombre)}"><div class="ex">Exp. ${esc(e.expediente)} · ${esc(fmtFecha(e.fecha))}</div></div><div class="visit-actions"><div class="visit-switch"><button type="button" class="ib" id="e-prev" aria-label="Paciente anterior" title="Paciente anterior" ${prevId?'':'disabled'}>‹</button><span class="visit-counter">${idx+1}/${vecinos.length}</span><button type="button" class="ib" id="e-next" aria-label="Paciente siguiente" title="Paciente siguiente" ${nextId?'':'disabled'}>›</button></div><button type="button" class="visit-done" data-close tabindex="-1" aria-label="Cerrar valoración">Listo</button></div><span class="sv" id="e-sv"></span></div>
+      <div class="stabs2"><button type="button" data-st="pase">Pase</button><button type="button" data-st="nota">Nota rápida</button><button type="button" class="notabtn" id="e-nota"></button></div></div>
+    <div class="sp" data-pn="pase">
     <div class="row"><div><label>Sillón</label><input id="e-sil" inputmode="numeric" value="${esc(e.sillon)}"></div><div style="display:flex;align-items:end"><button type="button" class="btn sec" id="e-cal">Calculadora</button></div></div>
-    <details id="e-nr" class="compact-details nr" ${lsGet('nrOpen')==='1'?'open':''}><summary>Nota rápida · copiar campos</summary>
-      <div class="blk"><div class="bh"><b>Fecha</b><button type="button" class="cp" data-cp="fecha" data-lbl="fecha">Copiar</button></div><div class="pv" id="nr-fecha"></div></div>
-      <div class="blk"><div class="bh"><b>Sala y turno</b><button type="button" class="cp" data-cp="sala" data-lbl="sala y turno">Copiar</button></div>
-        <label for="nr-sala">Sala</label><input id="nr-sala" inputmode="numeric" autocomplete="off"><div class="pv" id="nr-salatxt"></div></div>
-      <div class="blk"><div class="bh"><b>Padecimiento actual</b><button type="button" class="cp" data-cp="pa" data-lbl="padecimiento actual">Copiar</button></div>
-        <div class="seg"><button type="button" data-pam="asin">Asintomático</button><button type="button" data-pam="sint">Con síntomas</button></div>
-        <div class="tags" id="nr-sint"></div><input id="nr-sotro" placeholder="Otro síntoma…" autocomplete="off" style="margin-top:6px">
-        <textarea id="nr-pa" rows="3"></textarea>
-        <label>Sexo del paciente (ajusta asintomático/a)</label><div class="seg"><button type="button" data-sx="F">Mujer</button><button type="button" data-sx="M">Hombre</button></div></div>
-      <div class="blk"><div class="bh"><b>Exploración física (opcional)</b><button type="button" class="cp" data-cp="exf" data-lbl="exploración física">Copiar</button></div>
-        <textarea id="nr-exf" rows="6"></textarea>
-        <div class="ntrow"><button type="button" id="nr-exf-def">Guardar como predeterminada</button><button type="button" id="nr-exf-rst">Restaurar</button></div></div>
-      <div class="blk"><div class="bh"><b>UF programada y tolerada</b><button type="button" class="cp" data-cp="uf" data-lbl="UF">Copiar</button></div>
-        <div class="row"><div><label for="nr-ufp">Programada (mL)</label><input id="nr-ufp" inputmode="numeric" autocomplete="off"></div><div><label for="nr-uft">Tolerada (mL)</label><input id="nr-uft" inputmode="numeric" autocomplete="off"></div></div>
-        <button type="button" class="mini" id="nr-ufeq" style="margin-top:8px">Tolerada = programada</button><div class="pv" id="nr-uftxt"></div></div>
-    </details>
     <div class="box" style="margin:7px 0;padding:9px">
       <label for="e-com"><b>Comentario de hoy</b></label>
       <textarea id="e-com" rows="3" placeholder="Comentario de esta sesión…">${esc(e.comentario)}</textarea>
@@ -647,7 +681,35 @@ async function openEntry(id){
     </details>
     <details id="e-hist"><summary>Historial completo</summary><div id="e-hist-list">Cargando…</div></details>
     <details class="compact-details"><summary>Eventos de hoy</summary><div class="tags" id="e-tags"></div></details>
-    <button class="dng" id="e-del">Quitar de la lista</button>`);
+    <button class="dng" id="e-del">Quitar de la lista</button>
+    </div>
+    <div class="sp" data-pn="nota">
+    <div id="e-nr" class="nr">
+      <div class="nrgrid">
+        <div class="nrfoto"><div class="bh"><b>Hoja de enfermería de hoy</b></div>
+          <div id="nr-fotos" class="nrimgs"><div class="mu" style="padding:10px">Sin foto de hoy.</div></div>
+          <small class="mu">Toca la foto para verla grande y capturar los datos junto a ella.</small>
+          <div style="margin-top:6px"><label class="btn" for="e-file" style="display:inline-block">Agregar foto</label></div></div>
+        <div class="nrcol">
+          <div class="blk"><div class="bh"><b>Fecha, sala y turno</b><button type="button" class="cp" data-cp="enc" data-lbl="encabezado">Copiar</button></div>
+            <label for="nr-sala">Sala</label><input id="nr-sala" inputmode="numeric" autocomplete="off">
+            <div class="pv" id="nr-enctxt"></div>
+            <div style="margin-top:6px"><button type="button" class="cp2" data-cp="fecha" data-lbl="fecha">Copiar solo la fecha</button></div></div>
+          <div class="blk"><div class="bh"><b>Pesos</b><button type="button" class="cp" data-cp="pe" data-lbl="pesos">Copiar</button></div>
+            <div class="row3" style="margin-top:6px"><div><label for="nr-seco">Peso seco</label><input id="nr-seco" inputmode="decimal" autocomplete="off"></div><div><label for="nr-ing">Al ingreso</label><input id="nr-ing" inputmode="decimal" autocomplete="off"></div><div><label for="nr-gan">Peso ganado</label><input id="nr-gan" inputmode="decimal" autocomplete="off"></div></div>
+            <div class="pv" id="nr-petxt"></div>
+            <div style="margin-top:6px"><button type="button" class="cp2" data-cp="svpe" data-lbl="signos y pesos">Copiar signos y pesos (2 líneas)</button></div></div>
+          <div class="blk"><div class="bh"><b>Signos vitales</b><button type="button" class="cp" data-cp="sv" data-lbl="signos vitales">Copiar</button></div>
+            <div class="row3" style="margin-top:6px"><div><label for="nr-fc">FC</label><input id="nr-fc" inputmode="numeric" autocomplete="off"></div><div><label for="nr-tas">TA sist.</label><input id="nr-tas" inputmode="numeric" autocomplete="off"></div><div><label for="nr-tad">TA diast.</label><input id="nr-tad" inputmode="numeric" autocomplete="off"></div></div>
+            <div class="row3"><div><label for="nr-fr">FR</label><input id="nr-fr" inputmode="numeric" autocomplete="off"></div><div><label for="nr-tp">Temp °C</label><input id="nr-tp" inputmode="decimal" autocomplete="off"></div><div><label for="nr-sp">SpO2 %</label><input id="nr-sp" inputmode="numeric" autocomplete="off"></div></div>
+            <div class="pv" id="nr-svtxt"></div></div>
+          <div class="blk"><div class="bh"><b>UF programada y tolerada</b><button type="button" class="cp" data-cp="uf" data-lbl="UF">Copiar</button></div>
+            <div class="row" style="margin-top:6px"><div><label for="nr-ufp">Programada (mL)</label><input id="nr-ufp" inputmode="numeric" autocomplete="off"></div><div><label for="nr-uft">Tolerada (mL)</label><input id="nr-uft" inputmode="numeric" autocomplete="off" placeholder="igual si queda vacío"></div></div>
+            <div class="pv" id="nr-uftxt"></div>
+            <div style="margin-top:6px"><button type="button" class="cp2" data-cp="uf2" data-lbl="UF corta">Copiar solo "tolera UF … ml"</button></div></div>
+        </div>
+      </div>
+    </div>`);
   S.sel=e.id;refreshList();
   $('#e-cal',sh).onclick=()=>openCalcFloating();
   loadHistory(e.expediente,e.id,sh);
@@ -656,49 +718,67 @@ async function openEntry(id){
   const q=s=>$(s,sh);
   let tm=null;
   let curNotaFija=pat.notaFija||'';
-  // ---- Nota rápida: solo los campos que cambian en la nota; cada uno con su botón de copiar
+  // pestañas: Pase | Nota rápida (al cambiar de paciente con ‹ › se conserva la pestaña)
+  const showTab=n=>{
+    sh.querySelectorAll('[data-pn]').forEach(p=>p.classList.toggle('on',p.dataset.pn===n));
+    sh.querySelectorAll('[data-st]').forEach(b=>b.classList.toggle('on',b.dataset.st===n));
+    sh.scrollTop=0;S.etab=n;
+  };
+  sh.addEventListener('click',ev=>{const b=ev.target.closest('[data-st]');if(b)showTab(b.dataset.st)});
+  showTab(S.keepTab&&S.etab?S.etab:'pase');S.keepTab=false;
+  // ---- Nota: bloques independientes con su botón de copiar (encabezado, signos, pesos, UF)
   const nr=Object.assign({},e.nr||{});
-  let sexo=pat.sexo||'';
-  const SINT=['Calambres','Náuseas','Vómito','Cefalea','Disnea','Dolor torácico','Mareo','Prurito','Edema'];
-  if(!Array.isArray(nr.sint))nr.sint=[];
-  if(!nr.pam)nr.pam='asin';
   if(nr.sala===undefined)nr.sala=lsGet('sala')||'';
-  if(nr.exf===undefined)nr.exf=lsGet('nrExf')||DEF_EXF;
-  const listaY=a=>a.length<2?a.join(''):a.slice(0,-1).join(', ')+' y '+a[a.length-1];
-  const genPA=()=>{
-    if(nr.pam==='asin'){const o=sexo==='F'?'a':sexo==='M'?'o':'o/a';return `Al ingreso refiere estar asintomátic${o}, niega síntomas interdialíticos.`}
-    const l=[...nr.sint.map(x=>x.toLowerCase()),...((nr.sotro||'').trim()?[nr.sotro.trim()]:[])];
-    return `Al ingreso refiere ${l.length?listaY(l):'…'}.`;
-  };
-  if(nr.pa===undefined)nr.pa=genPA();
+  const val=id=>q(id).value.trim();
+  const num=x=>{const n=parseFloat(String(x).replace(',','.'));return isNaN(n)?null:n};
   const fechaTxt=()=>String(e.fecha||'').split('-').reverse().join('/');
-  const salaTxt=()=>`SALA ${q('#nr-sala').value.trim()||'__'} TURNO ${e.turno}`;
-  const ufTxt=()=>`Paciente en sesión de hemodiálisis con UF programada de ${q('#nr-ufp').value.trim()||'__'} mL y UF tolerada de ${q('#nr-uft').value.trim()||'__'} mL.`;
-  const fillNR=()=>{q('#nr-sala').value=nr.sala||'';q('#nr-pa').value=nr.pa||'';q('#nr-exf').value=nr.exf||'';q('#nr-ufp').value=nr.ufp||'';q('#nr-uft').value=nr.uft||'';q('#nr-sotro').value=nr.sotro||''};
+  const encTxt=()=>`NOTA DIARIA             ${fechaTxt()}              SALA ${val('#nr-sala')||'__'}      TURNO ${e.turno}`;
+  const ganTxt=()=>val('#nr-gan');
+  const svTxt=()=>`Signos vitales: FC: ${val('#nr-fc')||'__'} lpm FR: ${val('#nr-fr')||'__'} rpm TA: ${val('#nr-tas')||'__'}/${val('#nr-tad')||'__'}mmHg SpO2 ${val('#nr-sp')||'__'}% Temp ${val('#nr-tp')||'__'}°C`;
+  const peTxt=()=>`Peso seco: ${val('#nr-seco')||'__'}kg Peso al ingreso: ${val('#nr-ing')||'__'}kg Ganancia interdialítica: ${ganTxt()||'__'}kg`;
+  const ufT=()=>val('#nr-uft')||val('#nr-ufp')||'__';
+  const ufTxt=()=>`Paciente en sesión de hemodiálisis con UF programada de ${val('#nr-ufp')||'__'} mL y UF tolerada de ${ufT()} mL.`;
+  const uf2Txt=()=>`tolera UF ${ufT()} ml`;
+  const NRIN={'#nr-sala':'sala','#nr-fc':'fc','#nr-fr':'fr','#nr-sp':'sp','#nr-tas':'tas','#nr-tad':'tad','#nr-tp':'tp','#nr-seco':'seco','#nr-ing':'ing','#nr-gan':'gan','#nr-ufp':'ufp','#nr-uft':'uft'};
+  const fillNR=()=>{for(const [id,k] of Object.entries(NRIN))q(id).value=nr[k]||''};
   const drawNR=()=>{
-    q('#nr-fecha').textContent=fechaTxt();q('#nr-salatxt').textContent=salaTxt();q('#nr-uftxt').textContent=ufTxt();
-    sh.querySelectorAll('[data-pam]').forEach(b=>b.classList.toggle('on',b.dataset.pam===nr.pam));
-    sh.querySelectorAll('[data-sx]').forEach(b=>b.classList.toggle('on',b.dataset.sx===sexo));
-    const con=nr.pam==='sint';
-    q('#nr-sint').style.display=con?'':'none';q('#nr-sotro').style.display=con?'':'none';
-    q('#nr-sint').innerHTML=SINT.map((x,i)=>`<button type="button" class="tg ${nr.sint.includes(x)?'on':''}" data-sint="${i}">${esc(x)}</button>`).join('');
+    q('#nr-enctxt').textContent=encTxt();q('#nr-svtxt').textContent=svTxt();q('#nr-petxt').textContent=peTxt();q('#nr-uftxt').textContent=ufTxt();
+    if(vwHook)vwHook();
   };
+  const VK={};for(const [id,k] of Object.entries(NRIN))VK[k]=id;
   fillNR();drawNR();
-  // ¿el texto del padecimiento sigue siendo el generado (sin editar a mano)?
-  const paAuto=()=>q('#nr-pa').value===genPA();
+  vwHook=()=>{document.querySelectorAll('#vw-side [data-vk]').forEach(i=>{if(document.activeElement!==i&&sheetEl===sh)i.value=q(VK[i.dataset.vk]).value});$('#vx-enc').textContent=encTxt()};
+  vwPush=(k,v)=>{if(sheetEl!==sh)return;const el=q(VK[k]);el.value=v;el.dispatchEvent(new Event('input',{bubbles:true}))};
+  vwCopy=k=>{if(sheetEl===sh)q('[data-cp="'+k+'"]').click()};
+  // peso seco, UF programada y sala se arrastran de la sesión anterior del mismo paciente (si aún no hay valor)
+  (async()=>{try{
+    const prev=(await all('entries')).filter(x=>!x.deleted&&x.nr&&x.expediente===e.expediente&&x.id!==e.id&&((x.fecha||'')<(e.fecha||'')||((x.fecha||'')===(e.fecha||'')&&(x.creado||0)<(e.creado||0))))
+      .sort((a,b)=>(b.fecha||'').localeCompare(a.fecha||'')||(b.creado||0)-(a.creado||0))[0];
+    if(!prev||sheetEl!==sh)return;
+    if(!q('#nr-seco').value&&prev.nr.seco)q('#nr-seco').value=prev.nr.seco;
+    if(!q('#nr-ufp').value&&prev.nr.ufp)q('#nr-ufp').value=prev.nr.ufp;
+    drawNR();
+  }catch(err){logErr('nota previa',err)}})();
   const freshPat=async()=>(await get('patients',e.expediente))||{expediente:e.expediente,nombre:'',pendientes:[],updatedAt:0,pu:0};
   const sv=ok=>{const s=q('#e-sv');if(!s)return;s.textContent=ok?'Guardado ✓':'No se pudo guardar';s.className='sv on'+(ok?'':' err');clearTimeout(sv.t);if(ok)sv.t=setTimeout(()=>s.classList.remove('on'),1500)};
-  const flushRaw=async()=>{clearTimeout(tm);tm=null;
+  const collect=()=>{
     e.comentario=q('#e-com').value;e.sillon=q('#e-sil').value.trim();
     e.extras={peso:q('#x-peso').value,gan:q('#x-gan').value,ta:q('#x-ta').value,otro:q('#x-otro').value};
-    e.nr={sala:q('#nr-sala').value.trim(),pam:nr.pam,sint:nr.sint,sotro:q('#nr-sotro').value,pa:q('#nr-pa').value,exf:q('#nr-exf').value,ufp:q('#nr-ufp').value.trim(),uft:q('#nr-uft').value.trim()};
+    e.nr={};
+    for(const [id,k] of Object.entries(NRIN))e.nr[k]=val(id);
+  };
+  const sig=()=>JSON.stringify([e.comentario||'',e.sillon||'',e.extras,e.nr,!!e.nota,e.tags,e.turno,e.asistencia||'',e.fotos]);
+  collect();let savedSig=sig();
+  const flushRaw=async()=>{clearTimeout(tm);tm=null;
+    collect();
     if(e.nr.sala)lsSet('sala',e.nr.sala);
-    e.updatedAt=now();await put('entries',e);
+    // solo se escribe (y se sincroniza) si algo cambió: abrir y cerrar una ficha no debe pisar cambios hechos en otro dispositivo
+    const s2=sig();if(s2!==savedSig){const prevSig=savedSig;savedSig=s2;e.updatedAt=now();try{await put('entries',e)}catch(err){savedSig=prevSig;throw err}}
     // el perfil se escribe sobre la copia más reciente del paciente (por si otro dispositivo cambió pendientes)
-    const nn=q('#e-nom').value.trim(),ac=q('#e-ac').value,av=q('#e-av').value.trim(),nf=curNotaFija,sx=sexo;
+    const nn=q('#e-nom').value.trim(),ac=q('#e-ac').value,av=q('#e-av').value.trim(),nf=curNotaFija;
     const cur=await freshPat();
-    if(nn!==(cur.nombre||'')||ac!==(cur.acceso||'')||av!==(cur.aviso||'')||nf!==(cur.notaFija||'')||sx!==(cur.sexo||'')){
-      cur.nombre=nn;cur.acceso=ac;cur.aviso=av;cur.notaFija=nf;cur.sexo=sx;cur.pu=now();cur.updatedAt=now();await put('patients',cur)}
+    if(nn!==(cur.nombre||'')||ac!==(cur.acceso||'')||av!==(cur.aviso||'')||nf!==(cur.notaFija||'')){
+      cur.nombre=nn;cur.acceso=ac;cur.aviso=av;cur.notaFija=nf;cur.pu=now();cur.updatedAt=now();await put('patients',cur)}
     pat=cur;
     refreshList()};
   const mutPat=async fn=>{const cur=await freshPat();fn(cur);cur.updatedAt=now();await put('patients',cur);pat=cur};
@@ -713,6 +793,7 @@ async function openEntry(id){
       // Persistir cambios antes de cerrar; si falla, quedarse en este expediente.
       await flush();
       await closeSheet(true);
+      S.keepTab=true;
       await openEntry(target);
     }catch(err){
       logErr('cambiar paciente',err);
@@ -723,30 +804,23 @@ async function openEntry(id){
   q('#e-prev').onclick=()=>goToPatient(prevId);
   q('#e-next').onclick=()=>goToPatient(nextId);
 
-  sheetCb=async()=>{try{await flush()}finally{urls.forEach(u=>URL.revokeObjectURL(u));const prev=q('#e-prev-fotos');if(prev&&prev._photoUrls)prev._photoUrls.forEach(u=>URL.revokeObjectURL(u))}};
+  sheetCb=async()=>{try{await flush()}finally{vwHook=vwPush=vwCopy=null;if($('#vw').classList.contains('on'))$('#v-x').onclick();urls.forEach(u=>URL.revokeObjectURL(u));const prev=q('#e-prev-fotos');if(prev&&prev._photoUrls)prev._photoUrls.forEach(u=>URL.revokeObjectURL(u))}};
   ['#e-com','#e-sil','#e-nom','#e-av','#x-peso','#x-gan','#x-ta','#x-otro'].forEach(s=>q(s).addEventListener('input',later));
-  ['#nr-sala','#nr-pa','#nr-exf','#nr-ufp','#nr-uft'].forEach(s=>q(s).addEventListener('input',()=>{drawNR();later()}));
-  q('#nr-sotro').addEventListener('input',()=>{const was=paAuto();nr.sotro=q('#nr-sotro').value;if(was)q('#nr-pa').value=genPA();later()});
-  q('#e-nr').addEventListener('toggle',()=>lsSet('nrOpen',q('#e-nr').open?'1':'0'));
+  Object.keys(NRIN).forEach(s=>q(s).addEventListener('input',()=>{drawNR();later()}));
+  // Enter pasa al siguiente campo de signos y pesos
+  const orden=['#nr-seco','#nr-ing','#nr-gan','#nr-fc','#nr-tas','#nr-tad','#nr-fr','#nr-tp','#nr-sp','#nr-ufp','#nr-uft'];
+  orden.forEach((id,i)=>q(id).addEventListener('keydown',ev=>{if(ev.key==='Enter'){ev.preventDefault();const n=orden[i+1];if(n)q(n).focus();else ev.target.blur()}}));
+  q('#nr-fotos').addEventListener('click',ev=>{const im=ev.target.closest('.nrimg');if(!im)return;viewPhoto(im.dataset.u,null)});
   q('#e-nr').addEventListener('click',async ev=>{
     const cp=ev.target.closest('[data-cp]');
     if(cp){
       const k=cp.dataset.cp;
-      const txt=k==='fecha'?fechaTxt():k==='sala'?salaTxt():k==='pa'?q('#nr-pa').value:k==='exf'?q('#nr-exf').value:ufTxt();
+      const txt=k==='fecha'?fechaTxt():k==='enc'?encTxt():k==='sv'?svTxt():k==='pe'?peTxt():k==='svpe'?svTxt()+'\n'+peTxt():k==='uf2'?uf2Txt():ufTxt();
       if(!txt.trim()){toast('No hay texto para copiar');return}
       const ok=await copyText(txt);toast(ok?'Copiado: '+cp.dataset.lbl:'No se pudo copiar');
       if(ok){const o=cp.textContent;cp.textContent='Copiado';setTimeout(()=>{cp.textContent=o},1200)}
       return}
-    const pm=ev.target.closest('[data-pam]');
-    if(pm){nr.pam=pm.dataset.pam;q('#nr-pa').value=genPA();drawNR();flush().catch(()=>{});return}
-    const sg=ev.target.closest('[data-sint]');
-    if(sg){const x=SINT[+sg.dataset.sint];const was=paAuto();nr.sint=nr.sint.includes(x)?nr.sint.filter(y=>y!==x):[...nr.sint,x];if(was)q('#nr-pa').value=genPA();drawNR();flush().catch(()=>{});return}
-    const sx=ev.target.closest('[data-sx]');
-    if(sx){const was=paAuto();sexo=sexo===sx.dataset.sx?'':sx.dataset.sx;if(was)q('#nr-pa').value=genPA();drawNR();flush().catch(()=>{});return}
-    if(ev.target.id==='nr-ufeq'){q('#nr-uft').value=q('#nr-ufp').value;drawNR();flush().catch(()=>{});return}
-    if(ev.target.id==='nr-exf-def'){lsSet('nrExf',q('#nr-exf').value);toast('Exploración predeterminada guardada');return}
-    if(ev.target.id==='nr-exf-rst'){q('#nr-exf').value=lsGet('nrExf')||DEF_EXF;flush().catch(()=>{});return}
-  });
+    });
   q('#e-ac').addEventListener('change',ev=>{later();ev.target.blur()});
   // al salir de cualquier campo se guarda enseguida
   sh.addEventListener('focusout',()=>{clearTimeout(tm);tm=setTimeout(()=>flush().catch(()=>{}),60)});
@@ -763,7 +837,8 @@ async function openEntry(id){
     await flush().catch(()=>{});drawTags();
   });
   q('#e-tur').onchange=async ev=>{const v=+ev.target.value;ev.target.blur();e.turno=v;S.turno=v;lsSet('turno',v);drawNR();await flush().catch(()=>{})};
-  const drawNota=()=>{}; // Se conserva el estado histórico sin mostrar controles adicionales.
+  const drawNota=()=>{const b=q('#e-nota');b.className='notabtn'+(e.nota?' ok':'');b.textContent=e.nota?'✓ Nota hecha':'○ Nota pendiente'};
+  q('#e-nota').onclick=async()=>{e.nota=!e.nota;drawNota();await flush().catch(()=>{})};drawNota();
   const drawPend=()=>{
     const row=x=>`<div class="pr ${x.hecho?'dn':''}"><button class="ck ${x.hecho?'on':''}" data-pt="${x.id}">${x.hecho?'✓':''}</button><span>${esc(x.texto)}</span><button class="x" data-px="${x.id}">×</button></div>`;
     const open=pAct(pat),done=pDone(pat);
@@ -792,6 +867,7 @@ async function openEntry(id){
     setE:r=>{
       e.nota=!!r.nota;e.tags=r.tags||[];e.turno=r.turno;e.updatedAt=r.updatedAt;e.deleted=!!r.deleted;
       if(r.fotos)e.fotos=r.fotos;
+      savedSig=sig();
       if(sheetEl!==sh)return;
       drawNota();drawTags();q('#e-tur').value=String(e.turno);
       const fo=document.activeElement;
@@ -799,6 +875,7 @@ async function openEntry(id){
       if(typeof r.notaTxt==='string')e.notaTxt=r.notaTxt;
       if(r.nr&&!q('#e-nr').contains(document.activeElement)){Object.assign(nr,r.nr);e.nr=r.nr;fillNR();drawNR()}
       if(fo!==q('#e-sil')){q('#e-sil').value=r.sillon||'';e.sillon=r.sillon||''}
+      savedSig=sig();
     },
     // llegó o se borró una foto desde otro dispositivo: se vuelve a leer la lista de fotos de esta sesión
     refreshFotos:async()=>{
@@ -806,7 +883,7 @@ async function openEntry(id){
       if(sheetEl===sh)await drawFotos();
     },
     setPat:p=>{
-      pat=p;if(sheetEl!==sh)return;drawPend();sexo=p.sexo||'';drawNR();
+      pat=p;if(sheetEl!==sh)return;drawPend();drawNR();
       const fo=document.activeElement;
       if(fo!==q('#e-nom'))q('#e-nom').value=p.nombre||'';
       if(fo!==q('#e-av'))q('#e-av').value=p.aviso||'';
@@ -836,6 +913,7 @@ async function openEntry(id){
     if(keep.length!==e.fotos.length){e.fotos=keep;await flush().catch(()=>{})}
     if(!sheetEl||sheetEl!==sh)return;
     q('#e-fotos').innerHTML=html||'<div class="mu">Sin fotos</div>';
+    q('#nr-fotos').innerHTML=urls.length?urls.map(u=>`<img class="nrimg" src="${u}" data-u="${u}" alt="Hoja de signos">`).join(''):'<div class="mu" style="padding:10px">Sin foto de hoy.</div>';
   };
   await drawFotos();
   q('#e-fotos').addEventListener('click',ev=>{const t=ev.target.closest('[data-ph]');if(!t)return;
@@ -889,7 +967,7 @@ function compress(file,modo){return new Promise((res,rej)=>{
   };
   img.onerror=()=>{URL.revokeObjectURL(url);rej(new Error('img'))};img.src=url;});}
 
-let vwDel=null,vz=1;
+let vwDel=null,vz=1,vwHook=null,vwPush=null,vwCopy=null;
 function setZoom(z){
   const sc=$('#vw .sc'),im=$('#v-img');
   z=Math.min(5,Math.max(1,z));
@@ -899,8 +977,12 @@ function setZoom(z){
   $('#v-zoom').textContent='🔍 '+(Math.round(z*10)/10)+'×';
 }
 function viewPhoto(url,onDelete){
+  $('#vw-side').style.display=vwHook?'':'none';if(vwHook)vwHook();
   $('#v-img').src=url;$('#vw').classList.add('on');vwDel=onDelete;vz=1;$('#v-img').style.width='100%';$('#vw .sc').scrollTo(0,0);setZoom(1);
 }
+$('#vw-side').addEventListener('input',ev=>{const i=ev.target.closest('[data-vk]');if(i&&vwPush)vwPush(i.dataset.vk,i.value)});
+$('#vw-side').addEventListener('click',ev=>{const b=ev.target.closest('[data-vcp]');if(b&&vwCopy)vwCopy(b.dataset.vcp)});
+{const o=['sala','seco','ing','gan','fc','tas','tad','fr','tp','sp','ufp','uft'];$('#vw-side').addEventListener('keydown',ev=>{const i=ev.target.closest('[data-vk]');if(!i||ev.key!=='Enter')return;ev.preventDefault();const n=o[o.indexOf(i.dataset.vk)+1];if(n)$('#vw-side [data-vk="'+n+'"]').focus();else i.blur()})}
 $('#v-x').onclick=()=>{$('#vw').classList.remove('on');$('#v-img').removeAttribute('src');vwDel=null};
 $('#v-zoom').onclick=()=>setZoom(vz>=3.5?1:Math.floor(vz)+1);
 { // zoom con pellizco solo dentro del visor de fotos
@@ -957,13 +1039,16 @@ $('#v-zoom').onclick=()=>setZoom(vz>=3.5?1:Math.floor(vz)+1);
 $('#v-del').onclick=async()=>{if(!vwDel||!confirm('¿Borrar esta foto?'))return;const f=vwDel;$('#v-x').onclick();await f()};
 
 async function purge(){
-  const lim=now()-DIAS_FOTO*DAY;let n=0;const gone=new Set();
-  for(const p of await all('photos'))if(p.created<lim){await del('photos',p.id);gone.add(p.id);n++}
-  if(gone.size)for(const e of await all('entries')){
+  const lim=now()-DIAS_FOTO*DAY;const old=[];
+  await new Promise((res,rej)=>{const r=store('photos').openCursor();r.onsuccess=()=>{const c=r.result;if(c){if((c.value.created||0)<lim)old.push(c.key);c.continue()}else res()};r.onerror=()=>rej(r.error)});
+  if(!old.length)return 0;
+  const gone=new Set(old);
+  for(const k of old)await del('photos',k);
+  for(const e of await all('entries')){
     const k=(e.fotos||[]).filter(i=>!gone.has(i));
     // las fotos son locales: limpiar la lista no cuenta como cambio para la sincronización
     if(k.length!==(e.fotos||[]).length){e.fotos=k;await put('entries',e,{nosync:true})}}
-  return n;
+  return old.length;
 }
 
 /* ---------- Respaldo ---------- */
@@ -1042,10 +1127,13 @@ async function loadPreviousInfo(exp,current,host){
 async function loadPreviousPhotos(exp,current,host){
  const target=$('#e-prev-fotos',host);if(!target)return;
  const entries=(await all('entries')).filter(x=>!x.deleted&&x.expediente===exp&&x.id!==current).sort((a,b)=>b.fecha.localeCompare(a.fecha));
- const photos=await all('photos');const limit=now()-DIAS_FOTO*DAY;
+ const limit=now()-DIAS_FOTO*DAY;
  const items=[];
- for(const entry of entries){for(const ph of photos){if(ph.entry===entry.id&&ph.created>=limit&&ph.blob)items.push({entry,ph})}}
- if(!items.length){target.textContent='No hay hojas anteriores disponibles dentro de los últimos 7 días.';return}
+ for(const entry of entries.slice(0,12)){
+  for(const ph of await rq(store('photos').index('entry').getAll(entry.id)))if((ph.created||0)>=limit&&ph.blob)items.push({entry,ph});
+  if(items.length>=6)break;
+ }
+ if(!items.length){target.textContent='No hay hojas anteriores disponibles dentro de los últimos '+DIAS_FOTO+' días.';return}
  const urls=[];target.innerHTML='';
  for(const {entry,ph} of items){const u=URL.createObjectURL(ph.blob);urls.push(u);const b=document.createElement('button');b.type='button';b.className='th';b.style.margin='5px';const img=document.createElement('img');img.src=u;img.alt='Hoja de enfermería anterior';const small=document.createElement('small');small.textContent=entry.fecha+' · Turno '+entry.turno;b.append(img,small);b.onclick=()=>viewPhoto(u,()=>{});target.appendChild(b)}
  // Conservar las URLs mientras la ficha está abierta; liberar al cerrar.
@@ -1085,6 +1173,7 @@ document.addEventListener('click',async ev=>{
   const shb=t.closest('[data-shist]');if(shb){const x=shb.dataset.shist;clearSearch();openProfile(x);return}
   const srr=t.closest('[data-sexp]');if(srr){pickPatient(srr.dataset.sexp).catch(err=>logErr('buscar',err));return}
   const snw=t.closest('[data-snew]');if(snw){const v=snw.dataset.snew;clearSearch();openAdd(/\d/.test(v)&&!/\s/.test(v)?{exp:v}:{nombre:v});return}
+  if(t.closest('[data-resume]')){lsSet('safe','0');location.reload();return}
   const nav=t.closest('nav button');
   if(nav){if(sheetEl&&sheetDocked)closeSheet(true);S.view=nav.dataset.v;render();window.scrollTo(0,0);return}
   const kc=t.closest('[data-k]');if(kc){calcKey(kc.dataset.k);return}
@@ -1204,6 +1293,7 @@ const SYNC=(()=>{
   }
   // la nube solo conserva las fotos de los últimos 7 días, igual que los dispositivos
   async function purgeRemote(){
+    crumb('sync limpia nube');
     if(!st.uid||!st.fs||!st.syncPhotos)return;
     try{
       const snap=await ref('photos').where('created','<',now()-DIAS_FOTO*DAY).get();
@@ -1211,6 +1301,7 @@ const SYNC=(()=>{
     }catch(e){logErr('limpiar nube',e)}
   }
   async function pushAll(){
+    crumb('sync sube todo');
     if(!st.uid||!st.fs)return;
     const items=[];
     for(const p of await all('patients'))items.push(...itemsFor('patients',p));
@@ -1231,6 +1322,7 @@ const SYNC=(()=>{
 
   /* --- bajar --- */
   async function applyRemote(name,r){
+    crumb('sync aplica '+name);
     if(name==='patients'){
       const cur=await get('patients',r.expediente),rs=r.updatedAt||0;
       if(!st.forceNames&&cur&&patStamp(cur)>=rs)return null;
@@ -1293,12 +1385,14 @@ const SYNC=(()=>{
   }
   function unlisten(){st.unsubs.forEach(u=>{try{u()}catch(e){}});st.unsubs=[]}
   function listen(){
+    crumb('sync escucha');
     unlisten();st.first={};
     const cut=todayStr(new Date(Date.now()-DIAS_ENT*DAY));
     const defs=[['patients',ref('patients')],['pendientes',ref('pendientes')],['entries',ref('entries').where('fecha','>=',cut)],['meta',ref('meta')]];
     if(st.syncPhotos)defs.push(['photos',ref('photos').where('created','>=',now()-DIAS_FOTO*DAY)]);
     defs.forEach(([name,q])=>{
       st.unsubs.push(q.onSnapshot(snap=>{
+        crumb('sync recibe '+name+' '+snap.docChanges().length);
         snap.docChanges().forEach(ch=>{
           if(ch.type==='removed')return;
           const d=ch.doc.data();
@@ -1327,6 +1421,7 @@ const SYNC=(()=>{
       :/unauthorized-domain/.test(c)?'Este dominio no está autorizado en Firebase'
       :(e&&e.message)||'No se pudo iniciar sesión'};
   function init(){
+    crumb('sync inicia');
     if(!cfgOk()){st.status='nocfg';changed();return}
     if(typeof firebase==='undefined'){st.status='nosdk';changed();return}
     try{
@@ -1370,16 +1465,26 @@ const SYNC=(()=>{
 
 /* ---------- Inicio ---------- */
 (async()=>{
+  // Si la app se cerró durante el inicio anterior, arranca en modo seguro (sin sincronización ni limpieza) hasta que la reanudes.
+  try{const pc=JSON.parse(lsGet('crumb')||'null');if(pc&&pc.s!=='segundo plano')logErr('cierre previo','Último evento antes de cerrarse: '+pc.s+' ('+new Date(pc.t).toLocaleTimeString('es-MX')+'). Si la cerraste tú, ignóralo.')}catch(e){}
+  document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')crumb('segundo plano')});window.addEventListener('pagehide',()=>crumb('segundo plano'));
+  crumb('inicio');
+  const bootOk=()=>lsSet('booting','0');
+  if(lsGet('booting')==='1'){lsSet('safe','1');logErr('inicio','La app se cerró durante el inicio anterior: modo seguro')}
+  lsSet('booting','1');setTimeout(bootOk,8000);window.addEventListener('pagehide',bootOk);
+  const safe=lsGet('safe')==='1';
   try{db=await openDB()}catch(e){logErr('abrir base',e);$('#main').innerHTML='<div class="empty">Este navegador no permite guardar datos locales (¿modo privado?).</div>';return}
-  await purge();
   try{if(navigator.storage&&navigator.storage.persist)navigator.storage.persist()}catch(e){}
   await render();
-  // la sincronización arranca cuando terminan de cargar los scripts de Firebase
-  if(document.readyState==='complete')SYNC.init();else window.addEventListener('load',()=>SYNC.init());
-  setInterval(()=>purge().catch(()=>{}),36e5);
+  if(!safe){
+    purge().catch(e=>logErr('limpiar fotos',e));
+    // la sincronización arranca cuando terminan de cargar los scripts de Firebase
+    if(document.readyState==='complete')SYNC.init();else window.addEventListener('load',()=>SYNC.init());
+    setInterval(()=>purge().catch(()=>{}),36e5);
+  }
   document.addEventListener('visibilitychange',async()=>{
     if(document.visibilityState!=='visible')return;
-    await purge().catch(()=>{});
+    if(!safe)await purge().catch(()=>{});
     if(S.hoy&&S.fecha!==todayStr())S.fecha=todayStr();
     if(!sheetEl)render();
   });
