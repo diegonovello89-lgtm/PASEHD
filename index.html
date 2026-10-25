@@ -223,13 +223,13 @@ details{margin-top:12px}summary{padding:6px 0;color:var(--mu);font-weight:600}
  <div class="g"><div><label>F. respiratoria</label><input data-vk="fr" inputmode="numeric" autocomplete="off"></div><div><label>Temperatura</label><input data-vk="tp" inputmode="decimal" autocomplete="off"></div><div><label>Saturación O2</label><input data-vk="sp" inputmode="numeric" autocomplete="off"></div></div>
  <h4>Ultrafiltración (mL)</h4>
  <div class="g"><div><label>Programada</label><input data-vk="ufp" inputmode="numeric" autocomplete="off"></div><div><label>Tolerada</label><input data-vk="uft" inputmode="numeric" autocomplete="off" placeholder="igual"></div><div></div></div>
- <h4>Copiar <span><button type="button" class="cp" data-vcp="sv">Signos</button> <button type="button" class="cp" data-vcp="pe">Pesos</button> <button type="button" class="cp" data-vcp="uf">UF</button></span></h4>
+ <h4>Copiar <span><button type="button" class="cp" data-vcp="svpe">Signos y pesos</button> <button type="button" class="cp" data-vcp="uf">UF</button></span></h4>
 </div></div></div>
 <div id="toast"></div>
 
 <script>
 'use strict';
-const VERSION='11.7';
+const VERSION='11.8';
 const TURNOS=[1,2,3,4,5];
 const DIAS_FOTO=7;
 const ACCESOS=['FAV','Injerto','Catéter tunelizado','Catéter temporal'];
@@ -695,11 +695,10 @@ async function openEntry(id){
             <label for="nr-sala">Sala</label><input id="nr-sala" inputmode="numeric" autocomplete="off">
             <div class="pv" id="nr-enctxt"></div>
             <div style="margin-top:6px"><button type="button" class="cp2" data-cp="fecha" data-lbl="fecha">Copiar solo la fecha</button></div></div>
-          <div class="blk"><div class="bh"><b>Pesos</b><button type="button" class="cp" data-cp="pe" data-lbl="pesos">Copiar</button></div>
+          <div class="blk"><div class="bh"><b>Signos vitales y pesos</b><button type="button" class="cp" data-cp="svpe" data-lbl="signos y pesos">Copiar</button></div>
             <div class="row3" style="margin-top:6px"><div><label for="nr-seco">Peso seco</label><input id="nr-seco" inputmode="decimal" autocomplete="off"></div><div><label for="nr-ing">Al ingreso</label><input id="nr-ing" inputmode="decimal" autocomplete="off"></div><div><label for="nr-gan">Peso ganado</label><input id="nr-gan" inputmode="decimal" autocomplete="off"></div></div>
             <div class="pv" id="nr-petxt"></div>
-            <div style="margin-top:6px"><button type="button" class="cp2" data-cp="svpe" data-lbl="signos y pesos">Copiar signos y pesos (2 líneas)</button></div></div>
-          <div class="blk"><div class="bh"><b>Signos vitales</b><button type="button" class="cp" data-cp="sv" data-lbl="signos vitales">Copiar</button></div>
+            <div style="margin-top:8px"></div>
             <div class="row3" style="margin-top:6px"><div><label for="nr-fc">FC</label><input id="nr-fc" inputmode="numeric" autocomplete="off"></div><div><label for="nr-tas">TA sist.</label><input id="nr-tas" inputmode="numeric" autocomplete="off"></div><div><label for="nr-tad">TA diast.</label><input id="nr-tad" inputmode="numeric" autocomplete="off"></div></div>
             <div class="row3"><div><label for="nr-fr">FR</label><input id="nr-fr" inputmode="numeric" autocomplete="off"></div><div><label for="nr-tp">Temp °C</label><input id="nr-tp" inputmode="decimal" autocomplete="off"></div><div><label for="nr-sp">SpO2 %</label><input id="nr-sp" inputmode="numeric" autocomplete="off"></div></div>
             <div class="pv" id="nr-svtxt"></div></div>
