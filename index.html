@@ -203,6 +203,12 @@ details{margin-top:12px}summary{padding:6px 0;color:var(--mu);font-weight:600}
 #vw-side h4{margin:10px 0 0;font-size:13px;display:flex;justify-content:space-between;align-items:center}
 #vw-side .cp{padding:6px 12px;border-radius:10px;background:var(--ac);color:#fff;font-weight:700;font-size:13px}
 @media(min-width:800px){.vwm{flex-direction:row}#vw-side{width:340px;max-height:none;flex:none}}
+.vwm{position:relative}
+#vw-side{position:absolute;left:0;right:0;bottom:0;max-height:46vh;--vwa:.6;background:var(--card);background:color-mix(in srgb,var(--card) calc(var(--vwa)*100%),transparent)}
+#vw-side input[data-vk]{background:var(--card);background:color-mix(in srgb,var(--card) calc(var(--vwa)*100%),transparent)}
+#vw-side .al{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--mu)}
+#vw-side .al input{padding:0;flex:1;accent-color:var(--ac)}
+@media(min-width:800px){#vw-side{left:auto;top:0;width:340px;max-height:none}}
 </style>
 </head>
 <body>
@@ -215,6 +221,7 @@ details{margin-top:12px}summary{padding:6px 0;color:var(--mu);font-weight:600}
 <div id="ov"></div>
 <div id="vw"><div class="bar"><button id="v-datos" style="display:none">Datos ▾</button><button id="v-zoom">🔍 Zoom</button><button id="v-del">🗑 Borrar</button><button id="v-x">Cerrar</button></div><div class="vwm"><div class="sc"><img id="v-img" alt="Hoja de signos"></div>
 <div id="vw-side" style="display:none">
+ <div class="al"><span>Transparencia</span><input type="range" id="vw-alpha" min="20" max="100" value="60" aria-label="Opacidad del panel"></div>
  <h4>Encabezado <span><button type="button" class="cp" data-vcp="enc">Copiar</button> <button type="button" class="cp" data-vcp="fecha">Solo fecha</button></span></h4>
  <div class="g"><div><label>Sala</label><input data-vk="sala" inputmode="numeric" autocomplete="off"></div><div style="grid-column:span 2"><label>Vista previa</label><div id="vx-enc" style="font-size:13px;padding:8px 0;white-space:pre-wrap"></div></div></div>
  <h4>Prediálisis (en el orden de la hoja)</h4>
@@ -229,7 +236,7 @@ details{margin-top:12px}summary{padding:6px 0;color:var(--mu);font-weight:600}
 
 <script>
 'use strict';
-const VERSION='11.8';
+const VERSION='11.9';
 const TURNOS=[1,2,3,4,5];
 const DIAS_FOTO=7;
 const ACCESOS=['FAV','Injerto','Catéter tunelizado','Catéter temporal'];
@@ -977,6 +984,9 @@ function setZoom(z){
 }
 let vwMin=false;
 function vwShowSide(){const on=!!vwHook;$('#v-datos').style.display=on?'':'none';$('#vw-side').style.display=on&&!vwMin?'':'none';$('#v-datos').textContent=vwMin?'Datos ▸':'Datos ▾';if(on&&!vwMin&&vwHook)vwHook()}
+{let a=60;try{a=+localStorage.getItem('vwAlpha')||60}catch(_){}
+const setA=v=>{$('#vw-side').style.setProperty('--vwa',v/100);$('#vw-alpha').value=v};setA(a);
+$('#vw-alpha').addEventListener('input',e=>{setA(+e.target.value);try{localStorage.setItem('vwAlpha',e.target.value)}catch(_){}})}
 $('#v-datos').onclick=()=>{vwMin=!vwMin;vwShowSide()};
 function viewPhoto(url,onDelete){
   vwShowSide();
