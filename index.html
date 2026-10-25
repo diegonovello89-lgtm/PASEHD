@@ -213,7 +213,7 @@ details{margin-top:12px}summary{padding:6px 0;color:var(--mu);font-weight:600}
   <button data-v="resp"><span>⚙️</span>Ajustes</button>
 </nav>
 <div id="ov"></div>
-<div id="vw"><div class="bar"><button id="v-zoom">🔍 Zoom</button><button id="v-del">🗑 Borrar</button><button id="v-x">Cerrar</button></div><div class="vwm"><div class="sc"><img id="v-img" alt="Hoja de signos"></div>
+<div id="vw"><div class="bar"><button id="v-datos" style="display:none">Datos ▾</button><button id="v-zoom">🔍 Zoom</button><button id="v-del">🗑 Borrar</button><button id="v-x">Cerrar</button></div><div class="vwm"><div class="sc"><img id="v-img" alt="Hoja de signos"></div>
 <div id="vw-side" style="display:none">
  <h4>Encabezado <span><button type="button" class="cp" data-vcp="enc">Copiar</button> <button type="button" class="cp" data-vcp="fecha">Solo fecha</button></span></h4>
  <div class="g"><div><label>Sala</label><input data-vk="sala" inputmode="numeric" autocomplete="off"></div><div style="grid-column:span 2"><label>Vista previa</label><div id="vx-enc" style="font-size:13px;padding:8px 0;white-space:pre-wrap"></div></div></div>
@@ -229,7 +229,7 @@ details{margin-top:12px}summary{padding:6px 0;color:var(--mu);font-weight:600}
 
 <script>
 'use strict';
-const VERSION='11.6';
+const VERSION='11.7';
 const TURNOS=[1,2,3,4,5];
 const DIAS_FOTO=7;
 const ACCESOS=['FAV','Injerto','Catéter tunelizado','Catéter temporal'];
@@ -976,8 +976,11 @@ function setZoom(z){
   sc.scrollLeft=cx*im.offsetWidth-sc.clientWidth/2;sc.scrollTop=cy*im.offsetHeight-sc.clientHeight/2;
   $('#v-zoom').textContent='🔍 '+(Math.round(z*10)/10)+'×';
 }
+let vwMin=false;
+function vwShowSide(){const on=!!vwHook;$('#v-datos').style.display=on?'':'none';$('#vw-side').style.display=on&&!vwMin?'':'none';$('#v-datos').textContent=vwMin?'Datos ▸':'Datos ▾';if(on&&!vwMin&&vwHook)vwHook()}
+$('#v-datos').onclick=()=>{vwMin=!vwMin;vwShowSide()};
 function viewPhoto(url,onDelete){
-  $('#vw-side').style.display=vwHook?'':'none';if(vwHook)vwHook();
+  vwShowSide();
   $('#v-img').src=url;$('#vw').classList.add('on');vwDel=onDelete;vz=1;$('#v-img').style.width='100%';$('#vw .sc').scrollTo(0,0);setZoom(1);
 }
 $('#vw-side').addEventListener('input',ev=>{const i=ev.target.closest('[data-vk]');if(i&&vwPush)vwPush(i.dataset.vk,i.value)});
