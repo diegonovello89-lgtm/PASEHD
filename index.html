@@ -236,7 +236,7 @@ details{margin-top:12px}summary{padding:6px 0;color:var(--mu);font-weight:600}
 
 <script>
 'use strict';
-const VERSION='11.9';
+const VERSION='11.10';
 const TURNOS=[1,2,3,4,5];
 const DIAS_FOTO=7;
 const ACCESOS=['FAV','Injerto','Catéter tunelizado','Catéter temporal'];
@@ -753,7 +753,7 @@ async function openEntry(id){
   };
   const VK={};for(const [id,k] of Object.entries(NRIN))VK[k]=id;
   fillNR();drawNR();
-  vwHook=()=>{document.querySelectorAll('#vw-side [data-vk]').forEach(i=>{if(document.activeElement!==i&&sheetEl===sh)i.value=q(VK[i.dataset.vk]).value});$('#vx-enc').textContent=encTxt()};
+  const myHook=vwHook=()=>{document.querySelectorAll('#vw-side [data-vk]').forEach(i=>{if(document.activeElement!==i&&sheetEl===sh)i.value=q(VK[i.dataset.vk]).value});$('#vx-enc').textContent=encTxt()};
   vwPush=(k,v)=>{if(sheetEl!==sh)return;const el=q(VK[k]);el.value=v;el.dispatchEvent(new Event('input',{bubbles:true}))};
   vwCopy=k=>{if(sheetEl===sh)q('[data-cp="'+k+'"]').click()};
   // peso seco, UF programada y sala se arrastran de la sesión anterior del mismo paciente (si aún no hay valor)
@@ -810,7 +810,7 @@ async function openEntry(id){
   q('#e-prev').onclick=()=>goToPatient(prevId);
   q('#e-next').onclick=()=>goToPatient(nextId);
 
-  sheetCb=async()=>{try{await flush()}finally{vwHook=vwPush=vwCopy=null;if($('#vw').classList.contains('on'))$('#v-x').onclick();urls.forEach(u=>URL.revokeObjectURL(u));const prev=q('#e-prev-fotos');if(prev&&prev._photoUrls)prev._photoUrls.forEach(u=>URL.revokeObjectURL(u))}};
+  sheetCb=async()=>{try{await flush()}finally{if(vwHook===myHook){vwHook=vwPush=vwCopy=null;if($('#vw').classList.contains('on'))$('#v-x').onclick()}urls.forEach(u=>URL.revokeObjectURL(u));const prev=q('#e-prev-fotos');if(prev&&prev._photoUrls)prev._photoUrls.forEach(u=>URL.revokeObjectURL(u))}};
   ['#e-com','#e-sil','#e-nom','#e-av','#x-peso','#x-gan','#x-ta','#x-otro'].forEach(s=>q(s).addEventListener('input',later));
   Object.keys(NRIN).forEach(s=>q(s).addEventListener('input',()=>{drawNR();later()}));
   // Enter pasa al siguiente campo de signos y pesos
