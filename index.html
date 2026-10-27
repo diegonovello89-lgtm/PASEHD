@@ -209,6 +209,7 @@ details{margin-top:12px}summary{padding:6px 0;color:var(--mu);font-weight:600}
 #vw-side .al{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--mu)}
 #vw-side .al input{padding:0;flex:1;accent-color:var(--ac)}
 @media(min-width:800px){#vw-side{left:auto;top:0;width:340px;max-height:none}}
+.expn{display:inline-flex;gap:6px;align-items:center}.expn input{width:130px;padding:6px 8px;font-size:15px}.expn button{padding:6px 10px;border-radius:8px;background:var(--ac);color:#fff;font-weight:700}
 </style>
 </head>
 <body>
@@ -236,7 +237,7 @@ details{margin-top:12px}summary{padding:6px 0;color:var(--mu);font-weight:600}
 
 <script>
 'use strict';
-const VERSION='11.10';
+const VERSION='11.11';
 const TURNOS=[1,2,3,4,5];
 const DIAS_FOTO=7;
 const ACCESOS=['FAV','Injerto','Catéter tunelizado','Catéter temporal'];
@@ -348,7 +349,7 @@ async function renderHoy(){
     const pe=P[e.expediente];const open=pe?pAct(pe).length:0;
     return `<div class="card ${e.id===S.sel?'sel':''}" data-id="${e.id}">
       <div class="sil"><small>sillón</small><b>${esc(e.sillon||'–')}</b></div>
-      <div><div class="nm">${esc(pe&&pe.nombre||'(sin nombre)')}</div><div class="ex">${esc(e.expediente)}</div>
+      <div><div class="nm">${esc(pe&&pe.nombre||'(sin nombre)')}</div><div class="ex">${e.temp?'sin expediente':esc(e.expediente)}</div>
         <div class="chips">${pe&&pe.acceso?`<span class="chip ax">${esc(pe.acceso)}</span>`:''}${pe&&pe.aviso?`<span class="chip al">⚠ ${esc(pe.aviso)}</span>`:''}${(e.tags||[]).map(g=>`<span class="chip ev">${esc(g)}</span>`).join('')}${e.fotos&&e.fotos.length?`<span class="chip">📷 ${e.fotos.length}</span>`:''}${e.notaTxt?'<span class="chip">📝 texto</span>':''}${e.asistencia==='ausente'?'<span class="chip al">No acudió</span>':''}${open?`<span class="chip w">⏳ ${open} pendiente${open>1?'s':''}</span>`:''}</div>
         ${e.comentario?`<div class="cm">${esc(e.comentario)}</div>`:''}</div>
       <button class="nota ${e.nota?'ok':''}" data-nota="${e.id}">${e.nota?'✓':'○'}<small>nota</small></button></div>`}).join('');
@@ -414,6 +415,11 @@ async function renderResp(){
   $('#main').innerHTML=`<div class="top"><div class="datebar"><div class="d">Ajustes y respaldo</div></div></div>
   <div class="box"><h3>Sincronización</h3>${syHtml}</div>
   <div class="box"><h3>📁 Expedientes</h3><p>Consulta, corrige y revisa el historial de los pacientes.</p><button class="btn sec" id="settings-archivo">Administrar expedientes</button></div>
+  <details class="box"><summary><b>Cargar sillones vacíos</b></summary>
+    <p>Crea de una vez los sillones del turno (1 al número que indiques) sin expediente. Luego abres cada uno y le asignas el expediente. Los sillones que ya existen en ese turno no se duplican.</p>
+    <label for="sl-date">Fecha</label><input id="sl-date" type="date" value="${esc(S.fecha)}"><label for="sl-turn">Turno</label><select id="sl-turn">${turnoOpts(S.turno)}</select>
+    <label for="sl-n">Número de sillones</label><input id="sl-n" type="number" min="1" max="60" inputmode="numeric" value="20">
+    <button class="btn" id="sl-go">Cargar sillones</button><p id="sl-msg" class="hint"></p></details>
   <div class="box"><h3>Etiquetas de eventos</h3>
     <p>Son los chips que aparecen en cada paciente. Mantén la lista corta para que el pase sea rápido.</p>
     ${tags.map((g,i)=>`<div class="tgrow"><span>${esc(g)}</span><button class="x" data-tgi="${i}" aria-label="Quitar">×</button></div>`).join('')||'<p>Sin etiquetas.</p>'}
@@ -664,7 +670,7 @@ async function openEntry(id){
   const ex=e.extras;
   const sh=openSheet(`
     <div class="sh-sticky">
-    <div class="sh-head visit-head"><div class="visit-identity"><input id="e-nom" class="nm-in" placeholder="Nombre del paciente" value="${esc(pat.nombre)}"><div class="ex">Exp. ${esc(e.expediente)} · ${esc(fmtFecha(e.fecha))}</div></div><div class="visit-actions"><div class="visit-switch"><button type="button" class="ib" id="e-prev" aria-label="Paciente anterior" title="Paciente anterior" ${prevId?'':'disabled'}>‹</button><span class="visit-counter">${idx+1}/${vecinos.length}</span><button type="button" class="ib" id="e-next" aria-label="Paciente siguiente" title="Paciente siguiente" ${nextId?'':'disabled'}>›</button></div><button type="button" class="visit-done" data-close tabindex="-1" aria-label="Cerrar valoración">Listo</button></div><span class="sv" id="e-sv"></span></div>
+    <div class="sh-head visit-head"><div class="visit-identity"><input id="e-nom" class="nm-in" placeholder="Nombre del paciente" value="${esc(pat.nombre)}"><div class="ex">${e.temp?`<span class="expn"><input id="e-expn" placeholder="Expediente" autocomplete="off" inputmode="text"><button type="button" id="e-expgo">Asignar</button></span>`:`Exp. ${esc(e.expediente)}`} · ${esc(fmtFecha(e.fecha))}</div></div><div class="visit-actions"><div class="visit-switch"><button type="button" class="ib" id="e-prev" aria-label="Paciente anterior" title="Paciente anterior" ${prevId?'':'disabled'}>‹</button><span class="visit-counter">${idx+1}/${vecinos.length}</span><button type="button" class="ib" id="e-next" aria-label="Paciente siguiente" title="Paciente siguiente" ${nextId?'':'disabled'}>›</button></div><button type="button" class="visit-done" data-close tabindex="-1" aria-label="Cerrar valoración">Listo</button></div><span class="sv" id="e-sv"></span></div>
       <div class="stabs2"><button type="button" data-st="pase">Pase</button><button type="button" data-st="nota">Nota rápida</button><button type="button" class="notabtn" id="e-nota"></button></div></div>
     <div class="sp" data-pn="pase">
     <div class="row"><div><label>Sillón</label><input id="e-sil" inputmode="numeric" value="${esc(e.sillon)}"></div><div style="display:flex;align-items:end"><button type="button" class="btn sec" id="e-cal">Calculadora</button></div></div>
@@ -807,6 +813,26 @@ async function openEntry(id){
       else toast('No se pudo abrir el paciente');
     }finally{changingPatient=false}
   };
+  if(e.temp)q('#e-expgo').onclick=async()=>{
+    const nx=normExp(q('#e-expn').value);if(!nx){toast('Escribe el expediente');return}
+    try{
+      await flush();
+      const otros=(await byDate(e.fecha)).filter(x=>x.id!==e.id&&x.expediente===nx);
+      if(otros.length){toast('Ese expediente ya está en la lista de este día');return}
+      const old=e.expediente;
+      const tp=await get('patients',old);let np=await get('patients',nx);
+      if(tp&&!tp.deleted){
+        if(!np)np={expediente:nx,nombre:tp.nombre||'',acceso:tp.acceso||'',aviso:tp.aviso||'',notaFija:tp.notaFija||'',pendientes:tp.pendientes||[],updatedAt:now(),pu:now()};
+        else{if(!np.nombre&&tp.nombre)np.nombre=tp.nombre;np.pendientes=[...(np.pendientes||[]),...(tp.pendientes||[])];np.updatedAt=now();np.pu=now()}
+        await put('patients',np);
+        tp.deleted=true;tp.updatedAt=now();await put('patients',tp);
+      }
+      e.expediente=nx;delete e.temp;e.updatedAt=now();
+      sheetCb=null;clearTimeout(tm);await put('entries',e);
+      for(const fid of e.fotos){const ph=await get('photos',fid);if(ph){ph.expediente=nx;try{await put('photos',ph)}catch(_){}}}
+      S.keepTab=true;await closeSheet(true);await openEntry(e.id);toast('Expediente asignado');
+    }catch(err){logErr('asignar expediente',err);toast('No se pudo asignar')}
+  };
   q('#e-prev').onclick=()=>goToPatient(prevId);
   q('#e-next').onclick=()=>goToPatient(nextId);
 
@@ -821,7 +847,7 @@ async function openEntry(id){
     const cp=ev.target.closest('[data-cp]');
     if(cp){
       const k=cp.dataset.cp;
-      const txt=k==='fecha'?fechaTxt():k==='enc'?encTxt():k==='sv'?svTxt():k==='pe'?peTxt():k==='svpe'?svTxt()+'\n'+peTxt():k==='uf2'?uf2Txt():ufTxt();
+      const txt=k==='fecha'?fechaTxt():k==='enc'?encTxt():k==='sv'?svTxt():k==='pe'?peTxt():k==='svpe'?svTxt()+' '+peTxt():k==='uf2'?uf2Txt():ufTxt();
       if(!txt.trim()){toast('No hay texto para copiar');return}
       const ok=await copyText(txt);toast(ok?'Copiado: '+cp.dataset.lbl:'No se pudo copiar');
       if(ok){const o=cp.textContent;cp.textContent='Copiado';setTimeout(()=>{cp.textContent=o},1200)}
@@ -1217,6 +1243,16 @@ document.addEventListener('click',async ev=>{
   const card=t.closest('.card[data-id]');if(card){openEntry(card.dataset.id);return}
   const tgd=t.closest('[data-tgi]');
   if(tgd){const a=await getTags();a.splice(+tgd.dataset.tgi,1);await setTags(a);render();return}
+  if(t.id==='sl-go'){
+    const fecha=$('#sl-date').value,turno=+$('#sl-turn').value,n=parseInt($('#sl-n').value,10);
+    if(!fecha||!(n>=1&&n<=60)){toast('Indica fecha y un número de 1 a 60');return}
+    const ya=(await byDate(fecha)).filter(x=>x.turno===turno);const tiene=new Set(ya.map(x=>String(x.sillon||'').trim()));
+    let add=0;
+    for(let i=1;i<=n;i++){if(tiene.has(String(i)))continue;
+      await put('entries',{id:uid(),fecha,turno,sillon:String(i),expediente:`S${i}-T${turno}-${fecha}`,temp:true,comentario:'',nota:false,notaTxt:'',fotos:[],tags:[],extras:{},creado:now()+i,updatedAt:now()});add++}
+    S.fecha=fecha;S.turno=turno;lsSet('turno',turno);
+    $('#sl-msg').textContent=add?`Listo: ${add} sillón${add===1?'':'es'} cargado${add===1?'':'s'} en el turno ${turno}.`:'Esos sillones ya existían.';
+    toast(add?`${add} sillones cargados`:'Ya existían');return}
   if(t.id==='tg-add'){const v=$('#tg-in').value.trim();if(!v)return;const a=await getTags();if(!a.includes(v)){a.push(v);await setTags(a)}render();return}
   if(t.id==='tg-def'){if(confirm('¿Restaurar la lista de etiquetas por defecto?')){await setTags(DEF_TAGS.slice());render()}return}
   if(t.id==='sy-login'){
