@@ -210,6 +210,25 @@ details{margin-top:12px}summary{padding:6px 0;color:var(--mu);font-weight:600}
 #vw-side .al input{padding:0;flex:1;accent-color:var(--ac)}
 @media(min-width:800px){#vw-side{left:auto;top:0;width:340px;max-height:none}}
 .expn{display:inline-flex;gap:6px;align-items:center}.expn input{width:130px;padding:6px 8px;font-size:15px}.expn button{padding:6px 10px;border-radius:8px;background:var(--ac);color:#fff;font-weight:700}
+.ncb{margin-top:8px}.ncb label{font-weight:700;font-size:12px;display:block}.ncb textarea,#nc-tpl{width:100%;font-size:14px;box-sizing:border-box}.ncb textarea[readonly]{background:var(--card);opacity:.85}
+.nclabs{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0}.nclabs button{padding:6px 10px;border-radius:999px;border:1px solid var(--ac);background:var(--card);color:var(--ac);font-weight:600;font-size:13px}
+#ncm{display:none;position:fixed;inset:0;z-index:40;background:rgba(0,0,0,.45);align-items:center;justify-content:center;padding:2vh 2vw}
+#ncm.on{display:flex}
+#ncm .box2{background:var(--bg);color:var(--tx);width:min(1100px,96vw);height:94vh;border-radius:16px;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 10px 40px #0007}
+#ncm .hd2{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:12px 16px;border-bottom:1px solid var(--bd)}
+#ncm .hd2 button{padding:10px 16px;border-radius:10px;font-weight:700;background:var(--ac);color:#fff}
+#ncm .hd2 button.sec{background:var(--card);color:var(--tx);border:1px solid var(--bd)}
+#ncm .ncmc{flex:1;overflow:auto;padding:12px 16px calc(16px + env(safe-area-inset-bottom))}
+#ncm .ncb textarea{font-size:16px;line-height:1.4;min-height:60px;padding:10px;resize:vertical}
+#ncm #nc-tpl{font-size:16px;line-height:1.45;height:55vh;padding:10px}
+#ncm .ncb label{font-size:13px}
+.ncb .bl{display:flex;justify-content:space-between;align-items:center}.ncb .bl button{padding:4px 10px;border-radius:8px;border:1px solid var(--ac);background:var(--card);color:var(--ac);font-weight:700;font-size:12px}
+.nr .cp2,#ncm .cp2{background:var(--ac)!important;color:#fff!important;border:0!important;font-size:15px!important;padding:11px 16px!important;border-radius:12px!important;font-weight:700}
+.nr .cp,#ncm .cp{font-size:15px!important;padding:11px 18px!important;border-radius:12px!important}
+.ncb .bl button{background:var(--ac)!important;color:#fff!important;border:0!important;font-size:14px!important;padding:8px 14px!important;border-radius:10px!important}
+.nclabs button{background:var(--ac)!important;color:#fff!important;border:0!important;font-size:15px!important;padding:9px 14px!important}
+#ncm .hd2 button{font-size:16px;padding:12px 20px}
+#ncm .ncb label{font-size:15px;font-weight:800}
 </style>
 </head>
 <body>
@@ -220,6 +239,7 @@ details{margin-top:12px}summary{padding:6px 0;color:var(--mu);font-weight:600}
   <button data-v="resp"><span>⚙️</span>Ajustes</button>
 </nav>
 <div id="ov"></div>
+<div id="ncm"><div class="box2"><div class="hd2"><b>Nota completa</b><span><button type="button" id="ncm-copy">Copiar nota completa</button> <button type="button" class="sec" id="ncm-x">Cerrar</button></span></div><div class="ncmc" id="ncm-c"></div></div></div>
 <div id="vw"><div class="bar"><button id="v-datos" style="display:none">Datos ▾</button><button id="v-zoom">🔍 Zoom</button><button id="v-del">🗑 Borrar</button><button id="v-x">Cerrar</button></div><div class="vwm"><div class="sc"><img id="v-img" alt="Hoja de signos"></div>
 <div id="vw-side" style="display:none">
  <div class="al"><span>Transparencia</span><input type="range" id="vw-alpha" min="20" max="100" value="60" aria-label="Opacidad del panel"></div>
@@ -237,7 +257,7 @@ details{margin-top:12px}summary{padding:6px 0;color:var(--mu);font-weight:600}
 
 <script>
 'use strict';
-const VERSION='11.11';
+const VERSION='11.16';
 const TURNOS=[1,2,3,4,5];
 const DIAS_FOTO=7;
 const ACCESOS=['FAV','Injerto','Catéter tunelizado','Catéter temporal'];
@@ -304,7 +324,7 @@ const patStamp=p=>p.pu||p.updatedAt||0;
 function mergePat(cur,r){
   if(!cur)return r;
   const out={...cur};
-  if(patStamp(r)>patStamp(cur)){out.nombre=r.nombre;out.acceso=r.acceso;out.aviso=r.aviso;out.notaFija=r.notaFija;out.sexo=r.sexo;out.pu=patStamp(r)}
+  if(patStamp(r)>patStamp(cur)){out.nombre=r.nombre;out.acceso=r.acceso;out.aviso=r.aviso;out.notaFija=r.notaFija;out.sexo=r.sexo;if(r.plantilla!==undefined)out.plantilla=r.plantilla;out.pu=patStamp(r)}
   const m=new Map((cur.pendientes||[]).map(x=>[x.id,x]));
   for(const x of r.pendientes||[]){const c=m.get(x.id);if(!c||pStamp(x)>pStamp(c))m.set(x.id,x)}
   out.pendientes=[...m.values()];
@@ -594,7 +614,7 @@ async function openAdd(pre){
     <div class="row"><div><label>Turno</label><select id="a-tur">${turnoOpts(S.turno)}</select></div>
     <div><label>Sillón</label><input id="a-sil" inputmode="numeric" autocomplete="off"></div></div>
     <div id="a-hint" class="hint"></div>
-    <label style="display:flex;align-items:center;gap:8px;margin:12px 0"><input id="a-rapid" type="checkbox" checked style="width:auto"> Captura rápida: continuar con el siguiente paciente</label><button class="pri" id="a-ok">Guardar paciente y sillón</button><div id="a-count" class="mu" aria-live="polite"></div>`);
+    <label style="display:flex;align-items:center;gap:8px;margin:12px 0"><input id="a-rapid" type="checkbox" style="width:auto"> Captura rápida: continuar con el siguiente paciente</label><button class="pri" id="a-ok">Guardar paciente y sillón</button><div id="a-count" class="mu" aria-live="polite"></div>`);
   const exp=$('#a-exp',sh),nom=$('#a-nom',sh),sug=$('#a-sug',sh),hint=$('#a-hint',sh);
   let auto=false;
   const upd=(src)=>{
@@ -719,6 +739,10 @@ async function openEntry(id){
             <div class="row" style="margin-top:6px"><div><label for="nr-ufp">Programada (mL)</label><input id="nr-ufp" inputmode="numeric" autocomplete="off"></div><div><label for="nr-uft">Tolerada (mL)</label><input id="nr-uft" inputmode="numeric" autocomplete="off" placeholder="igual si queda vacío"></div></div>
             <div class="pv" id="nr-uftxt"></div>
             <div style="margin-top:6px"><button type="button" class="cp2" data-cp="uf2" data-lbl="UF corta">Copiar solo "tolera UF … ml"</button></div></div>
+          <div class="blk"><div class="bh"><b>Nota completa</b><button type="button" class="cp" id="nc-quick">Copiar nota</button></div>
+            <small class="mu">Usa la plantilla del paciente. Para revisar o editar una parte, ábrela en ventana grande.</small>
+            <div style="margin-top:6px"><button type="button" class="cp2" id="nc-open">Abrir en ventana grande</button></div>
+            <div id="nc-hold" style="display:none"><div id="nc-body"></div></div></div>
         </div>
       </div>
     </div>`);
@@ -741,6 +765,7 @@ async function openEntry(id){
   // ---- Nota: bloques independientes con su botón de copiar (encabezado, signos, pesos, UF)
   const nr=Object.assign({},e.nr||{});
   if(nr.sala===undefined)nr.sala=lsGet('sala')||'';
+  let ncUpd=null;
   const val=id=>q(id).value.trim();
   const num=x=>{const n=parseFloat(String(x).replace(',','.'));return isNaN(n)?null:n};
   const fechaTxt=()=>String(e.fecha||'').split('-').reverse().join('/');
@@ -756,12 +781,102 @@ async function openEntry(id){
   const drawNR=()=>{
     q('#nr-enctxt').textContent=encTxt();q('#nr-svtxt').textContent=svTxt();q('#nr-petxt').textContent=peTxt();q('#nr-uftxt').textContent=ufTxt();
     if(vwHook)vwHook();
+    if(ncUpd)ncUpd();
   };
   const VK={};for(const [id,k] of Object.entries(NRIN))VK[k]=id;
   fillNR();drawNR();
   const myHook=vwHook=()=>{document.querySelectorAll('#vw-side [data-vk]').forEach(i=>{if(document.activeElement!==i&&sheetEl===sh)i.value=q(VK[i.dataset.vk]).value});$('#vx-enc').textContent=encTxt()};
   vwPush=(k,v)=>{if(sheetEl!==sh)return;const el=q(VK[k]);el.value=v;el.dispatchEvent(new Event('input',{bubbles:true}))};
   vwCopy=k=>{if(sheetEl===sh)q('[data-cp="'+k+'"]').click()};
+  // ---- Nota completa: plantilla del paciente con [texto] etiqueta
+  const ncBody=q('#nc-body');const ncq=x=>ncBody.querySelector(x);
+  const NCA=l=>{const f=fold(l);return f.includes('fecha')?'fecha':f.includes('signos')?'signos':(f.includes('ultrafil')||/\buf\b/.test(f))?'uf':''};
+  const parseTpl=t=>{const out=[];let last=0,i=0;const re=/\[([^\[\]]*)\](?:\{([^{}\n]*)\}|[ \t]*([^\n]*))/g;let m;
+    while((m=re.exec(t))){if(m.index>last)out.push({t:t.slice(last,m.index)});out.push({b:1,i:i++,text:m[1],label:(m[2]!==undefined?m[2]:(m[3]||'')).trim()});last=re.lastIndex}
+    if(last<t.length)out.push({t:t.slice(last)});return out};
+  const hashT=t=>{let h=0;for(let k=0;k<t.length;k++)h=(h*31+t.charCodeAt(k))|0;return t.length+':'+h};
+  const genAuto=(kind,tx)=>{
+    if(kind==='fecha'){let ch=false;const r=tx.replace(/\d{1,2}\/\d{1,2}\/\d{2,4}/,()=>{ch=true;return fechaTxt()}).replace(/(SALA\s+)\S+/i,(m,a)=>{ch=true;return a+(val('#nr-sala')||'__')}).replace(/(TURNO\s+)\S+/i,(m,a)=>{ch=true;return a+e.turno});return ch?r:encTxt()}
+    if(kind==='signos')return svTxt()+(/\n/.test(tx)?'\n':' ')+peTxt();
+    if(kind==='uf'){if(!/UF programada/i.test(tx))return ufTxt();return tx.replace(/(UF programada de\s+)[\d.,_]+/i,(m,a)=>a+(val('#nr-ufp')||'__')).replace(/(UF tolerada de\s+)[\d.,_]+/i,(m,a)=>a+ufT())}
+    return tx};
+  const ncParts=()=>parseTpl(pat.plantilla||'');
+  const ncShown=p=>{const k=NCA(p.label);if(k)return genAuto(k,p.text);const ta=ncBody.querySelector('[data-nb="'+p.i+'"]');return ta?ta.value:(nr.blk&&nr.blk[p.i]!==undefined?nr.blk[p.i]:p.text)};
+  const ncFull=()=>ncParts().map(p=>p.b?ncShown(p):p.t).join('');
+  const ncBase=()=>ncParts().map(p=>p.b?'['+ncShown(p)+']'+(p.label?'{'+p.label+'}':''):p.t).join('');
+  const LABS=['fecha y turno','dx','subjetivo','signos','exploración física','análisis','ultrafiltrado','tratamiento habitual','plan','médico'];
+  const ncEditor=txt=>'<textarea id="nc-tpl" rows="12" placeholder="Pega aquí la nota completa del paciente"></textarea>'
+    +'<p class="mu" style="margin:6px 0 0">Selecciona un texto de la nota y toca una etiqueta para marcarlo (como ocultar en Anki).</p>'
+    +'<div class="nclabs">'+LABS.map(l=>`<button type="button" data-nclab="${esc(l)}">${esc(l)}</button>`).join('')+'</div>'
+    +'<div class="row"><input id="nc-lab" placeholder="Otra etiqueta…" autocomplete="off"><button type="button" class="cp2" id="nc-mark">Marcar</button></div>'
+    +'<div style="margin-top:6px"><button type="button" class="cp2" id="nc-auto">Detectar fecha, signos y UF</button> <button type="button" class="cp2" id="nc-unmark">Quitar marca de la selección</button> <button type="button" class="cp2" id="nc-save">Guardar plantilla</button></div>';
+  const wrapSel=lab=>{
+    const ta=ncq('#nc-tpl');if(!ta)return;lab=String(lab||'').trim();
+    if(!lab){toast('Escribe o elige una etiqueta');return}
+    let a=ta.selectionStart,b=ta.selectionEnd;
+    if(a===b){toast('Primero selecciona el texto en la nota');return}
+    const v=ta.value;const sel=v.slice(a,b);
+    if(/[\[\]]/.test(sel)){toast('La selección ya contiene una marca');return}
+    const ins='['+sel+']{'+lab.replace(/[{}\n]/g,' ')+'}';
+    ta.value=v.slice(0,a)+ins+v.slice(b);ta.focus();ta.setSelectionRange(a+ins.length,a+ins.length);
+  };
+  const autoMark=()=>{
+    const ta=ncq('#nc-tpl');if(!ta)return;let v=ta.value,n=0;
+    const tryMark=(re,lab)=>{if(v.includes(']{'+lab+'}'))return;const m=re.exec(v);if(!m)return;
+      const a=m.index,b=a+m[0].length;if(v.slice(0,a).split('[').length!==v.slice(0,a).split(']').length)return;
+      v=v.slice(0,a)+'['+m[0]+']{'+lab+'}'+v.slice(b);n++};
+    tryMark(/NOTA DIARIA[^\n]*/i,'fecha y turno');
+    tryMark(/Signos vitales:[\s\S]*?Ganancia interdial[^\n]*/i,'signos');
+    tryMark(/UF programada de[\s\S]*?UF tolerada de\s*[\d.,_]+\s*mL\.?/i,'ultrafiltrado');
+    ta.value=v;toast(n?`Marcados: ${n}`:'No encontré partes nuevas para marcar');
+  };
+  const unmarkSel=()=>{
+    const ta=ncq('#nc-tpl');if(!ta)return;const v=ta.value,pos=ta.selectionStart;
+    const re=/\[([^\[\]]*)\](?:\{([^{}\n]*)\}|[ \t]*([^\n]*))/g;let m;
+    while((m=re.exec(v))){const a=m.index,b=a+m[0].length;if(pos>=a&&pos<=b){ta.value=v.slice(0,a)+m[1]+v.slice(b);ta.focus();ta.setSelectionRange(a,a+m[1].length);return}}
+    toast('Pon el cursor dentro del texto marcado');
+  };
+  const setTpl=async t=>{await mutPat(p=>{p.plantilla=t;p.pu=now()})};
+  const renderNC=()=>{
+    const tpl=pat.plantilla||'';const sg=hashT(tpl);
+    if(nr.blkSig!==sg){nr.blk={};nr.blkSig=sg}
+    if(!nr.blk)nr.blk={};
+    if(!tpl.trim()){ncBody.innerHTML='<p class="mu">Este paciente aún no tiene plantilla. Pega su nota y marca los textos que cambian. Las etiquetas «fecha y turno», «signos» y «ultrafiltrado» se llenan solas con los datos de arriba.</p>'+ncEditor()+'<label for="nc-from">O copia la plantilla de otro paciente (expediente)</label><div class="row"><input id="nc-from" autocomplete="off"><button type="button" class="cp2" id="nc-copyfrom">Copiar</button></div>';return}
+    const parts=ncParts();
+    ncBody.innerHTML='<div class="bh"><b>Nota completa</b><button type="button" class="cp" id="nc-copy">Copiar nota</button></div>'
+      +parts.filter(p=>p.b).map(p=>{const k=NCA(p.label);return `<div class="ncb"><div class="bl"><label>${esc(p.label||('Bloque '+(p.i+1)))}${k?' <small>(automático)</small>':''}</label><button type="button" data-nbc="${p.i}">Copiar bloque</button></div><textarea data-nb="${p.i}" rows="${Math.min(10,Math.max(2,String(k?genAuto(k,p.text):(nr.blk[p.i]!==undefined?nr.blk[p.i]:p.text)).split('\n').length))}" ${k?'readonly':''}></textarea></div>`}).join('')
+      +'<div style="margin-top:8px"><button type="button" class="cp2" id="nc-base">Guardar cambios como base del paciente</button> <button type="button" class="cp2" id="nc-edit">Editar plantilla</button></div><div id="nc-editbox"></div>';
+    parts.filter(p=>p.b).forEach(p=>{const k=NCA(p.label);ncBody.querySelector('[data-nb="'+p.i+'"]').value=k?genAuto(k,p.text):(nr.blk[p.i]!==undefined?nr.blk[p.i]:p.text)});
+    grow();
+  };
+  ncUpd=()=>{if(!ncBody.querySelector('[data-nb]'))return;ncParts().forEach(p=>{if(!p.b)return;const k=NCA(p.label);if(!k)return;const ta=ncBody.querySelector('[data-nb="'+p.i+'"]');if(ta)ta.value=genAuto(k,p.text)})};
+  ncBody.addEventListener('mousedown',ev=>{if(ev.target.closest('[data-nclab],#nc-auto,#nc-unmark,#nc-mark'))ev.preventDefault()});
+  ncBody.addEventListener('input',ev=>{const ta=ev.target.closest('[data-nb]');if(ta){nr.blk[ta.dataset.nb]=ta.value;later()}});
+  ncBody.addEventListener('click',async ev=>{
+    const id=ev.target.id;if(!id&&!ev.target.dataset.nclab&&ev.target.dataset.nbc===undefined)return;
+    try{
+      if(id==='nc-copy'){const ok=await copyText(ncFull());toast(ok?'Copiada la nota completa':'No se pudo copiar');return}
+      if(id==='nc-save'){const t=ncq('#nc-tpl').value;if(!t.trim()){toast('Pega la nota primero');return}await setTpl(t);renderNC();toast('Plantilla guardada');return}
+      if(id==='nc-copyfrom'){const x=normExp(ncq('#nc-from').value);const o=x&&await get('patients',x);if(!o||!o.plantilla){toast('Ese expediente no tiene plantilla');return}await setTpl(o.plantilla);renderNC();toast('Plantilla copiada');return}
+      if(id==='nc-base'){await setTpl(ncBase());renderNC();toast('Guardado como base de este paciente');return}
+      if(id==='nc-edit'){ncq('#nc-editbox').innerHTML=ncEditor();ncq('#nc-tpl').value=pat.plantilla||'';return}
+      if(ev.target.dataset.nbc!==undefined){const ta=ncq('[data-nb="'+ev.target.dataset.nbc+'"]');const ok=ta&&await copyText(ta.value);toast(ok?'Bloque copiado':'No se pudo copiar');return}
+      if(ev.target.dataset.nclab){wrapSel(ev.target.dataset.nclab);return}
+      if(id==='nc-mark'){wrapSel(ncq('#nc-lab').value);ncq('#nc-lab').value='';return}
+      if(id==='nc-auto'){autoMark();return}
+      if(id==='nc-unmark'){unmarkSel();return}
+    }catch(err){logErr('plantilla',err);toast('No se pudo guardar la plantilla')}
+  });
+  const grow=()=>ncBody.querySelectorAll('.ncb textarea').forEach(t=>{t.style.height='auto';t.style.height=Math.max(60,t.scrollHeight+4)+'px'});
+  const ncOpenM=()=>{$('#ncm-c').replaceChildren(ncBody);$('#ncm').classList.add('on');$('#ncm-copy').style.display=(pat.plantilla||'').trim()?'':'none';renderNC();grow()};
+  const ncCloseM=()=>{const h=q('#nc-hold');if(h)h.appendChild(ncBody);$('#ncm').classList.remove('on')};
+  ncM={open:ncOpenM,close:ncCloseM};
+  q('#nc-open').onclick=ncOpenM;
+  q('#nc-quick').onclick=async()=>{if(!(pat.plantilla||'').trim()){ncOpenM();return}const ok=await copyText(ncFull());toast(ok?'Copiada la nota completa':'No se pudo copiar')};
+  $('#ncm-copy').onclick=async()=>{const ok=await copyText(ncFull());toast(ok?'Copiada la nota completa':'No se pudo copiar')};
+  $('#ncm-x').onclick=ncCloseM;
+  ncBody.addEventListener('input',grow);
+  renderNC();
   // peso seco, UF programada y sala se arrastran de la sesión anterior del mismo paciente (si aún no hay valor)
   (async()=>{try{
     const prev=(await all('entries')).filter(x=>!x.deleted&&x.nr&&x.expediente===e.expediente&&x.id!==e.id&&((x.fecha||'')<(e.fecha||'')||((x.fecha||'')===(e.fecha||'')&&(x.creado||0)<(e.creado||0))))
@@ -776,7 +891,7 @@ async function openEntry(id){
   const collect=()=>{
     e.comentario=q('#e-com').value;e.sillon=q('#e-sil').value.trim();
     e.extras={peso:q('#x-peso').value,gan:q('#x-gan').value,ta:q('#x-ta').value,otro:q('#x-otro').value};
-    e.nr={};
+    e.nr={blk:nr.blk||{},blkSig:nr.blkSig||''};
     for(const [id,k] of Object.entries(NRIN))e.nr[k]=val(id);
   };
   const sig=()=>JSON.stringify([e.comentario||'',e.sillon||'',e.extras,e.nr,!!e.nota,e.tags,e.turno,e.asistencia||'',e.fotos]);
@@ -836,7 +951,7 @@ async function openEntry(id){
   q('#e-prev').onclick=()=>goToPatient(prevId);
   q('#e-next').onclick=()=>goToPatient(nextId);
 
-  sheetCb=async()=>{try{await flush()}finally{if(vwHook===myHook){vwHook=vwPush=vwCopy=null;if($('#vw').classList.contains('on'))$('#v-x').onclick()}urls.forEach(u=>URL.revokeObjectURL(u));const prev=q('#e-prev-fotos');if(prev&&prev._photoUrls)prev._photoUrls.forEach(u=>URL.revokeObjectURL(u))}};
+  sheetCb=async()=>{try{await flush()}finally{$('#ncm').classList.remove('on');$('#ncm-c').replaceChildren();if(vwHook===myHook){vwHook=vwPush=vwCopy=null;if($('#vw').classList.contains('on'))$('#v-x').onclick()}urls.forEach(u=>URL.revokeObjectURL(u));const prev=q('#e-prev-fotos');if(prev&&prev._photoUrls)prev._photoUrls.forEach(u=>URL.revokeObjectURL(u))}};
   ['#e-com','#e-sil','#e-nom','#e-av','#x-peso','#x-gan','#x-ta','#x-otro'].forEach(s=>q(s).addEventListener('input',later));
   Object.keys(NRIN).forEach(s=>q(s).addEventListener('input',()=>{drawNR();later()}));
   // Enter pasa al siguiente campo de signos y pesos
@@ -905,7 +1020,7 @@ async function openEntry(id){
       const fo=document.activeElement;
       if(fo!==q('#e-com')){q('#e-com').value=r.comentario||'';e.comentario=r.comentario||''}
       if(typeof r.notaTxt==='string')e.notaTxt=r.notaTxt;
-      if(r.nr&&!q('#e-nr').contains(document.activeElement)){Object.assign(nr,r.nr);e.nr=r.nr;fillNR();drawNR()}
+      if(r.nr&&!q('#e-nr').contains(document.activeElement)){Object.assign(nr,r.nr);e.nr=r.nr;fillNR();drawNR();if(!ncBody.contains(document.activeElement))renderNC()}
       if(fo!==q('#e-sil')){q('#e-sil').value=r.sillon||'';e.sillon=r.sillon||''}
       savedSig=sig();
     },
@@ -915,7 +1030,7 @@ async function openEntry(id){
       if(sheetEl===sh)await drawFotos();
     },
     setPat:p=>{
-      pat=p;if(sheetEl!==sh)return;drawPend();drawNR();
+      pat=p;if(sheetEl!==sh)return;drawPend();drawNR();if(!ncBody.contains(document.activeElement))renderNC();
       const fo=document.activeElement;
       if(fo!==q('#e-nom'))q('#e-nom').value=p.nombre||'';
       if(fo!==q('#e-av'))q('#e-av').value=p.aviso||'';
@@ -999,7 +1114,7 @@ function compress(file,modo){return new Promise((res,rej)=>{
   };
   img.onerror=()=>{URL.revokeObjectURL(url);rej(new Error('img'))};img.src=url;});}
 
-let vwDel=null,vz=1,vwHook=null,vwPush=null,vwCopy=null;
+let ncM=null;let vwDel=null,vz=1,vwHook=null,vwPush=null,vwCopy=null;
 function setZoom(z){
   const sc=$('#vw .sc'),im=$('#v-img');
   z=Math.min(5,Math.max(1,z));
@@ -1298,7 +1413,7 @@ const SYNC=(()=>{
   const fail=(err,n=1)=>{if(err&&err.code==='permission-denied')st.denied+=n;else logErr('subir',err)};
 
   /* --- registros --- */
-  const recPat=p=>{const r={expediente:p.expediente,acceso:p.acceso||'',aviso:p.aviso||'',sexo:p.sexo||'',updatedAt:patStamp(p)};if(st.syncNames)r.nombre=p.nombre||'';return r};
+  const recPat=p=>{const r={expediente:p.expediente,acceso:p.acceso||'',aviso:p.aviso||'',sexo:p.sexo||'',updatedAt:patStamp(p)};if(st.syncNames){r.nombre=p.nombre||'';r.plantilla=p.plantilla||''}return r};
   const recPend=(p,x)=>({id:x.id,expediente:p.expediente,texto:x.texto,hecho:!!x.hecho,hechoEn:x.hechoEn||null,creado:x.creado||0,del:!!x.del,updatedAt:pStamp(x)});
   const recEnt=e=>{const r={...e};delete r.fotos;r.deleted=!!e.deleted;r.updatedAt=e.updatedAt||0;return r};
   // Fotos: ya vienen comprimidas (ligeras ~100-150 KB); van dentro del documento como texto base64.
@@ -1376,6 +1491,7 @@ const SYNC=(()=>{
       if(!st.forceNames&&cur&&patStamp(cur)>=rs)return null;
       const p=cur||{expediente:r.expediente,nombre:'',pendientes:[],updatedAt:0};
       if(st.syncNames&&typeof r.nombre==='string')p.nombre=r.nombre;
+      if(st.syncNames&&typeof r.plantilla==='string')p.plantilla=r.plantilla;
       if('acceso' in r)p.acceso=r.acceso;if('aviso' in r)p.aviso=r.aviso;if('sexo' in r)p.sexo=r.sexo;
       p.pu=rs;p.updatedAt=Math.max(p.updatedAt||0,rs);
       await put('patients',p,{nosync:true});return p;
