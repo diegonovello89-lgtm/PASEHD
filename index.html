@@ -257,7 +257,7 @@ details{margin-top:12px}summary{padding:6px 0;color:var(--mu);font-weight:600}
 
 <script>
 'use strict';
-const VERSION='11.16';
+const VERSION='11.18';
 const TURNOS=[1,2,3,4,5];
 const DIAS_FOTO=7;
 const ACCESOS=['FAV','Injerto','Catéter tunelizado','Catéter temporal'];
@@ -385,7 +385,7 @@ async function renderHoy(){
       <div class="sbar"><input id="s-q" type="search" placeholder="Buscar paciente por nombre o expediente" autocomplete="off" autocorrect="off" enterkeyhint="search" value="${esc(S.q||'')}"><div id="s-res" class="sres"></div></div></div>
     ${lsGet('safe')==='1'?'<div class="banner"><div>Modo seguro: la app se cerró sola al iniciar la última vez. La sincronización y la limpieza de fotos están en pausa. <button type="button" class="mini" data-resume style="margin-top:6px">Reanudar</button></div></div>':''}
     ${showBanner?`<div class="banner"><div>Para que iOS no borre tus datos, instala la app: botón Compartir → <b>Agregar a pantalla de inicio</b>, y úsala siempre desde ese ícono.</div><button data-bn>×</button></div>`:''}
-    ${cards||`<div class="empty">Sin pacientes en el turno ${S.turno}.</div>`}
+    ${cards||`<div class="empty">Sin pacientes en el turno ${S.turno}.<br><button class="btn" data-loadprev style="margin-top:10px">Cargar desde la sesión anterior</button></div>`}
     <button class="addend" data-add>＋ Agregar paciente</button>`;
   if(S.q)drawSearch().catch(()=>{});
 }
@@ -435,6 +435,11 @@ async function renderResp(){
   $('#main').innerHTML=`<div class="top"><div class="datebar"><div class="d">Ajustes y respaldo</div></div></div>
   <div class="box"><h3>Sincronización</h3>${syHtml}</div>
   <div class="box"><h3>📁 Expedientes</h3><p>Consulta, corrige y revisa el historial de los pacientes.</p><button class="btn sec" id="settings-archivo">Administrar expedientes</button></div>
+  <details class="box"><summary><b>Cargar turno desde una sesión anterior</b></summary>
+    <p>Copia los pacientes de un turno de una sesión anterior (por defecto, la del mismo grupo de días: lunes-miércoles-viernes o martes-jueves-sábado). Cada paciente viene con el sillón de esa vez; luego cambias el sillón de quien se haya movido.</p>
+    <label for="cp-date">Cargar en la fecha</label><input id="cp-date" type="date" value="${esc(S.fecha)}"><label for="cp-turn">Turno</label><select id="cp-turn">${turnoOpts(S.turno)}</select>
+    <label for="cp-src">Copiar de la fecha</label><input id="cp-src" type="date" value="${esc(fechaBase(S.fecha))}">
+    <p id="cp-info" class="hint"></p><button class="btn" id="cp-go">Cargar pacientes</button></details>
   <details class="box"><summary><b>Cargar sillones vacíos</b></summary>
     <p>Crea de una vez los sillones del turno (1 al número que indiques) sin expediente. Luego abres cada uno y le asignas el expediente. Los sillones que ya existen en ese turno no se duplican.</p>
     <label for="sl-date">Fecha</label><input id="sl-date" type="date" value="${esc(S.fecha)}"><label for="sl-turn">Turno</label><select id="sl-turn">${turnoOpts(S.turno)}</select>
@@ -651,6 +656,21 @@ async function openAdd(pre){
   }else setTimeout(()=>exp.focus(),50);
 }
 
+/* ---------- Cargar el turno desde la sesión anterior del mismo grupo (L-M-V / M-J-S) ---------- */
+const addDays=(f,n)=>{const d=new Date(f+'T12:00:00');d.setDate(d.getDate()+n);return todayStr(d)};
+// lunes y martes miran 3 días atrás (viernes/sábado); miércoles a sábado miran 2 días atrás
+const fechaBase=f=>{const w=new Date(f+'T12:00:00').getDay();return addDays(f,(w===1||w===2)?-3:-2)};
+async function listaOrigen(src,turno){return(await byDate(src)).filter(x=>x.turno===turno&&!x.temp).sort(cmpSillon)}
+async function cargarDesde(fecha,turno,src){
+  const orig=await listaOrigen(src,turno);
+  const hoy=await byDate(fecha);const ya=new Set(hoy.map(x=>x.expediente));
+  let add=0,omit=0;
+  for(const o of orig){
+    if(ya.has(o.expediente)){omit++;continue}
+    await put('entries',{id:'p-'+fecha+'-'+o.expediente,fecha,turno,sillon:o.sillon||'',expediente:o.expediente,comentario:'',nota:false,notaTxt:'',fotos:[],tags:[],extras:{},creado:now()+add,updatedAt:now()});
+    ya.add(o.expediente);add++}
+  return{add,omit,total:orig.length}
+}
 async function addEntry(expRaw,nom,tur,sil,rapid=false){
   const exp=normExp(expRaw);if(!exp){toast('Falta el expediente');return}
   nom=nom.trim();sil=sil.trim();
@@ -868,8 +888,12 @@ async function openEntry(id){
     }catch(err){logErr('plantilla',err);toast('No se pudo guardar la plantilla')}
   });
   const grow=()=>ncBody.querySelectorAll('.ncb textarea').forEach(t=>{t.style.height='auto';t.style.height=Math.max(60,t.scrollHeight+4)+'px'});
-  const ncOpenM=()=>{$('#ncm-c').replaceChildren(ncBody);$('#ncm').classList.add('on');$('#ncm-copy').style.display=(pat.plantilla||'').trim()?'':'none';renderNC();grow()};
-  const ncCloseM=()=>{const h=q('#nc-hold');if(h)h.appendChild(ncBody);$('#ncm').classList.remove('on')};
+  // guarda y restaura el desplazamiento de la página y de la ficha para que nada se mueva al abrir/cerrar la ventana
+  let ncPos=[],ncLock=false;
+  const ncSave=()=>{const se=document.scrollingElement||document.documentElement;ncPos=[[se,se.scrollTop]];for(let n=q('#nc-open');n&&n!==document.body;n=n.parentElement)if(n.scrollTop)ncPos.push([n,n.scrollTop])};
+  const ncRestore=()=>{const f=()=>ncPos.forEach(([n,t])=>{n.scrollTop=t});f();requestAnimationFrame(f);setTimeout(f,80)};
+  const ncOpenM=()=>{ncSave();ncLock=!document.body.classList.contains('lock');if(ncLock)document.body.classList.add('lock');$('#ncm-c').replaceChildren(ncBody);$('#ncm').classList.add('on');$('#ncm-copy').style.display=(pat.plantilla||'').trim()?'':'none';renderNC();grow();ncRestore()};
+  const ncCloseM=()=>{const h=q('#nc-hold');if(h)h.appendChild(ncBody);$('#ncm').classList.remove('on');if(ncLock){document.body.classList.remove('lock');ncLock=false}ncRestore()};
   ncM={open:ncOpenM,close:ncCloseM};
   q('#nc-open').onclick=ncOpenM;
   q('#nc-quick').onclick=async()=>{if(!(pat.plantilla||'').trim()){ncOpenM();return}const ok=await copyText(ncFull());toast(ok?'Copiada la nota completa':'No se pudo copiar')};
@@ -951,7 +975,7 @@ async function openEntry(id){
   q('#e-prev').onclick=()=>goToPatient(prevId);
   q('#e-next').onclick=()=>goToPatient(nextId);
 
-  sheetCb=async()=>{try{await flush()}finally{$('#ncm').classList.remove('on');$('#ncm-c').replaceChildren();if(vwHook===myHook){vwHook=vwPush=vwCopy=null;if($('#vw').classList.contains('on'))$('#v-x').onclick()}urls.forEach(u=>URL.revokeObjectURL(u));const prev=q('#e-prev-fotos');if(prev&&prev._photoUrls)prev._photoUrls.forEach(u=>URL.revokeObjectURL(u))}};
+  sheetCb=async()=>{try{await flush()}finally{if(ncLock){document.body.classList.remove('lock');ncLock=false}$('#ncm').classList.remove('on');$('#ncm-c').replaceChildren();if(vwHook===myHook){vwHook=vwPush=vwCopy=null;if($('#vw').classList.contains('on'))$('#v-x').onclick()}urls.forEach(u=>URL.revokeObjectURL(u));const prev=q('#e-prev-fotos');if(prev&&prev._photoUrls)prev._photoUrls.forEach(u=>URL.revokeObjectURL(u))}};
   ['#e-com','#e-sil','#e-nom','#e-av','#x-peso','#x-gan','#x-ta','#x-otro'].forEach(s=>q(s).addEventListener('input',later));
   Object.keys(NRIN).forEach(s=>q(s).addEventListener('input',()=>{drawNR();later()}));
   // Enter pasa al siguiente campo de signos y pesos
@@ -1358,13 +1382,27 @@ document.addEventListener('click',async ev=>{
   const card=t.closest('.card[data-id]');if(card){openEntry(card.dataset.id);return}
   const tgd=t.closest('[data-tgi]');
   if(tgd){const a=await getTags();a.splice(+tgd.dataset.tgi,1);await setTags(a);render();return}
+  if(t.id==='cp-go'){
+    const fecha=$('#cp-date').value,turno=+$('#cp-turn').value,src=$('#cp-src').value;
+    if(!fecha||!src){toast('Indica las fechas');return}
+    if(fecha===src){toast('La fecha de origen debe ser distinta');return}
+    const r=await cargarDesde(fecha,turno,src);
+    S.fecha=fecha;S.turno=turno;lsSet('turno',turno);
+    toast(r.total?`${r.add} pacientes cargados${r.omit?` (${r.omit} ya estaban)`:''}`:'No hay pacientes en esa fecha y turno');
+    if(r.add)S.view='hoy';
+    render();return}
+  if(t.closest&&t.closest('[data-loadprev]')){
+    const src=fechaBase(S.fecha);const orig=await listaOrigen(src,S.turno);
+    if(!orig.length){toast(`No hay pacientes en el turno ${S.turno} del ${fmtFecha(src)}. Puedes elegir otra fecha en Ajustes.`);return}
+    if(!confirm(`¿Cargar ${orig.length} pacientes del turno ${S.turno} del ${fmtFecha(src)}?`))return;
+    const r=await cargarDesde(S.fecha,S.turno,src);toast(`${r.add} pacientes cargados`);render();return}
   if(t.id==='sl-go'){
     const fecha=$('#sl-date').value,turno=+$('#sl-turn').value,n=parseInt($('#sl-n').value,10);
     if(!fecha||!(n>=1&&n<=60)){toast('Indica fecha y un número de 1 a 60');return}
     const ya=(await byDate(fecha)).filter(x=>x.turno===turno);const tiene=new Set(ya.map(x=>String(x.sillon||'').trim()));
     let add=0;
     for(let i=1;i<=n;i++){if(tiene.has(String(i)))continue;
-      await put('entries',{id:uid(),fecha,turno,sillon:String(i),expediente:`S${i}-T${turno}-${fecha}`,temp:true,comentario:'',nota:false,notaTxt:'',fotos:[],tags:[],extras:{},creado:now()+i,updatedAt:now()});add++}
+      await put('entries',{id:'sil-'+fecha+'-'+turno+'-'+i,fecha,turno,sillon:String(i),expediente:`S${i}-T${turno}-${fecha}`,temp:true,comentario:'',nota:false,notaTxt:'',fotos:[],tags:[],extras:{},creado:now()+i,updatedAt:now()});add++}
     S.fecha=fecha;S.turno=turno;lsSet('turno',turno);
     $('#sl-msg').textContent=add?`Listo: ${add} sillón${add===1?'':'es'} cargado${add===1?'':'s'} en el turno ${turno}.`:'Esos sillones ya existían.';
     toast(add?`${add} sillones cargados`:'Ya existían');return}
@@ -1391,7 +1429,11 @@ document.addEventListener('click',async ev=>{
     toast('Fotos borradas');render()}return}
   if(t.id==='r-exp'){const ok=await exportar($('#r-fot').checked);if(ok){toast('Respaldo listo');render()}return}
 });
+async function cpInfo(){const i=$('#cp-info');if(!i)return;const f=$('#cp-date').value,t=+$('#cp-turn').value,s=$('#cp-src').value;if(!f||!s){i.textContent='';return}
+  const o=await listaOrigen(s,t);i.textContent=o.length?`Hay ${o.length} paciente${o.length===1?'':'s'} en el turno ${t} del ${fmtFecha(s)}.`:`No hay pacientes en el turno ${t} del ${fmtFecha(s)}.`}
 document.addEventListener('change',async ev=>{
+  if(ev.target.id==='cp-date'){$('#cp-src').value=fechaBase(ev.target.value)}
+  if(ev.target.id==='cp-date'||ev.target.id==='cp-turn'||ev.target.id==='cp-src'){cpInfo().catch(()=>{})}
   if(ev.target.id==='r-file'){const f=ev.target.files[0];ev.target.value='';if(!f)return;
     try{const r=await importar(f);toast(`Importado: ${r.a} pacientes, ${r.b} registros`);render()}catch(err){logErr('importar',err);alert('No se pudo importar: '+err.message)}}
 });
