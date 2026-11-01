@@ -229,6 +229,8 @@ details{margin-top:12px}summary{padding:6px 0;color:var(--mu);font-weight:600}
 .nclabs button{background:var(--ac)!important;color:#fff!important;border:0!important;font-size:15px!important;padding:9px 14px!important}
 #ncm .hd2 button{font-size:16px;padding:12px 20px}
 #ncm .ncb label{font-size:15px;font-weight:800}
+.ncp{margin:7px 0;padding:10px}.ncp-b{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+.ncp .cp,.ncp .cp2{background:var(--ac)!important;color:#fff!important;border:0!important;font-size:15px!important;padding:12px 16px!important;border-radius:12px!important;font-weight:700}
 </style>
 </head>
 <body>
@@ -239,7 +241,7 @@ details{margin-top:12px}summary{padding:6px 0;color:var(--mu);font-weight:600}
   <button data-v="resp"><span>⚙️</span>Ajustes</button>
 </nav>
 <div id="ov"></div>
-<div id="ncm"><div class="box2"><div class="hd2"><b>Nota completa</b><span><button type="button" id="ncm-copy">Copiar nota completa</button> <button type="button" class="sec" id="ncm-x">Cerrar</button></span></div><div class="ncmc" id="ncm-c"></div></div></div>
+<div id="ncm"><div class="box2"><div class="hd2"><b id="ncm-t">Nota completa</b><span><button type="button" id="ncm-copy">Copiar nota completa</button> <button type="button" class="sec" id="ncm-x">Cerrar</button></span></div><div class="ncmc" id="ncm-c"></div></div></div>
 <div id="vw"><div class="bar"><button id="v-datos" style="display:none">Datos ▾</button><button id="v-zoom">🔍 Zoom</button><button id="v-del">🗑 Borrar</button><button id="v-x">Cerrar</button></div><div class="vwm"><div class="sc"><img id="v-img" alt="Hoja de signos"></div>
 <div id="vw-side" style="display:none">
  <div class="al"><span>Transparencia</span><input type="range" id="vw-alpha" min="20" max="100" value="60" aria-label="Opacidad del panel"></div>
@@ -257,7 +259,7 @@ details{margin-top:12px}summary{padding:6px 0;color:var(--mu);font-weight:600}
 
 <script>
 'use strict';
-const VERSION='11.18';
+const VERSION='11.21';
 const TURNOS=[1,2,3,4,5];
 const DIAS_FOTO=7;
 const ACCESOS=['FAV','Injerto','Catéter tunelizado','Catéter temporal'];
@@ -436,7 +438,7 @@ async function renderResp(){
   <div class="box"><h3>Sincronización</h3>${syHtml}</div>
   <div class="box"><h3>📁 Expedientes</h3><p>Consulta, corrige y revisa el historial de los pacientes.</p><button class="btn sec" id="settings-archivo">Administrar expedientes</button></div>
   <details class="box"><summary><b>Cargar turno desde una sesión anterior</b></summary>
-    <p>Copia los pacientes de un turno de una sesión anterior (por defecto, la del mismo grupo de días: lunes-miércoles-viernes o martes-jueves-sábado). Cada paciente viene con el sillón de esa vez; luego cambias el sillón de quien se haya movido.</p>
+    <p>Copia los pacientes de un turno de una sesión anterior (por defecto, la del mismo grupo de días: lunes-miércoles-viernes o martes-jueves-sábado). Los pacientes se cargan sin sillón (como siempre los mueven); se lo pones conforme van llegando. En la ficha de cada uno ves en qué sillón estuvo la última vez.</p>
     <label for="cp-date">Cargar en la fecha</label><input id="cp-date" type="date" value="${esc(S.fecha)}"><label for="cp-turn">Turno</label><select id="cp-turn">${turnoOpts(S.turno)}</select>
     <label for="cp-src">Copiar de la fecha</label><input id="cp-src" type="date" value="${esc(fechaBase(S.fecha))}">
     <p id="cp-info" class="hint"></p><button class="btn" id="cp-go">Cargar pacientes</button></details>
@@ -667,7 +669,7 @@ async function cargarDesde(fecha,turno,src){
   let add=0,omit=0;
   for(const o of orig){
     if(ya.has(o.expediente)){omit++;continue}
-    await put('entries',{id:'p-'+fecha+'-'+o.expediente,fecha,turno,sillon:o.sillon||'',expediente:o.expediente,comentario:'',nota:false,notaTxt:'',fotos:[],tags:[],extras:{},creado:now()+add,updatedAt:now()});
+    await put('entries',{id:'p-'+fecha+'-'+o.expediente,fecha,turno,sillon:'',expediente:o.expediente,comentario:'',nota:false,notaTxt:'',fotos:[],tags:[],extras:{},creado:now()+add,updatedAt:now()});
     ya.add(o.expediente);add++}
   return{add,omit,total:orig.length}
 }
@@ -714,6 +716,8 @@ async function openEntry(id){
       <div class="stabs2"><button type="button" data-st="pase">Pase</button><button type="button" data-st="nota">Nota rápida</button><button type="button" class="notabtn" id="e-nota"></button></div></div>
     <div class="sp" data-pn="pase">
     <div class="row"><div><label>Sillón</label><input id="e-sil" inputmode="numeric" value="${esc(e.sillon)}"></div><div style="display:flex;align-items:end"><button type="button" class="btn sec" id="e-cal">Calculadora</button></div></div>
+    <div class="box ncp"><b>Nota completa</b>
+      <div class="ncp-b"><button type="button" class="cp" id="nc-quick2">Copiar nota</button><button type="button" class="cp2" id="nc-open2">Abrir en ventana grande</button><button type="button" class="cp2" id="nc-sig2">Signos y pesos</button></div></div>
     <div class="box" style="margin:7px 0;padding:9px">
       <label for="e-com"><b>Comentario de hoy</b></label>
       <textarea id="e-com" rows="3" placeholder="Comentario de esta sesión…">${esc(e.comentario)}</textarea>
@@ -723,7 +727,7 @@ async function openEntry(id){
       <div style="margin-top:10px"><b>Fotos de hoy</b><div class="thumbs" id="e-fotos"></div><label class="btn" for="e-file" style="display:inline-block;margin-top:5px">Tomar o agregar foto</label><input id="e-file" type="file" accept="image/*" hidden multiple></div>
       <div style="margin-top:9px"><b>Fotos anteriores</b><div class="thumbs" id="e-prev-fotos">Buscando hojas recientes…</div><small class="mu">Se eliminan según el plazo de 7 días.</small></div>
     </div>
-    <details class="compact-details visit-notes"><summary>Notas · 4 campos</summary>
+    <details class="compact-details visit-notes" style="display:none"><summary>Notas · 4 campos</summary>
       <div class="row"><div><label for="x-peso">Peso seco</label><input id="x-peso" value="${esc(ex.peso)}"></div><div><label for="x-gan">Ganancia interdialítica</label><input id="x-gan" value="${esc(ex.gan)}"></div></div>
       <div class="row"><div><label for="x-ta">TA</label><input id="x-ta" value="${esc(ex.ta)}"></div><div><label for="x-otro">Otros</label><input id="x-otro" value="${esc(ex.otro)}"></div></div>
       <small class="mu">Se conservan los datos de la sesión mediante guardado automático.</small>
@@ -744,6 +748,10 @@ async function openEntry(id){
           <small class="mu">Toca la foto para verla grande y capturar los datos junto a ella.</small>
           <div style="margin-top:6px"><label class="btn" for="e-file" style="display:inline-block">Agregar foto</label></div></div>
         <div class="nrcol">
+          <div class="blk"><div class="bh"><b>Nota completa</b><button type="button" class="cp" id="nc-quick">Copiar nota</button></div>
+            <small class="mu">Usa la plantilla del paciente. Para revisar o editar una parte, ábrela en ventana grande.</small>
+            <div style="margin-top:6px"><button type="button" class="cp2" id="nc-open">Abrir en ventana grande</button></div>
+            <div id="nc-hold" style="display:none"><div id="nc-body"></div></div></div>
           <div class="blk"><div class="bh"><b>Fecha, sala y turno</b><button type="button" class="cp" data-cp="enc" data-lbl="encabezado">Copiar</button></div>
             <label for="nr-sala">Sala</label><input id="nr-sala" inputmode="numeric" autocomplete="off">
             <div class="pv" id="nr-enctxt"></div>
@@ -759,10 +767,6 @@ async function openEntry(id){
             <div class="row" style="margin-top:6px"><div><label for="nr-ufp">Programada (mL)</label><input id="nr-ufp" inputmode="numeric" autocomplete="off"></div><div><label for="nr-uft">Tolerada (mL)</label><input id="nr-uft" inputmode="numeric" autocomplete="off" placeholder="igual si queda vacío"></div></div>
             <div class="pv" id="nr-uftxt"></div>
             <div style="margin-top:6px"><button type="button" class="cp2" data-cp="uf2" data-lbl="UF corta">Copiar solo "tolera UF … ml"</button></div></div>
-          <div class="blk"><div class="bh"><b>Nota completa</b><button type="button" class="cp" id="nc-quick">Copiar nota</button></div>
-            <small class="mu">Usa la plantilla del paciente. Para revisar o editar una parte, ábrela en ventana grande.</small>
-            <div style="margin-top:6px"><button type="button" class="cp2" id="nc-open">Abrir en ventana grande</button></div>
-            <div id="nc-hold" style="display:none"><div id="nc-body"></div></div></div>
         </div>
       </div>
     </div>`);
@@ -865,7 +869,7 @@ async function openEntry(id){
     const parts=ncParts();
     ncBody.innerHTML='<div class="bh"><b>Nota completa</b><button type="button" class="cp" id="nc-copy">Copiar nota</button></div>'
       +parts.filter(p=>p.b).map(p=>{const k=NCA(p.label);return `<div class="ncb"><div class="bl"><label>${esc(p.label||('Bloque '+(p.i+1)))}${k?' <small>(automático)</small>':''}</label><button type="button" data-nbc="${p.i}">Copiar bloque</button></div><textarea data-nb="${p.i}" rows="${Math.min(10,Math.max(2,String(k?genAuto(k,p.text):(nr.blk[p.i]!==undefined?nr.blk[p.i]:p.text)).split('\n').length))}" ${k?'readonly':''}></textarea></div>`}).join('')
-      +'<div style="margin-top:8px"><button type="button" class="cp2" id="nc-base">Guardar cambios como base del paciente</button> <button type="button" class="cp2" id="nc-edit">Editar plantilla</button></div><div id="nc-editbox"></div>';
+      +'<div style="margin-top:8px"><button type="button" class="cp2" id="nc-base">Guardar cambios como base del paciente</button> <button type="button" class="cp2" id="nc-edit">Editar plantilla</button> <button type="button" class="cp2" id="nc-del" style="background:#b3261e!important">Borrar plantilla de este paciente</button></div><div id="nc-editbox"></div>';
     parts.filter(p=>p.b).forEach(p=>{const k=NCA(p.label);ncBody.querySelector('[data-nb="'+p.i+'"]').value=k?genAuto(k,p.text):(nr.blk[p.i]!==undefined?nr.blk[p.i]:p.text)});
     grow();
   };
@@ -879,6 +883,7 @@ async function openEntry(id){
       if(id==='nc-save'){const t=ncq('#nc-tpl').value;if(!t.trim()){toast('Pega la nota primero');return}await setTpl(t);renderNC();toast('Plantilla guardada');return}
       if(id==='nc-copyfrom'){const x=normExp(ncq('#nc-from').value);const o=x&&await get('patients',x);if(!o||!o.plantilla){toast('Ese expediente no tiene plantilla');return}await setTpl(o.plantilla);renderNC();toast('Plantilla copiada');return}
       if(id==='nc-base'){await setTpl(ncBase());renderNC();toast('Guardado como base de este paciente');return}
+      if(id==='nc-del'){if(!confirm('¿Borrar la plantilla de este paciente? No afecta a otros pacientes.'))return;await setTpl('');nr.blk={};renderNC();toast('Plantilla borrada');return}
       if(id==='nc-edit'){ncq('#nc-editbox').innerHTML=ncEditor();ncq('#nc-tpl').value=pat.plantilla||'';return}
       if(ev.target.dataset.nbc!==undefined){const ta=ncq('[data-nb="'+ev.target.dataset.nbc+'"]');const ok=ta&&await copyText(ta.value);toast(ok?'Bloque copiado':'No se pudo copiar');return}
       if(ev.target.dataset.nclab){wrapSel(ev.target.dataset.nclab);return}
@@ -890,13 +895,16 @@ async function openEntry(id){
   const grow=()=>ncBody.querySelectorAll('.ncb textarea').forEach(t=>{t.style.height='auto';t.style.height=Math.max(60,t.scrollHeight+4)+'px'});
   // guarda y restaura el desplazamiento de la página y de la ficha para que nada se mueva al abrir/cerrar la ventana
   let ncPos=[],ncLock=false;
-  const ncSave=()=>{const se=document.scrollingElement||document.documentElement;ncPos=[[se,se.scrollTop]];for(let n=q('#nc-open');n&&n!==document.body;n=n.parentElement)if(n.scrollTop)ncPos.push([n,n.scrollTop])};
+  const ncSave=(anchor)=>{const se=document.scrollingElement||document.documentElement;ncPos=[[se,se.scrollTop]];for(let n=anchor||q('#nc-open');n&&n!==document.body;n=n.parentElement)if(n.scrollTop)ncPos.push([n,n.scrollTop])};
   const ncRestore=()=>{const f=()=>ncPos.forEach(([n,t])=>{n.scrollTop=t});f();requestAnimationFrame(f);setTimeout(f,80)};
-  const ncOpenM=()=>{ncSave();ncLock=!document.body.classList.contains('lock');if(ncLock)document.body.classList.add('lock');$('#ncm-c').replaceChildren(ncBody);$('#ncm').classList.add('on');$('#ncm-copy').style.display=(pat.plantilla||'').trim()?'':'none';renderNC();grow();ncRestore()};
+  const ncOpenM=(anchor)=>{ncSave(anchor);$('#ncm-t').textContent='Nota completa · '+((pat.nombre||'').trim()||'(sin nombre)')+' · Exp. '+e.expediente;ncLock=!document.body.classList.contains('lock');if(ncLock)document.body.classList.add('lock');$('#ncm-c').replaceChildren(ncBody);$('#ncm').classList.add('on');$('#ncm-copy').style.display=(pat.plantilla||'').trim()?'':'none';renderNC();grow();ncRestore()};
   const ncCloseM=()=>{const h=q('#nc-hold');if(h)h.appendChild(ncBody);$('#ncm').classList.remove('on');if(ncLock){document.body.classList.remove('lock');ncLock=false}ncRestore()};
   ncM={open:ncOpenM,close:ncCloseM};
-  q('#nc-open').onclick=ncOpenM;
-  q('#nc-quick').onclick=async()=>{if(!(pat.plantilla||'').trim()){ncOpenM();return}const ok=await copyText(ncFull());toast(ok?'Copiada la nota completa':'No se pudo copiar')};
+  q('#nc-open').onclick=()=>ncOpenM(q('#nc-open'));
+  q('#nc-open2').onclick=()=>ncOpenM(q('#nc-open2'));
+  q('#nc-sig2').onclick=async()=>{const ok=await copyText(svTxt()+' '+peTxt());toast(ok?'Copiados: signos y pesos':'No se pudo copiar')};
+  const ncQuick=async()=>{if(!(pat.plantilla||'').trim()){ncOpenM(q('#nc-open'));return}const ok=await copyText(ncFull());toast(ok?'Copiada la nota completa':'No se pudo copiar')};
+  q('#nc-quick').onclick=ncQuick;q('#nc-quick2').onclick=ncQuick;
   $('#ncm-copy').onclick=async()=>{const ok=await copyText(ncFull());toast(ok?'Copiada la nota completa':'No se pudo copiar')};
   $('#ncm-x').onclick=ncCloseM;
   ncBody.addEventListener('input',grow);
@@ -1455,7 +1463,7 @@ const SYNC=(()=>{
   const fail=(err,n=1)=>{if(err&&err.code==='permission-denied')st.denied+=n;else logErr('subir',err)};
 
   /* --- registros --- */
-  const recPat=p=>{const r={expediente:p.expediente,acceso:p.acceso||'',aviso:p.aviso||'',sexo:p.sexo||'',updatedAt:patStamp(p)};if(st.syncNames){r.nombre=p.nombre||'';r.plantilla=p.plantilla||''}return r};
+  const recPat=p=>{const r={expediente:p.expediente,acceso:p.acceso||'',aviso:p.aviso||'',sexo:p.sexo||'',updatedAt:patStamp(p)};if(st.syncNames){r.nombre=p.nombre||'';if(p.plantilla!==undefined)r.plantilla=p.plantilla}return r};
   const recPend=(p,x)=>({id:x.id,expediente:p.expediente,texto:x.texto,hecho:!!x.hecho,hechoEn:x.hechoEn||null,creado:x.creado||0,del:!!x.del,updatedAt:pStamp(x)});
   const recEnt=e=>{const r={...e};delete r.fotos;r.deleted=!!e.deleted;r.updatedAt=e.updatedAt||0;return r};
   // Fotos: ya vienen comprimidas (ligeras ~100-150 KB); van dentro del documento como texto base64.
