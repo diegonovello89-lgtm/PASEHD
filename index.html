@@ -231,6 +231,8 @@ details{margin-top:12px}summary{padding:6px 0;color:var(--mu);font-weight:600}
 #ncm .ncb label{font-size:15px;font-weight:800}
 .ncp{margin:7px 0;padding:10px}.ncp-b{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
 .ncp .cp,.ncp .cp2{background:var(--ac)!important;color:#fff!important;border:0!important;font-size:15px!important;padding:12px 16px!important;border-radius:12px!important;font-weight:700}
+.evtop{margin:6px 0 4px}.evtop .tags{gap:6px}
+.cpx{padding:5px 12px;border-radius:10px;background:var(--ac);color:#fff;font-weight:700;font-size:13px;margin-left:6px}
 </style>
 </head>
 <body>
@@ -259,7 +261,7 @@ details{margin-top:12px}summary{padding:6px 0;color:var(--mu);font-weight:600}
 
 <script>
 'use strict';
-const VERSION='11.21';
+const VERSION='11.25';
 const TURNOS=[1,2,3,4,5];
 const DIAS_FOTO=7;
 const ACCESOS=['FAV','Injerto','Catéter tunelizado','Catéter temporal'];
@@ -275,6 +277,9 @@ const fmtFecha=s=>new Date(s+'T12:00:00').toLocaleDateString('es-MX',{weekday:'s
 const normExp=s=>String(s||'').trim().toUpperCase();
 const lsGet=k=>{try{return localStorage.getItem(k)}catch(e){return null}};
 const lsSet=(k,v)=>{try{localStorage.setItem(k,v)}catch(e){}};
+// Expediente tal como lo pide el sistema de la clínica: prefijo (RL, LE…) + número. Si ya trae letras, se respeta.
+const expPref=()=>{const v=lsGet('expPrefix');return v===null?'RL':v};
+const expFull=x=>{x=String(x||'').trim();return /^[A-Za-z]/.test(x)?x.toUpperCase():expPref()+x};
 
 /* ---------- Registro de errores (se ve en Ajustes) ---------- */
 function readErrs(){try{const a=JSON.parse(lsGet('errlog')||'[]');return Array.isArray(a)?a:[]}catch(e){return[]}}
@@ -317,6 +322,13 @@ const byDate=f=>rq(store('entries').index('fecha').getAll(f)).then(a=>a.filter(e
 const photoIdsOf=entryId=>rq(store('photos').index('entry').getAllKeys(entryId));
 async function getTags(){const m=await get('meta','tags');return m&&Array.isArray(m.v)?m.v:DEF_TAGS.slice()}
 const setTags=a=>put('meta',{k:'tags',v:a,updatedAt:now()});
+// Etiquetas fijas: empiezan con «↻ » y pasan solas a la siguiente sesión del paciente hasta que las quites
+const FIJA='↻ ';
+const esFija=g=>String(g).startsWith(FIJA);
+async function tagsHeredadas(exp,fecha){
+  const prev=(await all('entries')).filter(x=>!x.deleted&&x.expediente===exp&&(x.fecha||'')<fecha).sort((a,b)=>(b.fecha||'').localeCompare(a.fecha||'')||(b.creado||0)-(a.creado||0))[0];
+  return prev?(prev.tags||[]).filter(esFija):[];
+}
 // Pendientes: cada uno lleva su propia fecha de cambio; borrar = marcar (del) para que el borrado también se sincronice.
 const pStamp=x=>x.updatedAt||x.hechoEn||x.creado||0;
 const pAct=p=>(p&&p.pendientes||[]).filter(x=>!x.hecho&&!x.del);
@@ -449,9 +461,15 @@ async function renderResp(){
     <button class="btn" id="sl-go">Cargar sillones</button><p id="sl-msg" class="hint"></p></details>
   <div class="box"><h3>Etiquetas de eventos</h3>
     <p>Son los chips que aparecen en cada paciente. Mantén la lista corta para que el pase sea rápido.</p>
-    ${tags.map((g,i)=>`<div class="tgrow"><span>${esc(g)}</span><button class="x" data-tgi="${i}" aria-label="Quitar">×</button></div>`).join('')||'<p>Sin etiquetas.</p>'}
+    ${tags.map((g,i)=>`<div class="tgrow"><span>${esc(g)}</span><span><button class="tg ${esFija(g)?'on':''}" data-tgfix="${i}" title="La etiqueta fija pasa sola a la siguiente sesión del paciente">${esFija(g)?'Fija':'Fijar'}</button> <button class="x" data-tgi="${i}" aria-label="Quitar">×</button></span></div>`).join('')||'<p>Sin etiquetas.</p>'}
+    <p class="hint">Una etiqueta <b>fija</b> (↻) se queda en el paciente: aparece sola en su siguiente sesión hasta que la desmarques. Úsala para cosas como "transgresor" o "infección de catéter".</p>
     <div class="addrow"><input id="tg-in" placeholder="Nueva etiqueta…" autocomplete="off"><button id="tg-add">+</button></div>
     <button class="btn sec" id="tg-def">Restaurar lista por defecto</button></div>
+  <div class="box"><h3>Prefijo del expediente</h3>
+    <p>Para pegar el expediente en el sistema de la clínica. En pantalla ves el número (por ejemplo 1234) y el botón <b>Copiar</b> copia el prefijo más el número (RL1234 o LE1234).</p>
+    <div class="tags"><button class="tg ${expPref()==='RL'?'on':''}" data-px="RL">RL</button><button class="tg ${expPref()==='LE'?'on':''}" data-px="LE">LE</button><button class="tg ${expPref()===''?'on':''}" data-px="">Sin prefijo</button></div>
+    <label for="px-in">Otro prefijo</label><input id="px-in" value="${esc(expPref())}" maxlength="6" autocomplete="off" autocapitalize="characters">
+    <p id="px-ej" class="hint">Ejemplo: ${esc(expPref())}1234</p></div>
   <div class="box"><h3>Calidad de las fotos</h3>
     <p>Ligera (recomendada): escala de grises y menor tamaño, aprox. 100-150 KB por foto. Normal: a color, aprox. 300 KB. Aplica a las fotos nuevas.</p>
     <div class="tags"><button class="tg ${modo==='ligera'?'on':''}" data-fq="ligera">Ligera</button><button class="tg ${modo==='normal'?'on':''}" data-fq="normal">Normal</button></div></div>
@@ -669,7 +687,7 @@ async function cargarDesde(fecha,turno,src){
   let add=0,omit=0;
   for(const o of orig){
     if(ya.has(o.expediente)){omit++;continue}
-    await put('entries',{id:'p-'+fecha+'-'+o.expediente,fecha,turno,sillon:'',expediente:o.expediente,comentario:'',nota:false,notaTxt:'',fotos:[],tags:[],extras:{},creado:now()+add,updatedAt:now()});
+    await put('entries',{id:'p-'+fecha+'-'+o.expediente,fecha,turno,sillon:'',expediente:o.expediente,comentario:'',nota:false,notaTxt:'',fotos:[],tags:await tagsHeredadas(o.expediente,fecha),extras:{},creado:now()+add,updatedAt:now()});
     ya.add(o.expediente);add++}
   return{add,omit,total:orig.length}
 }
@@ -690,7 +708,7 @@ async function addEntry(expRaw,nom,tur,sil,rapid=false){
     }
     return;
   }
-  const e={id:uid(),fecha:S.fecha,turno:tur,sillon:sil,expediente:exp,comentario:'',nota:false,fotos:[],tags:[],extras:{},creado:now(),updatedAt:now()};
+  const e={id:uid(),fecha:S.fecha,turno:tur,sillon:sil,expediente:exp,comentario:'',nota:false,fotos:[],tags:await tagsHeredadas(exp,S.fecha),extras:{},creado:now(),updatedAt:now()};
   await put('entries',e);S.turno=tur;lsSet('turno',tur);
   if(!rapid){closeSheet();openEntry(e.id)}else{toast('Paciente agregado');render().catch(()=>{})}
   return 'added';
@@ -712,9 +730,10 @@ async function openEntry(id){
   const ex=e.extras;
   const sh=openSheet(`
     <div class="sh-sticky">
-    <div class="sh-head visit-head"><div class="visit-identity"><input id="e-nom" class="nm-in" placeholder="Nombre del paciente" value="${esc(pat.nombre)}"><div class="ex">${e.temp?`<span class="expn"><input id="e-expn" placeholder="Expediente" autocomplete="off" inputmode="text"><button type="button" id="e-expgo">Asignar</button></span>`:`Exp. ${esc(e.expediente)}`} · ${esc(fmtFecha(e.fecha))}</div></div><div class="visit-actions"><div class="visit-switch"><button type="button" class="ib" id="e-prev" aria-label="Paciente anterior" title="Paciente anterior" ${prevId?'':'disabled'}>‹</button><span class="visit-counter">${idx+1}/${vecinos.length}</span><button type="button" class="ib" id="e-next" aria-label="Paciente siguiente" title="Paciente siguiente" ${nextId?'':'disabled'}>›</button></div><button type="button" class="visit-done" data-close tabindex="-1" aria-label="Cerrar valoración">Listo</button></div><span class="sv" id="e-sv"></span></div>
+    <div class="sh-head visit-head"><div class="visit-identity"><input id="e-nom" class="nm-in" placeholder="Nombre del paciente" value="${esc(pat.nombre)}"><div class="ex">${e.temp?`<span class="expn"><input id="e-expn" placeholder="Expediente" autocomplete="off" inputmode="text"><button type="button" id="e-expgo">Asignar</button></span>`:`Exp. ${esc(e.expediente)} <button type="button" class="cpx" id="e-cpexp">Copiar ${esc(expFull(e.expediente))}</button>`} · ${esc(fmtFecha(e.fecha))}</div></div><div class="visit-actions"><div class="visit-switch"><button type="button" class="ib" id="e-prev" aria-label="Paciente anterior" title="Paciente anterior" ${prevId?'':'disabled'}>‹</button><span class="visit-counter">${idx+1}/${vecinos.length}</span><button type="button" class="ib" id="e-next" aria-label="Paciente siguiente" title="Paciente siguiente" ${nextId?'':'disabled'}>›</button></div><button type="button" class="visit-done" data-close tabindex="-1" aria-label="Cerrar valoración">Listo</button></div><span class="sv" id="e-sv"></span></div>
       <div class="stabs2"><button type="button" data-st="pase">Pase</button><button type="button" data-st="nota">Nota rápida</button><button type="button" class="notabtn" id="e-nota"></button></div></div>
     <div class="sp" data-pn="pase">
+    <div class="evtop"><div class="tags" id="e-tags"></div></div>
     <div class="row"><div><label>Sillón</label><input id="e-sil" inputmode="numeric" value="${esc(e.sillon)}"></div><div style="display:flex;align-items:end"><button type="button" class="btn sec" id="e-cal">Calculadora</button></div></div>
     <div class="box ncp"><b>Nota completa</b>
       <div class="ncp-b"><button type="button" class="cp" id="nc-quick2">Copiar nota</button><button type="button" class="cp2" id="nc-open2">Abrir en ventana grande</button><button type="button" class="cp2" id="nc-sig2">Signos y pesos</button></div></div>
@@ -737,7 +756,6 @@ async function openEntry(id){
       <label>Aviso fijo</label><input id="e-av" value="${esc(pat.aviso)}">
     </details>
     <details id="e-hist"><summary>Historial completo</summary><div id="e-hist-list">Cargando…</div></details>
-    <details class="compact-details"><summary>Eventos de hoy</summary><div class="tags" id="e-tags"></div></details>
     <button class="dng" id="e-del">Quitar de la lista</button>
     </div>
     <div class="sp" data-pn="nota">
@@ -750,7 +768,7 @@ async function openEntry(id){
         <div class="nrcol">
           <div class="blk"><div class="bh"><b>Nota completa</b><button type="button" class="cp" id="nc-quick">Copiar nota</button></div>
             <small class="mu">Usa la plantilla del paciente. Para revisar o editar una parte, ábrela en ventana grande.</small>
-            <div style="margin-top:6px"><button type="button" class="cp2" id="nc-open">Abrir en ventana grande</button></div>
+            <div style="margin-top:6px"><button type="button" class="cp2" id="nc-open">Abrir en ventana grande</button> <button type="button" class="cp2" id="nc-del2" style="background:#b3261e!important">Borrar nota</button></div>
             <div id="nc-hold" style="display:none"><div id="nc-body"></div></div></div>
           <div class="blk"><div class="bh"><b>Fecha, sala y turno</b><button type="button" class="cp" data-cp="enc" data-lbl="encabezado">Copiar</button></div>
             <label for="nr-sala">Sala</label><input id="nr-sala" inputmode="numeric" autocomplete="off">
@@ -867,9 +885,9 @@ async function openEntry(id){
     if(!nr.blk)nr.blk={};
     if(!tpl.trim()){ncBody.innerHTML='<p class="mu">Este paciente aún no tiene plantilla. Pega su nota y marca los textos que cambian. Las etiquetas «fecha y turno», «signos» y «ultrafiltrado» se llenan solas con los datos de arriba.</p>'+ncEditor()+'<label for="nc-from">O copia la plantilla de otro paciente (expediente)</label><div class="row"><input id="nc-from" autocomplete="off"><button type="button" class="cp2" id="nc-copyfrom">Copiar</button></div>';return}
     const parts=ncParts();
-    ncBody.innerHTML='<div class="bh"><b>Nota completa</b><button type="button" class="cp" id="nc-copy">Copiar nota</button></div>'
+    ncBody.innerHTML='<div class="bh"><b>Nota completa</b><button type="button" class="cp" id="nc-copy">Copiar nota</button></div><div style="margin:8px 0"><button type="button" class="cp2" id="nc-reset">Restablecer cambios de hoy</button> <button type="button" class="cp2" id="nc-del" style="background:#b3261e!important">Borrar nota y empezar de nuevo</button></div>'
       +parts.filter(p=>p.b).map(p=>{const k=NCA(p.label);return `<div class="ncb"><div class="bl"><label>${esc(p.label||('Bloque '+(p.i+1)))}${k?' <small>(automático)</small>':''}</label><button type="button" data-nbc="${p.i}">Copiar bloque</button></div><textarea data-nb="${p.i}" rows="${Math.min(10,Math.max(2,String(k?genAuto(k,p.text):(nr.blk[p.i]!==undefined?nr.blk[p.i]:p.text)).split('\n').length))}" ${k?'readonly':''}></textarea></div>`}).join('')
-      +'<div style="margin-top:8px"><button type="button" class="cp2" id="nc-base">Guardar cambios como base del paciente</button> <button type="button" class="cp2" id="nc-edit">Editar plantilla</button> <button type="button" class="cp2" id="nc-del" style="background:#b3261e!important">Borrar plantilla de este paciente</button></div><div id="nc-editbox"></div>';
+      +'<div style="margin-top:8px"><button type="button" class="cp2" id="nc-base">Guardar cambios como base del paciente</button> <button type="button" class="cp2" id="nc-edit">Editar plantilla</button></div><div id="nc-editbox"></div>';
     parts.filter(p=>p.b).forEach(p=>{const k=NCA(p.label);ncBody.querySelector('[data-nb="'+p.i+'"]').value=k?genAuto(k,p.text):(nr.blk[p.i]!==undefined?nr.blk[p.i]:p.text)});
     grow();
   };
@@ -883,7 +901,8 @@ async function openEntry(id){
       if(id==='nc-save'){const t=ncq('#nc-tpl').value;if(!t.trim()){toast('Pega la nota primero');return}await setTpl(t);renderNC();toast('Plantilla guardada');return}
       if(id==='nc-copyfrom'){const x=normExp(ncq('#nc-from').value);const o=x&&await get('patients',x);if(!o||!o.plantilla){toast('Ese expediente no tiene plantilla');return}await setTpl(o.plantilla);renderNC();toast('Plantilla copiada');return}
       if(id==='nc-base'){await setTpl(ncBase());renderNC();toast('Guardado como base de este paciente');return}
-      if(id==='nc-del'){if(!confirm('¿Borrar la plantilla de este paciente? No afecta a otros pacientes.'))return;await setTpl('');nr.blk={};renderNC();toast('Plantilla borrada');return}
+      if(id==='nc-reset'){nr.blk={};renderNC();later();toast('Se restableció la nota a la plantilla');return}
+      if(id==='nc-del'){if(!confirm('¿Borrar la nota de este paciente para volver a crearla? No afecta a otros pacientes.'))return;await setTpl('');nr.blk={};renderNC();toast('Nota borrada: pega la nueva');return}
       if(id==='nc-edit'){ncq('#nc-editbox').innerHTML=ncEditor();ncq('#nc-tpl').value=pat.plantilla||'';return}
       if(ev.target.dataset.nbc!==undefined){const ta=ncq('[data-nb="'+ev.target.dataset.nbc+'"]');const ok=ta&&await copyText(ta.value);toast(ok?'Bloque copiado':'No se pudo copiar');return}
       if(ev.target.dataset.nclab){wrapSel(ev.target.dataset.nclab);return}
@@ -901,6 +920,7 @@ async function openEntry(id){
   const ncCloseM=()=>{const h=q('#nc-hold');if(h)h.appendChild(ncBody);$('#ncm').classList.remove('on');if(ncLock){document.body.classList.remove('lock');ncLock=false}ncRestore()};
   ncM={open:ncOpenM,close:ncCloseM};
   q('#nc-open').onclick=()=>ncOpenM(q('#nc-open'));
+  q('#nc-del2').onclick=async()=>{if(!(pat.plantilla||'').trim()){toast('Este paciente no tiene nota guardada');return}if(!confirm('¿Borrar la nota de este paciente para volver a crearla? No afecta a otros pacientes.'))return;try{await setTpl('');nr.blk={};renderNC();toast('Nota borrada: pega la nueva en Abrir en ventana grande')}catch(err){logErr('borrar nota',err);toast('No se pudo borrar')}};
   q('#nc-open2').onclick=()=>ncOpenM(q('#nc-open2'));
   q('#nc-sig2').onclick=async()=>{const ok=await copyText(svTxt()+' '+peTxt());toast(ok?'Copiados: signos y pesos':'No se pudo copiar')};
   const ncQuick=async()=>{if(!(pat.plantilla||'').trim()){ncOpenM(q('#nc-open'));return}const ok=await copyText(ncFull());toast(ok?'Copiada la nota completa':'No se pudo copiar')};
@@ -980,6 +1000,7 @@ async function openEntry(id){
       S.keepTab=true;await closeSheet(true);await openEntry(e.id);toast('Expediente asignado');
     }catch(err){logErr('asignar expediente',err);toast('No se pudo asignar')}
   };
+  if(!e.temp)q('#e-cpexp').onclick=async()=>{const t=expFull(e.expediente);const ok=await copyText(t);toast(ok?'Copiado: '+t:'No se pudo copiar')};
   q('#e-prev').onclick=()=>goToPatient(prevId);
   q('#e-next').onclick=()=>goToPatient(nextId);
 
@@ -1388,8 +1409,12 @@ document.addEventListener('click',async ev=>{
     if(e&&isWide()&&S.view!=='hoy'){S.view='hoy';S.fecha=e.fecha;S.turno=e.turno;S.hoy=e.fecha===todayStr();await render()}
     openEntry(op.dataset.open);return}
   const card=t.closest('.card[data-id]');if(card){openEntry(card.dataset.id);return}
+  const tgf=t.closest('[data-tgfix]');
+  if(tgf){const a=await getTags();const i=+tgf.dataset.tgfix;const g=a[i];if(g===undefined)return;const n=esFija(g)?g.slice(FIJA.length):FIJA+g;if(!a.includes(n)){a[i]=n;await setTags(a)}render();return}
   const tgd=t.closest('[data-tgi]');
   if(tgd){const a=await getTags();a.splice(+tgd.dataset.tgi,1);await setTags(a);render();return}
+  const pxb=t.closest&&t.closest('[data-px]');
+  if(pxb){lsSet('expPrefix',pxb.dataset.px);render();return}
   if(t.id==='cp-go'){
     const fecha=$('#cp-date').value,turno=+$('#cp-turn').value,src=$('#cp-src').value;
     if(!fecha||!src){toast('Indica las fechas');return}
@@ -1446,7 +1471,7 @@ document.addEventListener('change',async ev=>{
     try{const r=await importar(f);toast(`Importado: ${r.a} pacientes, ${r.b} registros`);render()}catch(err){logErr('importar',err);alert('No se pudo importar: '+err.message)}}
 });
 
-document.addEventListener('input',ev=>{if(ev.target&&ev.target.id==='s-q'){clearTimeout(drawSearch.t);drawSearch.t=setTimeout(()=>drawSearch().catch(err=>logErr('buscar',err)),120)}});
+document.addEventListener('input',ev=>{if(ev.target&&ev.target.id==='px-in'){const v=ev.target.value.trim().toUpperCase().replace(/[^A-Z0-9]/g,'');lsSet('expPrefix',v);const j=$('#px-ej');if(j)j.textContent='Ejemplo: '+v+'1234'}if(ev.target&&ev.target.id==='s-q'){clearTimeout(drawSearch.t);drawSearch.t=setTimeout(()=>drawSearch().catch(err=>logErr('buscar',err)),120)}});
 
 /* ---------- Sincronización con Firebase (opcional) ----------
    Cada dispositivo sigue guardando todo local. Aquí solo se suben los cambios y se bajan los de los demás.
