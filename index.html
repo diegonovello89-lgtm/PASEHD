@@ -97,6 +97,8 @@ details{margin-top:12px}summary{padding:6px 0;color:var(--mu);font-weight:600}
 .box .btn{margin-top:8px;margin-right:6px}.box .sec{background:var(--card);color:var(--tx);border:1px solid var(--bd)}
 .banner{background:var(--wabg);color:var(--wa);border-radius:12px;padding:10px 12px;margin-top:10px;font-size:13px;display:flex;gap:8px;align-items:flex-start}
 .banner button{margin-left:auto;font-size:20px;color:inherit}
+.dueb{border-color:var(--wa)}
+.addrow select{flex:1 1 0;min-width:0;width:0}.addrow input[type=date]{flex:1 1 0}
 .pg{margin-top:10px;background:var(--card);border:1px solid var(--bd);border-radius:14px;padding:10px}
 .pg .hd{display:flex;justify-content:space-between;gap:8px;align-items:center}
 #toast{position:fixed;left:50%;bottom:calc(88px + env(safe-area-inset-bottom));transform:translateX(-50%);background:#111;color:#fff;padding:10px 16px;border-radius:20px;font-size:14px;z-index:40;display:none;max-width:90%}
@@ -261,7 +263,7 @@ details{margin-top:12px}summary{padding:6px 0;color:var(--mu);font-weight:600}
 
 <script>
 'use strict';
-const VERSION='11.25';
+const VERSION='11.26';
 const TURNOS=[1,2,3,4,5];
 const DIAS_FOTO=7;
 const ACCESOS=['FAV','Injerto','Catéter tunelizado','Catéter temporal'];
@@ -332,6 +334,11 @@ async function tagsHeredadas(exp,fecha){
 // Pendientes: cada uno lleva su propia fecha de cambio; borrar = marcar (del) para que el borrado también se sincronice.
 const pStamp=x=>x.updatedAt||x.hechoEn||x.creado||0;
 const pAct=p=>(p&&p.pendientes||[]).filter(x=>!x.hecho&&!x.del);
+const diasEntre=(a,b)=>Math.round((new Date(b+'T12:00:00')-new Date(a+'T12:00:00'))/864e5);
+const pDueList=(pats,ref)=>{ref=ref||todayStr();const out=[];for(const p of pats)for(const x of pAct(p))if(x.vence&&x.vence<=ref)out.push({p,x,d:diasEntre(x.vence,ref)});return out.sort((a,b)=>b.d-a.d||String(a.p.nombre).localeCompare(String(b.p.nombre)))};
+const venceTxt=(x,ref)=>{if(!x.vence)return '';ref=ref||todayStr();const d=diasEntre(x.vence,ref);return d>0?`venció hace ${d} d`:d===0?'vence hoy':'vence '+fmtFecha(x.vence)};
+const secHoy=pats=>{const L=pDueList(pats);if(!L.length)return '';
+  return `<div class="pg dueb"><div class="hd"><div><div class="nm">📌 Pendientes de hoy (${L.length})</div></div></div>${L.map(({p,x,d})=>`<div class="pr"><button class="ck" data-pt="${x.id}" data-pe="${esc(p.expediente)}"></button><span>${esc(x.texto)}<small class="mu" style="display:block">${esc(p.nombre||'(sin nombre)')} · ${esc(p.expediente)}</small></span><span class="chip ${d>0?'w':''}" style="flex:none">${d>0?'venció hace '+d+' d':'hoy'}</span></div>`).join('')}</div>`};
 const pDone=p=>(p&&p.pendientes||[]).filter(x=>x.hecho&&!x.del);
 const patStamp=p=>p.pu||p.updatedAt||0;
 // Une dos copias de un paciente (importar archivo): perfil por fecha de perfil, pendientes uno por uno.
@@ -399,6 +406,7 @@ async function renderHoy(){
       <div class="sbar"><input id="s-q" type="search" placeholder="Buscar paciente por nombre o expediente" autocomplete="off" autocorrect="off" enterkeyhint="search" value="${esc(S.q||'')}"><div id="s-res" class="sres"></div></div></div>
     ${lsGet('safe')==='1'?'<div class="banner"><div>Modo seguro: la app se cerró sola al iniciar la última vez. La sincronización y la limpieza de fotos están en pausa. <button type="button" class="mini" data-resume style="margin-top:6px">Reanudar</button></div></div>':''}
     ${showBanner?`<div class="banner"><div>Para que iOS no borre tus datos, instala la app: botón Compartir → <b>Agregar a pantalla de inicio</b>, y úsala siempre desde ese ícono.</div><button data-bn>×</button></div>`:''}
+    ${esHoy?secHoy(pats):''}
     ${cards||`<div class="empty">Sin pacientes en el turno ${S.turno}.<br><button class="btn" data-loadprev style="margin-top:10px">Cargar desde la sesión anterior</button></div>`}
     <button class="addend" data-add>＋ Agregar paciente</button>`;
   if(S.q)drawSearch().catch(()=>{});
@@ -410,10 +418,10 @@ async function renderPend(){
   const gs=pats.map(p=>({p,o:pAct(p)})).filter(g=>g.o.length)
     .sort((a,b)=>(!!hoy[b.p.expediente])-(!!hoy[a.p.expediente])||String(a.p.nombre).localeCompare(String(b.p.nombre)));
   const total=gs.reduce((s,g)=>s+g.o.length,0);
-  $('#main').innerHTML=`<div class="top"><div class="datebar"><div class="d">Pendientes abiertos<small>${total} en ${gs.length} paciente${gs.length===1?'':'s'}</small></div></div></div>`+
+  $('#main').innerHTML=`<div class="top"><div class="datebar"><div class="d">Pendientes abiertos<small>${total} en ${gs.length} paciente${gs.length===1?'':'s'}</small></div></div></div>`+secHoy(pats)+
    (gs.map(g=>{const h=hoy[g.p.expediente];
      return `<div class="pg"><div class="hd" ${h?`data-open="${h.id}"`:''}><div><div class="nm">${esc(g.p.nombre||'(sin nombre)')}</div><div class="ex">${esc(g.p.expediente)}</div></div>${h?`<span class="chip">hoy · T${h.turno}${h.sillon?' · S'+esc(h.sillon):''}</span>`:''}</div>
-     ${g.o.map(x=>`<div class="pr"><button class="ck" data-pt="${x.id}" data-pe="${esc(g.p.expediente)}"></button><span>${esc(x.texto)}</span></div>`).join('')}</div>`}).join('')||`<div class="empty">No hay pendientes abiertos 🎉</div>`);
+     ${g.o.map(x=>`<div class="pr"><button class="ck" data-pt="${x.id}" data-pe="${esc(g.p.expediente)}"></button><span>${esc(x.texto)}</span>${x.vence?`<span class="chip ${x.vence<=todayStr()?'w':''}" style="flex:none">${esc(venceTxt(x))}</span>`:''}</div>`).join('')}</div>`}).join('')||`<div class="empty">No hay pendientes abiertos 🎉</div>`);
 }
 
 const photoStats=()=>new Promise((res,rej)=>{let n=0,b=0;const r=store('photos').openCursor();r.onsuccess=()=>{const c=r.result;if(c){n++;b+=c.value.blob?c.value.blob.size:0;c.continue()}else res({n,b})};r.onerror=()=>rej(r.error)});
@@ -742,7 +750,8 @@ async function openEntry(id){
       <textarea id="e-com" rows="3" placeholder="Comentario de esta sesión…">${esc(e.comentario)}</textarea>
       <div id="e-prev-info" style="margin-top:5px">Buscando última sesión…</div>
       <button type="button" class="btn sec" id="e-reuse" style="margin-top:5px;font-size:12px">Usar comentario anterior</button>
-      <div style="margin-top:9px"><b>Pendientes por sesión</b><div id="e-pend"></div><div class="addrow"><input id="e-pin" placeholder="Nuevo pendiente de hoy…" enterkeyhint="done" autocomplete="off"><button id="e-padd">Agregar</button></div></div>
+      <div style="margin-top:9px"><b>Pendientes por sesión</b><div id="e-pend"></div><div class="addrow"><input id="e-pin" placeholder="Nuevo pendiente…" enterkeyhint="done" autocomplete="off"><button id="e-padd">Agregar</button></div>
+      <div class="addrow"><select id="e-pdue" aria-label="Cuándo"><option value="">Sin fecha</option><option value="1">Siguiente sesión</option><option value="2">En 2 días</option><option value="3">En 3 días</option><option value="7">En 7 días</option><option value="14">En 14 días</option><option value="d">Fecha exacta…</option></select><input id="e-pdate" type="date" style="display:none"></div></div>
       <div style="margin-top:10px"><b>Fotos de hoy</b><div class="thumbs" id="e-fotos"></div><label class="btn" for="e-file" style="display:inline-block;margin-top:5px">Tomar o agregar foto</label><input id="e-file" type="file" accept="image/*" hidden multiple></div>
       <div style="margin-top:9px"><b>Fotos anteriores</b><div class="thumbs" id="e-prev-fotos">Buscando hojas recientes…</div><small class="mu">Se eliminan según el plazo de 7 días.</small></div>
     </div>
@@ -1040,7 +1049,7 @@ async function openEntry(id){
   const drawNota=()=>{const b=q('#e-nota');b.className='notabtn'+(e.nota?' ok':'');b.textContent=e.nota?'✓ Nota hecha':'○ Nota pendiente'};
   q('#e-nota').onclick=async()=>{e.nota=!e.nota;drawNota();await flush().catch(()=>{})};drawNota();
   const drawPend=()=>{
-    const row=x=>`<div class="pr ${x.hecho?'dn':''}"><button class="ck ${x.hecho?'on':''}" data-pt="${x.id}">${x.hecho?'✓':''}</button><span>${esc(x.texto)}</span><button class="x" data-px="${x.id}">×</button></div>`;
+    const row=x=>`<div class="pr ${x.hecho?'dn':''}"><button class="ck ${x.hecho?'on':''}" data-pt="${x.id}">${x.hecho?'✓':''}</button><span>${esc(x.texto)}${x.vence&&!x.hecho?` <small class="chip ${x.vence<=todayStr()?'w':''}">${esc(venceTxt(x))}</small>`:''}</span><button class="x" data-px="${x.id}">×</button></div>`;
     const open=pAct(pat),done=pDone(pat);
     const groups=new Map();
     for(const x of open){const d=new Date(x.creado||x.updatedAt||now()).toLocaleDateString('es-MX',{year:'numeric',month:'short',day:'numeric'});if(!groups.has(d))groups.set(d,[]);groups.get(d).push(x)}
@@ -1059,8 +1068,10 @@ async function openEntry(id){
     }catch(err){logErr('pendiente',err);sv(false)}
     drawPend();refreshList();
   });
+  const venceSel=()=>{const v=q('#e-pdue').value;if(!v)return null;if(v==='d')return q('#e-pdate').value||null;return addDays(e.fecha||todayStr(),+v)};
+  q('#e-pdue').onchange=()=>{const d=q('#e-pdue').value==='d';q('#e-pdate').style.display=d?'':'none';if(d&&!q('#e-pdate').value)q('#e-pdate').value=addDays(todayStr(),1)};
   const addP=async()=>{const i=q('#e-pin');const t=i.value.trim();if(!t)return;
-    try{await mutPat(p=>{p.pendientes.push({id:uid(),texto:t,hecho:false,creado:now(),updatedAt:now()})});i.value='';sv(true)}catch(err){logErr('pendiente',err);sv(false)}
+    try{await mutPat(p=>{p.pendientes.push({id:uid(),texto:t,hecho:false,creado:now(),updatedAt:now(),vence:venceSel()})});i.value='';q('#e-pdue').value='';q('#e-pdate').style.display='none';sv(true)}catch(err){logErr('pendiente',err);sv(false)}
     drawPend();refreshList()};
   // cambios que llegan de otro dispositivo mientras esta hoja está abierta
   live={e,flush,drawNota,
@@ -1489,7 +1500,7 @@ const SYNC=(()=>{
 
   /* --- registros --- */
   const recPat=p=>{const r={expediente:p.expediente,acceso:p.acceso||'',aviso:p.aviso||'',sexo:p.sexo||'',updatedAt:patStamp(p)};if(st.syncNames){r.nombre=p.nombre||'';if(p.plantilla!==undefined)r.plantilla=p.plantilla}return r};
-  const recPend=(p,x)=>({id:x.id,expediente:p.expediente,texto:x.texto,hecho:!!x.hecho,hechoEn:x.hechoEn||null,creado:x.creado||0,del:!!x.del,updatedAt:pStamp(x)});
+  const recPend=(p,x)=>({id:x.id,expediente:p.expediente,texto:x.texto,hecho:!!x.hecho,hechoEn:x.hechoEn||null,creado:x.creado||0,del:!!x.del,vence:x.vence||null,updatedAt:pStamp(x)});
   const recEnt=e=>{const r={...e};delete r.fotos;r.deleted=!!e.deleted;r.updatedAt=e.updatedAt||0;return r};
   // Fotos: ya vienen comprimidas (ligeras ~100-150 KB); van dentro del documento como texto base64.
   // Un documento de Firestore admite ~1 MB, por eso se descarta lo que pase de este límite.
@@ -1576,7 +1587,7 @@ const SYNC=(()=>{
       if(!p)p={expediente:r.expediente,nombre:'',pendientes:[],updatedAt:0,pu:0};
       const i=p.pendientes.findIndex(x=>x.id===r.id),rs=r.updatedAt||0;
       if(i>=0&&pStamp(p.pendientes[i])>=rs)return null;
-      const item={id:r.id,texto:r.texto,hecho:!!r.hecho,hechoEn:r.hechoEn||null,creado:r.creado||0,updatedAt:rs,del:!!r.del};
+      const item={id:r.id,texto:r.texto,hecho:!!r.hecho,hechoEn:r.hechoEn||null,creado:r.creado||0,updatedAt:rs,del:!!r.del,vence:r.vence||null};
       if(i>=0)p.pendientes[i]=item;else p.pendientes.push(item);
       p.updatedAt=Math.max(p.updatedAt||0,rs);
       await put('patients',p,{nosync:true});return p;
