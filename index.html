@@ -263,7 +263,7 @@ details{margin-top:12px}summary{padding:6px 0;color:var(--mu);font-weight:600}
 
 <script>
 'use strict';
-const VERSION='11.26';
+const VERSION='11.28';
 const TURNOS=[1,2,3,4,5];
 const DIAS_FOTO=7;
 const ACCESOS=['FAV','Injerto','Catéter tunelizado','Catéter temporal'];
@@ -280,6 +280,9 @@ const normExp=s=>String(s||'').trim().toUpperCase();
 const lsGet=k=>{try{return localStorage.getItem(k)}catch(e){return null}};
 const lsSet=(k,v)=>{try{localStorage.setItem(k,v)}catch(e){}};
 // Expediente tal como lo pide el sistema de la clínica: prefijo (RL, LE…) + número. Si ya trae letras, se respeta.
+const SUBJ_DEF='Subjetivo: Paciente proveniente de domicilio. Paciente se refiere asintomática al ingreso. Niega nauseas, vomito, diarrea y sangrados. Sin requerimiento de oxigeno suplementario.';
+const subjTxt=()=>{const v=lsGet('subjTxt');return v&&v.trim()?v:SUBJ_DEF};
+const subjOn=()=>lsGet('subjOn')!=='0';
 const expPref=()=>{const v=lsGet('expPrefix');return v===null?'RL':v};
 const expFull=x=>{x=String(x||'').trim();return /^[A-Za-z]/.test(x)?x.toUpperCase():expPref()+x};
 
@@ -403,7 +406,7 @@ async function renderHoy(){
         <button class="ib" data-d="1">›</button>
         <button class="ib" data-batch title="Cargar lista del turno">☷ Lista</button><button class="ib pl" data-add aria-label="Agregar paciente">＋</button></div>
       <div class="tabs">${tabs}</div>
-      <div class="sbar"><input id="s-q" type="search" placeholder="Buscar paciente por nombre o expediente" autocomplete="off" autocorrect="off" enterkeyhint="search" value="${esc(S.q||'')}"><div id="s-res" class="sres"></div></div></div>
+      <div class="sbar"><input id="s-q" type="search" placeholder="Buscar paciente (atajo: / o Ctrl+K)" autocomplete="off" autocorrect="off" enterkeyhint="search" value="${esc(S.q||'')}"><div id="s-res" class="sres"></div></div></div>
     ${lsGet('safe')==='1'?'<div class="banner"><div>Modo seguro: la app se cerró sola al iniciar la última vez. La sincronización y la limpieza de fotos están en pausa. <button type="button" class="mini" data-resume style="margin-top:6px">Reanudar</button></div></div>':''}
     ${showBanner?`<div class="banner"><div>Para que iOS no borre tus datos, instala la app: botón Compartir → <b>Agregar a pantalla de inicio</b>, y úsala siempre desde ese ícono.</div><button data-bn>×</button></div>`:''}
     ${esHoy?secHoy(pats):''}
@@ -473,6 +476,11 @@ async function renderResp(){
     <p class="hint">Una etiqueta <b>fija</b> (↻) se queda en el paciente: aparece sola en su siguiente sesión hasta que la desmarques. Úsala para cosas como "transgresor" o "infección de catéter".</p>
     <div class="addrow"><input id="tg-in" placeholder="Nueva etiqueta…" autocomplete="off"><button id="tg-add">+</button></div>
     <button class="btn sec" id="tg-def">Restaurar lista por defecto</button></div>
+  <div class="box"><h3>Machote de subjetivo</h3>
+    <p>En la Nota completa, el bloque marcado como <b>subjetivo</b> sale con este texto de "todo bien". Si el paciente hoy refiere algo, lo editas en el sillón (solo cambia ese día). El botón <b>Machote</b> del bloque lo vuelve a poner.</p>
+    <label class="tg ${subjOn()?'on':''}" style="display:inline-block"><input type="checkbox" id="sj-on" ${subjOn()?'checked':''}> Usar el machote por defecto</label>
+    <textarea id="sj-tx" rows="4">${esc(subjTxt())}</textarea>
+    <button class="btn sec" id="sj-def">Restaurar texto original</button></div>
   <div class="box"><h3>Prefijo del expediente</h3>
     <p>Para pegar el expediente en el sistema de la clínica. En pantalla ves el número (por ejemplo 1234) y el botón <b>Copiar</b> copia el prefijo más el número (RL1234 o LE1234).</p>
     <div class="tags"><button class="tg ${expPref()==='RL'?'on':''}" data-px="RL">RL</button><button class="tg ${expPref()==='LE'?'on':''}" data-px="LE">LE</button><button class="tg ${expPref()===''?'on':''}" data-px="">Sin prefijo</button></div>
@@ -851,8 +859,10 @@ async function openEntry(id){
     if(kind==='signos')return svTxt()+(/\n/.test(tx)?'\n':' ')+peTxt();
     if(kind==='uf'){if(!/UF programada/i.test(tx))return ufTxt();return tx.replace(/(UF programada de\s+)[\d.,_]+/i,(m,a)=>a+(val('#nr-ufp')||'__')).replace(/(UF tolerada de\s+)[\d.,_]+/i,(m,a)=>a+ufT())}
     return tx};
+  const esSubj=p=>!NCA(p.label)&&fold(p.label).includes('subjetivo');
+  const ncDef=p=>esSubj(p)&&subjOn()?subjTxt():p.text;
   const ncParts=()=>parseTpl(pat.plantilla||'');
-  const ncShown=p=>{const k=NCA(p.label);if(k)return genAuto(k,p.text);const ta=ncBody.querySelector('[data-nb="'+p.i+'"]');return ta?ta.value:(nr.blk&&nr.blk[p.i]!==undefined?nr.blk[p.i]:p.text)};
+  const ncShown=p=>{const k=NCA(p.label);if(k)return genAuto(k,p.text);const ta=ncBody.querySelector('[data-nb="'+p.i+'"]');return ta?ta.value:(nr.blk&&nr.blk[p.i]!==undefined?nr.blk[p.i]:ncDef(p))};
   const ncFull=()=>ncParts().map(p=>p.b?ncShown(p):p.t).join('');
   const ncBase=()=>ncParts().map(p=>p.b?'['+ncShown(p)+']'+(p.label?'{'+p.label+'}':''):p.t).join('');
   const LABS=['fecha y turno','dx','subjetivo','signos','exploración física','análisis','ultrafiltrado','tratamiento habitual','plan','médico'];
@@ -895,16 +905,16 @@ async function openEntry(id){
     if(!tpl.trim()){ncBody.innerHTML='<p class="mu">Este paciente aún no tiene plantilla. Pega su nota y marca los textos que cambian. Las etiquetas «fecha y turno», «signos» y «ultrafiltrado» se llenan solas con los datos de arriba.</p>'+ncEditor()+'<label for="nc-from">O copia la plantilla de otro paciente (expediente)</label><div class="row"><input id="nc-from" autocomplete="off"><button type="button" class="cp2" id="nc-copyfrom">Copiar</button></div>';return}
     const parts=ncParts();
     ncBody.innerHTML='<div class="bh"><b>Nota completa</b><button type="button" class="cp" id="nc-copy">Copiar nota</button></div><div style="margin:8px 0"><button type="button" class="cp2" id="nc-reset">Restablecer cambios de hoy</button> <button type="button" class="cp2" id="nc-del" style="background:#b3261e!important">Borrar nota y empezar de nuevo</button></div>'
-      +parts.filter(p=>p.b).map(p=>{const k=NCA(p.label);return `<div class="ncb"><div class="bl"><label>${esc(p.label||('Bloque '+(p.i+1)))}${k?' <small>(automático)</small>':''}</label><button type="button" data-nbc="${p.i}">Copiar bloque</button></div><textarea data-nb="${p.i}" rows="${Math.min(10,Math.max(2,String(k?genAuto(k,p.text):(nr.blk[p.i]!==undefined?nr.blk[p.i]:p.text)).split('\n').length))}" ${k?'readonly':''}></textarea></div>`}).join('')
+      +parts.filter(p=>p.b).map(p=>{const k=NCA(p.label);return `<div class="ncb"><div class="bl"><label>${esc(p.label||('Bloque '+(p.i+1)))}${k?' <small>(automático)</small>':''}</label>${esSubj(p)?`<button type="button" data-nbm="${p.i}" class="cp2">Machote</button> `:''}<button type="button" data-nbc="${p.i}">Copiar bloque</button></div><textarea data-nb="${p.i}" rows="${Math.min(10,Math.max(2,String(k?genAuto(k,p.text):(nr.blk[p.i]!==undefined?nr.blk[p.i]:ncDef(p))).split('\n').length))}" ${k?'readonly':''}></textarea></div>`}).join('')
       +'<div style="margin-top:8px"><button type="button" class="cp2" id="nc-base">Guardar cambios como base del paciente</button> <button type="button" class="cp2" id="nc-edit">Editar plantilla</button></div><div id="nc-editbox"></div>';
-    parts.filter(p=>p.b).forEach(p=>{const k=NCA(p.label);ncBody.querySelector('[data-nb="'+p.i+'"]').value=k?genAuto(k,p.text):(nr.blk[p.i]!==undefined?nr.blk[p.i]:p.text)});
+    parts.filter(p=>p.b).forEach(p=>{const k=NCA(p.label);ncBody.querySelector('[data-nb="'+p.i+'"]').value=k?genAuto(k,p.text):(nr.blk[p.i]!==undefined?nr.blk[p.i]:ncDef(p))});
     grow();
   };
   ncUpd=()=>{if(!ncBody.querySelector('[data-nb]'))return;ncParts().forEach(p=>{if(!p.b)return;const k=NCA(p.label);if(!k)return;const ta=ncBody.querySelector('[data-nb="'+p.i+'"]');if(ta)ta.value=genAuto(k,p.text)})};
   ncBody.addEventListener('mousedown',ev=>{if(ev.target.closest('[data-nclab],#nc-auto,#nc-unmark,#nc-mark'))ev.preventDefault()});
   ncBody.addEventListener('input',ev=>{const ta=ev.target.closest('[data-nb]');if(ta){nr.blk[ta.dataset.nb]=ta.value;later()}});
   ncBody.addEventListener('click',async ev=>{
-    const id=ev.target.id;if(!id&&!ev.target.dataset.nclab&&ev.target.dataset.nbc===undefined)return;
+    const id=ev.target.id;if(!id&&!ev.target.dataset.nclab&&ev.target.dataset.nbc===undefined&&ev.target.dataset.nbm===undefined)return;
     try{
       if(id==='nc-copy'){const ok=await copyText(ncFull());toast(ok?'Copiada la nota completa':'No se pudo copiar');return}
       if(id==='nc-save'){const t=ncq('#nc-tpl').value;if(!t.trim()){toast('Pega la nota primero');return}await setTpl(t);renderNC();toast('Plantilla guardada');return}
@@ -913,6 +923,7 @@ async function openEntry(id){
       if(id==='nc-reset'){nr.blk={};renderNC();later();toast('Se restableció la nota a la plantilla');return}
       if(id==='nc-del'){if(!confirm('¿Borrar la nota de este paciente para volver a crearla? No afecta a otros pacientes.'))return;await setTpl('');nr.blk={};renderNC();toast('Nota borrada: pega la nueva');return}
       if(id==='nc-edit'){ncq('#nc-editbox').innerHTML=ncEditor();ncq('#nc-tpl').value=pat.plantilla||'';return}
+      if(ev.target.dataset.nbm!==undefined){const ta=ncq('[data-nb="'+ev.target.dataset.nbm+'"]');if(ta){ta.value=subjTxt();nr.blk[ev.target.dataset.nbm]=ta.value;later();toast('Machote puesto')}return}
       if(ev.target.dataset.nbc!==undefined){const ta=ncq('[data-nb="'+ev.target.dataset.nbc+'"]');const ok=ta&&await copyText(ta.value);toast(ok?'Bloque copiado':'No se pudo copiar');return}
       if(ev.target.dataset.nclab){wrapSel(ev.target.dataset.nclab);return}
       if(id==='nc-mark'){wrapSel(ncq('#nc-lab').value);ncq('#nc-lab').value='';return}
@@ -1305,7 +1316,14 @@ document.addEventListener('pointerup',ev=>{
   const c=ev.target.closest?ev.target.closest('[data-close]'):null;
   if(c&&c===pdTarget&&sheetEl){closeSheet()}
 },true);
+async function focusSearch(){
+  if(sheetEl&&!sheetDocked)return;
+  if(S.view!=='hoy'){if(sheetEl)closeSheet(true);S.view='hoy';await render()}
+  const i=$('#s-q');if(!i)return;i.focus();i.select();window.scrollTo(0,0)}
 document.addEventListener('keydown',ev=>{
+  const tg=ev.target,typing=tg&&(/^(INPUT|TEXTAREA|SELECT)$/.test(tg.tagName)||tg.isContentEditable);
+  if(((ev.ctrlKey||ev.metaKey)&&!ev.altKey&&(ev.key||'').toLowerCase()==='k')||(ev.key==='/'&&!typing&&!ev.ctrlKey&&!ev.metaKey&&!ev.altKey)){
+    ev.preventDefault();focusSearch().catch(err=>logErr('atajo',err));return}
   if(ev.target&&ev.target.id==='s-q'){
     if(ev.key==='Escape'){clearSearch();ev.target.blur();return}
     if(ev.key==='Enter'){ev.preventDefault();const f=$('#s-res [data-sexp]');if(f)pickPatient(f.dataset.sexp).catch(err=>logErr('buscar',err));else{const n=$('#s-res [data-snew]');if(n)n.click()}return}
@@ -1482,7 +1500,9 @@ document.addEventListener('change',async ev=>{
     try{const r=await importar(f);toast(`Importado: ${r.a} pacientes, ${r.b} registros`);render()}catch(err){logErr('importar',err);alert('No se pudo importar: '+err.message)}}
 });
 
-document.addEventListener('input',ev=>{if(ev.target&&ev.target.id==='px-in'){const v=ev.target.value.trim().toUpperCase().replace(/[^A-Z0-9]/g,'');lsSet('expPrefix',v);const j=$('#px-ej');if(j)j.textContent='Ejemplo: '+v+'1234'}if(ev.target&&ev.target.id==='s-q'){clearTimeout(drawSearch.t);drawSearch.t=setTimeout(()=>drawSearch().catch(err=>logErr('buscar',err)),120)}});
+document.addEventListener('change',ev=>{if(ev.target&&ev.target.id==='sj-on')lsSet('subjOn',ev.target.checked?'1':'0')});
+document.addEventListener('click',ev=>{if(ev.target&&ev.target.id==='sj-def'){lsSet('subjTxt','');const t=$('#sj-tx');if(t)t.value=SUBJ_DEF}});
+document.addEventListener('input',ev=>{if(ev.target&&ev.target.id==='sj-tx')lsSet('subjTxt',ev.target.value);if(ev.target&&ev.target.id==='px-in'){const v=ev.target.value.trim().toUpperCase().replace(/[^A-Z0-9]/g,'');lsSet('expPrefix',v);const j=$('#px-ej');if(j)j.textContent='Ejemplo: '+v+'1234'}if(ev.target&&ev.target.id==='s-q'){clearTimeout(drawSearch.t);drawSearch.t=setTimeout(()=>drawSearch().catch(err=>logErr('buscar',err)),120)}});
 
 /* ---------- Sincronización con Firebase (opcional) ----------
    Cada dispositivo sigue guardando todo local. Aquí solo se suben los cambios y se bajan los de los demás.
