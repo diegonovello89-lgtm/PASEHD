@@ -214,6 +214,24 @@ details{margin-top:12px}summary{padding:6px 0;color:var(--mu);font-weight:600}
 .expn{display:inline-flex;gap:6px;align-items:center}.expn input{width:130px;padding:6px 8px;font-size:15px}.expn button{padding:6px 10px;border-radius:8px;background:var(--ac);color:#fff;font-weight:700}
 .ncb{margin-top:8px}.ncb label{font-weight:700;font-size:12px;display:block}.ncb textarea,#nc-tpl{width:100%;font-size:14px;box-sizing:border-box}.ncb textarea[readonly]{background:var(--card);opacity:.85}
 .nclabs{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0}.nclabs button{padding:6px 10px;border-radius:999px;border:1px solid var(--ac);background:var(--card);color:var(--ac);font-weight:600;font-size:13px}
+#rxm{display:none;position:fixed;inset:0;z-index:45;background:rgba(0,0,0,.45);align-items:center;justify-content:center;padding:2vh 2vw}
+#rxm.on{display:flex}
+#rxm .box2{background:var(--bg);color:var(--tx);width:min(1000px,96vw);height:94vh;border-radius:16px;display:flex;flex-direction:column;overflow:hidden}
+#rxm .hd2{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:12px 16px;border-bottom:1px solid var(--bd)}
+#rxm .hd2 button,#rxm .btn2{padding:10px 16px;border-radius:10px;font-weight:700;background:var(--ac);color:#fff;font-size:16px}
+#rxm .hd2 button.sec,#rxm .btn2.sec{background:var(--card);color:var(--tx);border:1px solid var(--bd)}
+#rxm .rxc{flex:1;overflow:auto;padding:12px 16px calc(16px + env(safe-area-inset-bottom))}
+#rxm textarea,#rxm input{font-size:16px}
+#rxm .rxg{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+#rxm .rxo{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+#rxprev{margin-top:10px;background:#fff;color:#000;border:1px solid var(--bd);position:relative;width:420px;max-width:100%;aspect-ratio:210/297;overflow:hidden}
+#rx-page{display:none}
+@media print{
+  @page{size:A4;margin:0}
+  body.prx>*:not(#rx-page){display:none!important}
+  body.prx{background:#fff!important}
+  body.prx #rx-page{display:block!important;position:fixed;left:0;top:0;width:210mm;height:297mm;background:#fff;color:#000}
+}
 #ncm{display:none;position:fixed;inset:0;z-index:40;background:rgba(0,0,0,.45);align-items:center;justify-content:center;padding:2vh 2vw}
 #ncm.on{display:flex}
 #ncm .box2{background:var(--bg);color:var(--tx);width:min(1100px,96vw);height:94vh;border-radius:16px;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 10px 40px #0007}
@@ -245,6 +263,8 @@ details{margin-top:12px}summary{padding:6px 0;color:var(--mu);font-weight:600}
   <button data-v="resp"><span>⚙️</span>Ajustes</button>
 </nav>
 <div id="ov"></div>
+<div id="rxm"><div class="box2"><div class="hd2"><b>Receta · imprimir</b><span><button type="button" id="rx-print">Imprimir</button> <button type="button" class="sec" id="rx-x">Cerrar</button></span></div><div class="rxc" id="rx-c"></div></div></div>
+<div id="rx-page"></div>
 <div id="ncm"><div class="box2"><div class="hd2"><b id="ncm-t">Nota completa</b><span><button type="button" id="ncm-copy">Copiar nota completa</button> <button type="button" class="sec" id="ncm-x">Cerrar</button></span></div><div class="ncmc" id="ncm-c"></div></div></div>
 <div id="vw"><div class="bar"><button id="v-datos" style="display:none">Datos ▾</button><button id="v-zoom">🔍 Zoom</button><button id="v-del">🗑 Borrar</button><button id="v-x">Cerrar</button></div><div class="vwm"><div class="sc"><img id="v-img" alt="Hoja de signos"></div>
 <div id="vw-side" style="display:none">
@@ -263,7 +283,7 @@ details{margin-top:12px}summary{padding:6px 0;color:var(--mu);font-weight:600}
 
 <script>
 'use strict';
-const VERSION='11.28';
+const VERSION='11.29';
 const TURNOS=[1,2,3,4,5];
 const DIAS_FOTO=7;
 const ACCESOS=['FAV','Injerto','Catéter tunelizado','Catéter temporal'];
@@ -283,6 +303,51 @@ const lsSet=(k,v)=>{try{localStorage.setItem(k,v)}catch(e){}};
 const SUBJ_DEF='Subjetivo: Paciente proveniente de domicilio. Paciente se refiere asintomática al ingreso. Niega nauseas, vomito, diarrea y sangrados. Sin requerimiento de oxigeno suplementario.';
 const subjTxt=()=>{const v=lsGet('subjTxt');return v&&v.trim()?v:SUBJ_DEF};
 const subjOn=()=>lsGet('subjOn')!=='0';
+// ---- Receta: posiciones calculadas del formato de la hoja (A4, 7 col. de 66 pt + H de 51 pt, filas de 15.75 pt, ajustada al ancho con márgenes de 0.7 in)
+const RX={rowPt:15.75,colPt:66,hPt:51,ml:17.78,mt:19.05,printable:174.44};
+const rxCfg=()=>({dx:+lsGet('rxDx')||0,dy:+lsGet('rxDy')||0,sc:(+lsGet('rxSc')||100)});
+const rxKey=x=>'rx:'+x;
+const rxLoad=x=>{try{return JSON.parse(lsGet(rxKey(x))||'{}')}catch(e){return {}}};
+const rxFechaTxt=()=>{const d=new Date();const p=n=>String(n).padStart(2,'0');return p(d.getDate())+'/'+p(d.getMonth()+1)+'/'+d.getFullYear()};
+function rxHTML(f,scalePxPerMm){
+  // devuelve HTML con cajas en mm; scalePxPerMm solo para la vista previa
+  const c=rxCfg(),totalPt=7*RX.colPt+RX.hPt;
+  const sc=(RX.printable*(72/25.4)/totalPt)*(c.sc/100);   // factor de ajuste al ancho (como "ajustar a una página de ancho")
+  const mm=pt=>pt*sc*25.4/72;
+  const X0=RX.ml+c.dx,Y0=RX.mt+c.dy;
+  const box=(col0,colW,row,rows,txt,al,wrap)=>`<div style="position:absolute;left:${X0+mm(col0)}mm;top:${Y0+mm((row-1)*RX.rowPt)}mm;width:${mm(colW)}mm;height:${mm(rows*RX.rowPt)}mm;display:flex;align-items:flex-end;justify-content:${al==='c'?'center':al==='r'?'flex-end':'flex-start'};font:${12*sc}pt Arial,Helvetica,sans-serif;line-height:${mm(RX.rowPt)}mm;overflow:hidden;box-sizing:border-box;padding:0 ${mm(2)}mm;text-align:${al==='c'?'center':al==='r'?'right':'left'};white-space:${wrap?'normal':'nowrap'};word-break:break-word"><div style="width:100%">${esc(String(txt||'').toUpperCase()).replace(/\n/g,'<br>')}</div></div>`;
+  let h='';
+  h+=box(0,4*RX.colPt,4,1,f.nombre,'c');
+  h+=box(5*RX.colPt,RX.colPt,4,1,f.edad,'r');
+  h+=box(6*RX.colPt,RX.colPt+RX.hPt,4,1,f.fecha,'r');
+  h+=box(0,7*RX.colPt,7,2,f.idx,'l',1);
+  (f.lineas||[]).slice(0,7).forEach((t,i)=>{if(t&&t.trim())h+=box(0,7*RX.colPt,9+2*i,2,t,'l',1)});
+  return h}
+function openReceta(nombre,exp,dxHint){
+  const saved=rxLoad(exp);
+  const f={nombre:nombre||'',edad:saved.edad||'',fecha:rxFechaTxt(),idx:saved.idx!==undefined?saved.idx:(dxHint?'IDX: '+dxHint:'IDX: '),lineas:saved.lineas&&saved.lineas.length?saved.lineas.slice(0,7):[]};
+  while(f.lineas.length<7)f.lineas.push('');
+  const c=rxCfg();
+  const box=$('#rx-c');
+  const el=(id,lab,val,extra='')=>`<div><label for="${id}">${lab}</label><input id="${id}" value="${esc(val)}" autocomplete="off" ${extra}></div>`;
+  box.innerHTML=`<div class="rxg">${el('rx-nom','Nombre',f.nombre)}${el('rx-edad','Edad (ej. 52 AÑOS)',f.edad)}${el('rx-fec','Fecha',f.fecha)}</div>
+   <label for="rx-idx">Diagnóstico (IDX)</label><textarea id="rx-idx" rows="2">${esc(f.idx)}</textarea>
+   <label>Indicaciones / solicitudes (cada una ocupa 2 renglones de la receta)</label>
+   ${f.lineas.map((t,i)=>`<textarea data-rxl="${i}" rows="2" placeholder="${i===0?'(la primera queda como espacio, igual que en tu Excel, si la dejas vacía)':'Línea '+(i+1)}">${esc(t)}</textarea>`).join('')}
+   <div style="margin-top:8px"><button type="button" class="btn2 sec" id="rx-clr">Limpiar indicaciones</button></div>
+   <details style="margin-top:10px"><summary>Ajustar posición de impresión</summary>
+     <p class="mu">Si al imprimir sobre la receta algo queda corrido, mueve en milímetros (positivo = derecha / abajo). Se recuerda en este dispositivo.</p>
+     <div class="rxo"><div><label for="rx-dx">Derecha/izquierda (mm)</label><input id="rx-dx" type="number" step="0.5" value="${c.dx}"></div><div><label for="rx-dy">Abajo/arriba (mm)</label><input id="rx-dy" type="number" step="0.5" value="${c.dy}"></div><div><label for="rx-sc">Tamaño (%)</label><input id="rx-sc" type="number" step="1" value="${c.sc}"></div></div></details>
+   <b style="display:block;margin-top:10px">Vista previa (A4)</b><div id="rxprev"></div>`;
+  const cur=()=>({nombre:$('#rx-nom').value,edad:$('#rx-edad').value,fecha:$('#rx-fec').value,idx:$('#rx-idx').value,lineas:[...box.querySelectorAll('[data-rxl]')].map(x=>x.value)});
+  const prev=()=>{const k=420/210;const pv=$('#rxprev');pv.innerHTML=`<div style="transform:scale(${k*25.4/96});transform-origin:0 0;width:210mm;height:297mm;position:relative">${rxHTML(cur())}</div>`};
+  const persist=()=>{const v=cur();try{lsSet(rxKey(exp),JSON.stringify({edad:v.edad,idx:v.idx,lineas:v.lineas}))}catch(e){}};
+  box.oninput=ev=>{if(ev.target.id==='rx-dx')lsSet('rxDx',ev.target.value);if(ev.target.id==='rx-dy')lsSet('rxDy',ev.target.value);if(ev.target.id==='rx-sc')lsSet('rxSc',ev.target.value);persist();prev()};
+  $('#rx-clr').onclick=()=>{box.querySelectorAll('[data-rxl]').forEach(x=>x.value='');persist();prev()};
+  $('#rx-x').onclick=()=>{$('#rxm').classList.remove('on');document.body.classList.remove('lock')};
+  $('#rx-print').onclick=()=>{persist();$('#rx-page').innerHTML=rxHTML(cur());document.body.classList.add('prx');const done=()=>{document.body.classList.remove('prx');window.removeEventListener('afterprint',done)};window.addEventListener('afterprint',done);setTimeout(()=>{try{window.print()}catch(e){done()}if(!('onafterprint' in window))setTimeout(done,1500)},60)};
+  $('#rxm').classList.add('on');prev();
+}
 const expPref=()=>{const v=lsGet('expPrefix');return v===null?'RL':v};
 const expFull=x=>{x=String(x||'').trim();return /^[A-Za-z]/.test(x)?x.toUpperCase():expPref()+x};
 
@@ -750,7 +815,7 @@ async function openEntry(id){
       <div class="stabs2"><button type="button" data-st="pase">Pase</button><button type="button" data-st="nota">Nota rápida</button><button type="button" class="notabtn" id="e-nota"></button></div></div>
     <div class="sp" data-pn="pase">
     <div class="evtop"><div class="tags" id="e-tags"></div></div>
-    <div class="row"><div><label>Sillón</label><input id="e-sil" inputmode="numeric" value="${esc(e.sillon)}"></div><div style="display:flex;align-items:end"><button type="button" class="btn sec" id="e-cal">Calculadora</button></div></div>
+    <div class="row"><div><label>Sillón</label><input id="e-sil" inputmode="numeric" value="${esc(e.sillon)}"></div><div style="display:flex;align-items:end"><button type="button" class="btn sec" id="e-cal">Calculadora</button> <button type="button" class="btn sec" id="e-rx" style="margin-left:6px">🖨 Receta</button></div></div>
     <div class="box ncp"><b>Nota completa</b>
       <div class="ncp-b"><button type="button" class="cp" id="nc-quick2">Copiar nota</button><button type="button" class="cp2" id="nc-open2">Abrir en ventana grande</button><button type="button" class="cp2" id="nc-sig2">Signos y pesos</button></div></div>
     <div class="box" style="margin:7px 0;padding:9px">
@@ -1020,6 +1085,7 @@ async function openEntry(id){
       S.keepTab=true;await closeSheet(true);await openEntry(e.id);toast('Expediente asignado');
     }catch(err){logErr('asignar expediente',err);toast('No se pudo asignar')}
   };
+  q('#e-rx').onclick=()=>{const dxb=parseTpl(pat.plantilla||'').find(p=>p.b&&/^\s*(dx|diagn)/i.test(fold(p.label)));openReceta((q('#e-nom').value||pat.nombre||'').trim(),e.expediente,dxb?dxb.text.replace(/^\s*(dx|diagn[oó]stico)\s*:?\s*/i,'').trim():'')};
   if(!e.temp)q('#e-cpexp').onclick=async()=>{const t=expFull(e.expediente);const ok=await copyText(t);toast(ok?'Copiado: '+t:'No se pudo copiar')};
   q('#e-prev').onclick=()=>goToPatient(prevId);
   q('#e-next').onclick=()=>goToPatient(nextId);
