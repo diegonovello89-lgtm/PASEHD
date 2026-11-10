@@ -226,11 +226,15 @@ details{margin-top:12px}summary{padding:6px 0;color:var(--mu);font-weight:600}
 #rxm .rxo{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
 #rxprev{margin-top:10px;background:#fff;color:#000;border:1px solid var(--bd);position:relative;width:420px;max-width:100%;aspect-ratio:210/297;overflow:hidden}
 #rx-page{display:none}
+#lbm-list label{display:flex;gap:8px;align-items:center;padding:6px 0;font-size:16px}#lbm-list input{width:22px;height:22px;flex:none}
 @media print{
   @page{size:A4;margin:0}
   body.prx>*:not(#rx-page){display:none!important}
   body.prx{background:#fff!important}
-  body.prx #rx-page{display:block!important;position:fixed;left:0;top:0;width:210mm;height:297mm;background:#fff;color:#000}
+  body.prx{overflow:visible!important;height:auto!important;position:static!important}
+  body.prx #rx-page{display:block!important;position:static;width:210mm;background:#fff;color:#000}
+  .rxp{position:relative;width:210mm;height:296mm;overflow:hidden;break-after:page;page-break-after:always}
+  .rxp:last-child{break-after:auto;page-break-after:auto}
 }
 #ncm{display:none;position:fixed;inset:0;z-index:40;background:rgba(0,0,0,.45);align-items:center;justify-content:center;padding:2vh 2vw}
 #ncm.on{display:flex}
@@ -263,7 +267,7 @@ details{margin-top:12px}summary{padding:6px 0;color:var(--mu);font-weight:600}
   <button data-v="resp"><span>⚙️</span>Ajustes</button>
 </nav>
 <div id="ov"></div>
-<div id="rxm"><div class="box2"><div class="hd2"><b>Receta · imprimir</b><span><button type="button" id="rx-print">Imprimir</button> <button type="button" class="sec" id="rx-x">Cerrar</button></span></div><div class="rxc" id="rx-c"></div></div></div>
+<div id="rxm"><div class="box2"><div class="hd2"><b id="rx-title">Receta · imprimir</b><span><button type="button" id="rx-print">Imprimir</button> <button type="button" class="sec" id="rx-x">Cerrar</button></span></div><div class="rxc" id="rx-c"></div></div></div>
 <div id="rx-page"></div>
 <div id="ncm"><div class="box2"><div class="hd2"><b id="ncm-t">Nota completa</b><span><button type="button" id="ncm-copy">Copiar nota completa</button> <button type="button" class="sec" id="ncm-x">Cerrar</button></span></div><div class="ncmc" id="ncm-c"></div></div></div>
 <div id="vw"><div class="bar"><button id="v-datos" style="display:none">Datos ▾</button><button id="v-zoom">🔍 Zoom</button><button id="v-del">🗑 Borrar</button><button id="v-x">Cerrar</button></div><div class="vwm"><div class="sc"><img id="v-img" alt="Hoja de signos"></div>
@@ -283,7 +287,7 @@ details{margin-top:12px}summary{padding:6px 0;color:var(--mu);font-weight:600}
 
 <script>
 'use strict';
-const VERSION='11.29';
+const VERSION='11.30';
 const TURNOS=[1,2,3,4,5];
 const DIAS_FOTO=7;
 const ACCESOS=['FAV','Injerto','Catéter tunelizado','Catéter temporal'];
@@ -345,9 +349,80 @@ function openReceta(nombre,exp,dxHint){
   box.oninput=ev=>{if(ev.target.id==='rx-dx')lsSet('rxDx',ev.target.value);if(ev.target.id==='rx-dy')lsSet('rxDy',ev.target.value);if(ev.target.id==='rx-sc')lsSet('rxSc',ev.target.value);persist();prev()};
   $('#rx-clr').onclick=()=>{box.querySelectorAll('[data-rxl]').forEach(x=>x.value='');persist();prev()};
   $('#rx-x').onclick=()=>{$('#rxm').classList.remove('on');document.body.classList.remove('lock')};
-  $('#rx-print').onclick=()=>{persist();$('#rx-page').innerHTML=rxHTML(cur());document.body.classList.add('prx');const done=()=>{document.body.classList.remove('prx');window.removeEventListener('afterprint',done)};window.addEventListener('afterprint',done);setTimeout(()=>{try{window.print()}catch(e){done()}if(!('onafterprint' in window))setTimeout(done,1500)},60)};
+  $('#rx-print').onclick=()=>{persist();rxPrint(rxPage(rxHTML(cur())))};
   $('#rxm').classList.add('on');prev();
 }
+const rxPage=h=>`<div class="rxp">${h}</div>`;
+function rxPrint(pagesHtml,done){
+  $('#rx-page').innerHTML=pagesHtml;document.body.classList.add('prx');
+  const fin=()=>{document.body.classList.remove('prx');window.removeEventListener('afterprint',fin);if(done)Promise.resolve().then(done)};
+  window.addEventListener('afterprint',fin);
+  setTimeout(()=>{try{window.print()}catch(e){fin()}if(!('onafterprint' in window))setTimeout(fin,1500)},60)}
+// ---- Solicitud de laboratorios (receta de Alba): posiciones absolutas tomadas del formato RECETA_LABS_HC
+const LAB_CAT=[['bh','Biometría Hemática Completa','BH'],['qs','Química Sanguínea     (Glucosa, Urea, Creatinina, Ac. Úrico, Albumina)','QS'],['tr','Transaminasas     (Alanino Aminotransferasa, Aspartato Aminotransferasa)','Transaminasas'],['el','Electrolitos Séricos     (Sodio, Potasio, Calcio, Magnesio, Cloro, Fosforo)','Electrolitos'],['pt','PTHi (Hormona paratiroidea)','PTHi'],['vh','Panel viral (HBsAg, Anti HCV)','Panel viral'],['vi','Anti HIV','VIH']];
+const LAB_SEL0=['bh','qs','tr','el','pt'];
+const labDef=(exp,over)=>{let s={};try{s=JSON.parse(lsGet('lab:'+exp)||'{}')}catch(e){}if(over)s={...s,...over};
+  return {fn:s.fn||'',edad:s.edad||'',alerg:s.alerg!==undefined?s.alerg:'NEGADAS.',sel:Array.isArray(s.sel)?s.sel:LAB_SEL0.slice(),extra:s.extra||'',p1:s.p1!==undefined?s.p1:'Paciente Programa Hospital Cercano',p2:s.p2!==undefined?s.p2:'Enfermedad Renal Crónica En Terapia De Sustitución Renal Con Hemodiálisis'}};
+const labEdad=d=>{const m=/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec((d.fn||'').trim());
+  if(!m)return String(d.edad||'').replace(/\s*(a[ñn]os)?\s*$/i,'').trim();
+  const n=new Date(),bd=+m[1],bm=+m[2];let a=n.getFullYear()-(+m[3]);if(n.getMonth()+1<bm||(n.getMonth()+1===bm&&n.getDate()<bd))a--;return String(a)};
+const labLines=d=>{const s=new Set(d.sel||[]);const out=[];
+  for(const [id,t] of LAB_CAT){if(!s.has(id))continue;if(id==='vh'&&s.has('vi')){out.push('Panel viral (HBsAg, Anti HCV, Anti HIV)');continue}if(id==='vi'&&s.has('vh'))continue;out.push(t)}
+  String(d.extra||'').split('\n').map(x=>x.trim()).filter(Boolean).forEach(x=>out.push(x));return out};
+const labResumen=d=>{const s=new Set(d.sel||[]);const a=LAB_CAT.filter(x=>s.has(x[0])).map(x=>x[2]);String(d.extra||'').split('\n').map(x=>x.trim()).filter(Boolean).forEach(x=>a.push(x));return '🧪 Labs: '+(a.join(', ')||'(sin estudios)')};
+function labHTML(nombre,d){
+  const c=rxCfg(),mmv=pt=>pt*25.4/72;
+  const T=(x,y,html,st)=>`<div style="position:absolute;left:${(mmv(x)+c.dx).toFixed(2)}mm;top:${(mmv(y)+c.dy).toFixed(2)}mm;white-space:pre;${st}">${html}</div>`;
+  const AB='font:700 9pt Arial,Helvetica,sans-serif;line-height:10.4pt;',CA='font:9pt Calibri,Carlito,"Segoe UI",Arial,sans-serif;line-height:11pt;';
+  const ed=labEdad(d);let h='';
+  h+=T(87.81,98.1,esc(String(nombre||'').toUpperCase()),AB);
+  if(ed)h+=T(385.75,98.1,esc(ed+'  años'),AB);
+  h+=T(499.03,98.1,esc(rxFechaTxt()),AB);
+  h+=T(52.9,118.8,'Alergias:  '+esc(d.alerg||'')+(d.fn?'<span style="margin-left:12.4pt">FN: '+esc(d.fn)+'</span>':''),AB);
+  h+=T(228.75,149.53,'FAVOR DE REALIZAR LOS SIGUIENTES ESTUDIOS',CA);
+  const L=labLines(d);
+  L.forEach((t,i)=>{const y=189.23+i*12.15;h+=T(106.9,y+1.08,'o','font:9pt "Courier New",monospace;line-height:10pt;');h+=T(124.9,y,esc(t),CA)});
+  const y0=Math.max(289.98,189.23+L.length*12.15+14);
+  [d.p1,d.p2].filter(x=>x&&String(x).trim()).forEach((t,i)=>{const y=y0+i*11.85;h+=T(106.35,y,'•',AB);h+=T(124.35,y,esc(t),'font:700 9pt Calibri,Carlito,"Segoe UI",Arial,sans-serif;line-height:11pt;')});
+  return h}
+function openLabs(nombre,exp,api){
+  const mk=api&&api.marked&&api.marked();
+  const d0=labDef(exp,mk&&mk.datos);
+  $('#rx-title').textContent='Solicitud de laboratorios';
+  const box=$('#rx-c');
+  box.innerHTML=`<div class="rxg"><div><label for="lb-nom">Nombre</label><input id="lb-nom" value="${esc(nombre||'')}" autocomplete="off"></div><div><label for="lb-fn">Fecha de nacimiento (dd/mm/aaaa)</label><input id="lb-fn" value="${esc(d0.fn)}" inputmode="numeric" autocomplete="off" placeholder="16/04/1960"></div><div><label for="lb-ed">Edad (si no hay FN)</label><input id="lb-ed" value="${esc(d0.edad)}" inputmode="numeric" autocomplete="off"></div></div>
+   <label for="lb-al">Alergias</label><input id="lb-al" value="${esc(d0.alerg)}" autocomplete="off">
+   <b style="display:block;margin-top:10px">Estudios a solicitar</b><div id="lbm-list">${LAB_CAT.map(([id,t])=>`<label><input type="checkbox" data-lbs="${id}" ${d0.sel.includes(id)?'checked':''}>${esc(t.replace(/\s{2,}/g,' '))}</label>`).join('')}</div>
+   <label for="lb-ex">Otros estudios (uno por renglón)</label><textarea id="lb-ex" rows="2" placeholder="Hemocultivo, Perfil de hierro…">${esc(d0.extra)}</textarea>
+   <div class="rxg" style="grid-template-columns:1fr 1fr"><div><label for="lb-p1">Pie 1</label><input id="lb-p1" value="${esc(d0.p1)}" autocomplete="off"></div><div><label for="lb-p2">Pie 2</label><input id="lb-p2" value="${esc(d0.p2)}" autocomplete="off"></div></div>
+   <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap"><button type="button" class="btn2" id="lb-mark"></button><button type="button" class="btn2 sec" id="lb-unmark">Quitar marca</button></div>
+   <p class="mu" id="lb-info"></p>
+   <details style="margin-top:6px"><summary>Ajustar posición de impresión</summary><p class="mu">Es la misma calibración de la receta (milímetros).</p><div class="rxo"><div><label for="rx-dx">Derecha/izquierda (mm)</label><input id="rx-dx" type="number" step="0.5" value="${rxCfg().dx}"></div><div><label for="rx-dy">Abajo/arriba (mm)</label><input id="rx-dy" type="number" step="0.5" value="${rxCfg().dy}"></div></div></details>
+   <b style="display:block;margin-top:10px">Vista previa (A4)</b><div id="rxprev"></div>`;
+  const cur=()=>({fn:$('#lb-fn').value.trim(),edad:$('#lb-ed').value.trim(),alerg:$('#lb-al').value,sel:[...box.querySelectorAll('[data-lbs]')].filter(x=>x.checked).map(x=>x.dataset.lbs),extra:$('#lb-ex').value,p1:$('#lb-p1').value,p2:$('#lb-p2').value});
+  const prev=()=>{const k=420/210;$('#rxprev').innerHTML=`<div style="transform:scale(${k*25.4/96});transform-origin:0 0;width:210mm;height:297mm;position:relative">${labHTML($('#lb-nom').value,cur())}</div>`};
+  const persist=()=>{try{lsSet('lab:'+exp,JSON.stringify(cur()))}catch(e){}};
+  const refresh=()=>{const m=api&&api.marked&&api.marked();$('#lb-mark').textContent=m?'🧪 Actualizar marca':'🧪 Marcar para imprimir después';$('#lb-unmark').style.display=m?'':'none';$('#lb-info').textContent=m?'Este paciente está en "Labs por imprimir".':'Márcalo para imprimirlo junto con los demás desde Pendientes.'};
+  const onChange=ev=>{if(ev.target.id==='rx-dx')lsSet('rxDx',ev.target.value);if(ev.target.id==='rx-dy')lsSet('rxDy',ev.target.value);persist();prev()};
+  box.oninput=onChange;box.onchange=onChange;
+  $('#lb-mark').onclick=async()=>{if(!api)return;try{await api.mark(cur());persist();toast('Marcado para imprimir');refresh()}catch(e){logErr('labs',e)}};
+  $('#lb-unmark').onclick=async()=>{if(!api)return;try{await api.unmark();toast('Marca quitada');refresh()}catch(e){logErr('labs',e)}};
+  $('#rx-print').onclick=()=>{persist();rxPrint(rxPage(labHTML($('#lb-nom').value,cur())),async()=>{const m=api&&api.marked&&api.marked();if(m&&confirm('¿Ya la imprimiste? Se quita de "Labs por imprimir".')){await api.resolve();refresh()}})};
+  $('#rx-x').onclick=()=>{$('#rxm').classList.remove('on')};
+  $('#rxm').classList.add('on');refresh();prev();
+}
+const labItems=pats=>{const out=[];for(const p of pats)for(const x of pAct(p))if(x.tipo==='labs')out.push({p,x});return out.sort((a,b)=>String(a.p.nombre).localeCompare(String(b.p.nombre)))};
+const secLabs=pats=>{const L=labItems(pats);if(!L.length)return '';
+  return `<div class="pg dueb" style="border-color:var(--ac)"><div class="hd"><div><div class="nm">🧪 Labs por imprimir (${L.length})</div></div><button class="btn sec" data-labp="*" style="margin:0">Imprimir todos</button></div>${L.map(({p,x})=>`<div class="pr"><span>${esc(p.nombre||'(sin nombre)')}<small class="mu" style="display:block">${esc(p.expediente)} · ${esc(String(x.texto||'').replace(/^🧪 Labs:\s*/,''))}</small></span><button class="cp2" data-labp="${esc(p.expediente)}|${esc(x.id)}" style="flex:none">Imprimir</button><button class="x" data-labx="${esc(p.expediente)}|${esc(x.id)}">×</button></div>`).join('')}</div>`};
+async function labsPrint(which){
+  const pats=await all('patients');let L=labItems(pats);
+  if(which!=='*'){const [ex,id]=which.split('|');L=L.filter(z=>z.p.expediente===ex&&z.x.id===id)}
+  if(!L.length)return;
+  const pages=L.map(({p,x})=>rxPage(labHTML(p.nombre,labDef(p.expediente,x.datos))));
+  rxPrint(pages.join(''),async()=>{
+    if(!confirm(L.length===1?'¿Ya la imprimiste? Se quita de "Labs por imprimir".':`¿Ya imprimiste las ${L.length} solicitudes? Se quitan de "Labs por imprimir".`))return;
+    for(const {p,x} of L){const q=await get('patients',p.expediente);const it=q&&q.pendientes.find(z=>z.id===x.id);if(it){it.hecho=true;it.hechoEn=now();it.updatedAt=now();q.updatedAt=now();await put('patients',q)}}
+    await render();toast('Listo')})}
 const expPref=()=>{const v=lsGet('expPrefix');return v===null?'RL':v};
 const expFull=x=>{x=String(x||'').trim();return /^[A-Za-z]/.test(x)?x.toUpperCase():expPref()+x};
 
@@ -474,7 +549,7 @@ async function renderHoy(){
       <div class="sbar"><input id="s-q" type="search" placeholder="Buscar paciente (atajo: / o Ctrl+K)" autocomplete="off" autocorrect="off" enterkeyhint="search" value="${esc(S.q||'')}"><div id="s-res" class="sres"></div></div></div>
     ${lsGet('safe')==='1'?'<div class="banner"><div>Modo seguro: la app se cerró sola al iniciar la última vez. La sincronización y la limpieza de fotos están en pausa. <button type="button" class="mini" data-resume style="margin-top:6px">Reanudar</button></div></div>':''}
     ${showBanner?`<div class="banner"><div>Para que iOS no borre tus datos, instala la app: botón Compartir → <b>Agregar a pantalla de inicio</b>, y úsala siempre desde ese ícono.</div><button data-bn>×</button></div>`:''}
-    ${esHoy?secHoy(pats):''}
+    ${esHoy?secHoy(pats):''}${secLabs(pats)}
     ${cards||`<div class="empty">Sin pacientes en el turno ${S.turno}.<br><button class="btn" data-loadprev style="margin-top:10px">Cargar desde la sesión anterior</button></div>`}
     <button class="addend" data-add>＋ Agregar paciente</button>`;
   if(S.q)drawSearch().catch(()=>{});
@@ -486,7 +561,7 @@ async function renderPend(){
   const gs=pats.map(p=>({p,o:pAct(p)})).filter(g=>g.o.length)
     .sort((a,b)=>(!!hoy[b.p.expediente])-(!!hoy[a.p.expediente])||String(a.p.nombre).localeCompare(String(b.p.nombre)));
   const total=gs.reduce((s,g)=>s+g.o.length,0);
-  $('#main').innerHTML=`<div class="top"><div class="datebar"><div class="d">Pendientes abiertos<small>${total} en ${gs.length} paciente${gs.length===1?'':'s'}</small></div></div></div>`+secHoy(pats)+
+  $('#main').innerHTML=`<div class="top"><div class="datebar"><div class="d">Pendientes abiertos<small>${total} en ${gs.length} paciente${gs.length===1?'':'s'}</small></div></div></div>`+secHoy(pats)+secLabs(pats)+
    (gs.map(g=>{const h=hoy[g.p.expediente];
      return `<div class="pg"><div class="hd" ${h?`data-open="${h.id}"`:''}><div><div class="nm">${esc(g.p.nombre||'(sin nombre)')}</div><div class="ex">${esc(g.p.expediente)}</div></div>${h?`<span class="chip">hoy · T${h.turno}${h.sillon?' · S'+esc(h.sillon):''}</span>`:''}</div>
      ${g.o.map(x=>`<div class="pr"><button class="ck" data-pt="${x.id}" data-pe="${esc(g.p.expediente)}"></button><span>${esc(x.texto)}</span>${x.vence?`<span class="chip ${x.vence<=todayStr()?'w':''}" style="flex:none">${esc(venceTxt(x))}</span>`:''}</div>`).join('')}</div>`}).join('')||`<div class="empty">No hay pendientes abiertos 🎉</div>`);
@@ -815,7 +890,7 @@ async function openEntry(id){
       <div class="stabs2"><button type="button" data-st="pase">Pase</button><button type="button" data-st="nota">Nota rápida</button><button type="button" class="notabtn" id="e-nota"></button></div></div>
     <div class="sp" data-pn="pase">
     <div class="evtop"><div class="tags" id="e-tags"></div></div>
-    <div class="row"><div><label>Sillón</label><input id="e-sil" inputmode="numeric" value="${esc(e.sillon)}"></div><div style="display:flex;align-items:end"><button type="button" class="btn sec" id="e-cal">Calculadora</button> <button type="button" class="btn sec" id="e-rx" style="margin-left:6px">🖨 Receta</button></div></div>
+    <div class="row"><div><label>Sillón</label><input id="e-sil" inputmode="numeric" value="${esc(e.sillon)}"></div><div style="display:flex;align-items:end"><button type="button" class="btn sec" id="e-cal">Calculadora</button> <button type="button" class="btn sec" id="e-rx" style="margin-left:6px">🖨 Receta</button> <button type="button" class="btn sec" id="e-lab" style="margin-left:6px">🧪 Labs</button></div></div>
     <div class="box ncp"><b>Nota completa</b>
       <div class="ncp-b"><button type="button" class="cp" id="nc-quick2">Copiar nota</button><button type="button" class="cp2" id="nc-open2">Abrir en ventana grande</button><button type="button" class="cp2" id="nc-sig2">Signos y pesos</button></div></div>
     <div class="box" style="margin:7px 0;padding:9px">
@@ -1085,6 +1160,11 @@ async function openEntry(id){
       S.keepTab=true;await closeSheet(true);await openEntry(e.id);toast('Expediente asignado');
     }catch(err){logErr('asignar expediente',err);toast('No se pudo asignar')}
   };
+  q('#e-lab').onclick=()=>{const labMark=()=>pAct(pat).find(x=>x.tipo==='labs');
+    openLabs((q('#e-nom').value||pat.nombre||'').trim(),e.expediente,{marked:labMark,
+      mark:async d=>{await mutPat(p=>{const it=p.pendientes.find(x=>!x.hecho&&!x.del&&x.tipo==='labs');if(it){it.datos=d;it.texto=labResumen(d);it.updatedAt=now()}else p.pendientes.push({id:uid(),texto:labResumen(d),tipo:'labs',datos:d,hecho:false,creado:now(),updatedAt:now(),vence:null})});sv(true);drawPend();refreshList()},
+      unmark:async()=>{await mutPat(p=>{p.pendientes.filter(x=>!x.hecho&&!x.del&&x.tipo==='labs').forEach(x=>{x.del=true;x.updatedAt=now()})});sv(true);drawPend();refreshList()},
+      resolve:async()=>{await mutPat(p=>{p.pendientes.filter(x=>!x.hecho&&!x.del&&x.tipo==='labs').forEach(x=>{x.hecho=true;x.hechoEn=now();x.updatedAt=now()})});sv(true);drawPend();refreshList()}})};
   q('#e-rx').onclick=()=>{const dxb=parseTpl(pat.plantilla||'').find(p=>p.b&&/^\s*(dx|diagn)/i.test(fold(p.label)));openReceta((q('#e-nom').value||pat.nombre||'').trim(),e.expediente,dxb?dxb.text.replace(/^\s*(dx|diagn[oó]stico)\s*:?\s*/i,'').trim():'')};
   if(!e.temp)q('#e-cpexp').onclick=async()=>{const t=expFull(e.expediente);const ok=await copyText(t);toast(ok?'Copiado: '+t:'No se pudo copiar')};
   q('#e-prev').onclick=()=>goToPatient(prevId);
@@ -1496,6 +1576,9 @@ document.addEventListener('click',async ev=>{
   if(nt){
     if(live&&live.e.id===nt.dataset.nota){live.e.nota=!live.e.nota;live.drawNota();await live.flush().catch(()=>{});render();return}
     const e=await get('entries',nt.dataset.nota);e.nota=!e.nota;e.updatedAt=now();await put('entries',e);render();return}
+  const lbp=t.closest('[data-labp]');if(lbp){await labsPrint(lbp.dataset.labp);return}
+  const lbx=t.closest('[data-labx]');
+  if(lbx){const [ex,id]=lbx.dataset.labx.split('|');const p=await get('patients',ex);const x=p&&p.pendientes.find(z=>z.id===id);if(x){x.del=true;x.updatedAt=now();p.updatedAt=now();await put('patients',p);await render()}return}
   const pt=t.closest('[data-pt][data-pe]');
   if(pt){const p=await get('patients',pt.dataset.pe);const x=p.pendientes.find(z=>z.id===pt.dataset.pt);x.hecho=true;x.hechoEn=now();x.updatedAt=now();p.updatedAt=now();await put('patients',p);render();toast('Pendiente resuelto');return}
   const op=t.closest('[data-open]');
@@ -1586,7 +1669,7 @@ const SYNC=(()=>{
 
   /* --- registros --- */
   const recPat=p=>{const r={expediente:p.expediente,acceso:p.acceso||'',aviso:p.aviso||'',sexo:p.sexo||'',updatedAt:patStamp(p)};if(st.syncNames){r.nombre=p.nombre||'';if(p.plantilla!==undefined)r.plantilla=p.plantilla}return r};
-  const recPend=(p,x)=>({id:x.id,expediente:p.expediente,texto:x.texto,hecho:!!x.hecho,hechoEn:x.hechoEn||null,creado:x.creado||0,del:!!x.del,vence:x.vence||null,updatedAt:pStamp(x)});
+  const recPend=(p,x)=>({id:x.id,expediente:p.expediente,texto:x.texto,hecho:!!x.hecho,hechoEn:x.hechoEn||null,creado:x.creado||0,del:!!x.del,vence:x.vence||null,tipo:x.tipo||null,datos:x.datos||null,updatedAt:pStamp(x)});
   const recEnt=e=>{const r={...e};delete r.fotos;r.deleted=!!e.deleted;r.updatedAt=e.updatedAt||0;return r};
   // Fotos: ya vienen comprimidas (ligeras ~100-150 KB); van dentro del documento como texto base64.
   // Un documento de Firestore admite ~1 MB, por eso se descarta lo que pase de este límite.
@@ -1673,7 +1756,7 @@ const SYNC=(()=>{
       if(!p)p={expediente:r.expediente,nombre:'',pendientes:[],updatedAt:0,pu:0};
       const i=p.pendientes.findIndex(x=>x.id===r.id),rs=r.updatedAt||0;
       if(i>=0&&pStamp(p.pendientes[i])>=rs)return null;
-      const item={id:r.id,texto:r.texto,hecho:!!r.hecho,hechoEn:r.hechoEn||null,creado:r.creado||0,updatedAt:rs,del:!!r.del,vence:r.vence||null};
+      const item={id:r.id,texto:r.texto,hecho:!!r.hecho,hechoEn:r.hechoEn||null,creado:r.creado||0,updatedAt:rs,del:!!r.del,vence:r.vence||null,tipo:r.tipo||null,datos:r.datos||null};
       if(i>=0)p.pendientes[i]=item;else p.pendientes.push(item);
       p.updatedAt=Math.max(p.updatedAt||0,rs);
       await put('patients',p,{nosync:true});return p;
