@@ -217,14 +217,17 @@ details{margin-top:12px}summary{padding:6px 0;color:var(--mu);font-weight:600}
 #rxm{display:none;position:fixed;inset:0;z-index:45;background:rgba(0,0,0,.45);align-items:center;justify-content:center;padding:2vh 2vw}
 #rxm.on{display:flex}
 #rxm .box2{background:var(--bg);color:var(--tx);width:min(1000px,96vw);height:94vh;border-radius:16px;display:flex;flex-direction:column;overflow:hidden}
-#rxm .hd2{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:12px 16px;border-bottom:1px solid var(--bd)}
+#rxm .hd2{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:8px;padding:12px 16px;border-bottom:1px solid var(--bd)}
+#rxm .hd2 b{flex:1 1 100%}
+#rxm .hd2 span{display:flex;gap:8px;flex-wrap:wrap}
+#rxm .hd2 button{padding:10px 14px;font-size:15px}
 #rxm .hd2 button,#rxm .btn2{padding:10px 16px;border-radius:10px;font-weight:700;background:var(--ac);color:#fff;font-size:16px}
 #rxm .hd2 button.sec,#rxm .btn2.sec{background:var(--card);color:var(--tx);border:1px solid var(--bd)}
 #rxm .rxc{flex:1;overflow:auto;padding:12px 16px calc(16px + env(safe-area-inset-bottom))}
 #rxm textarea,#rxm input{font-size:16px}
 #rxm .rxg{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
 #rxm .rxo{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
-#rxprev{margin-top:10px;background:#fff;color:#000;border:1px solid var(--bd);position:relative;width:420px;max-width:100%;aspect-ratio:210/297;overflow:hidden}
+#rxprev{margin-top:10px;background:#fff;color:#000;border:1px solid var(--bd);position:relative;width:100%;max-width:420px;aspect-ratio:210/297;overflow:hidden}
 #rx-page{display:none}
 #lbm-list label{display:flex;gap:8px;align-items:center;padding:6px 0;font-size:16px}#lbm-list input{width:22px;height:22px;flex:none}
 @media print{
@@ -267,7 +270,7 @@ details{margin-top:12px}summary{padding:6px 0;color:var(--mu);font-weight:600}
   <button data-v="resp"><span>⚙️</span>Ajustes</button>
 </nav>
 <div id="ov"></div>
-<div id="rxm"><div class="box2"><div class="hd2"><b id="rx-title">Receta · imprimir</b><span><button type="button" id="rx-print">Imprimir</button> <button type="button" class="sec" id="rx-x">Cerrar</button></span></div><div class="rxc" id="rx-c"></div></div></div>
+<div id="rxm"><div class="box2"><div class="hd2"><b id="rx-title">Receta · imprimir</b><span><button type="button" id="rx-print">Imprimir</button><button type="button" id="rx-pdf">Compartir PDF</button><button type="button" class="sec" id="rx-x">Cerrar</button></span></div><div class="rxc" id="rx-c"></div></div></div>
 <div id="rx-page"></div>
 <div id="ncm"><div class="box2"><div class="hd2"><b id="ncm-t">Nota completa</b><span><button type="button" id="ncm-copy">Copiar nota completa</button> <button type="button" class="sec" id="ncm-x">Cerrar</button></span></div><div class="ncmc" id="ncm-c"></div></div></div>
 <div id="vw"><div class="bar"><button id="v-datos" style="display:none">Datos ▾</button><button id="v-zoom">🔍 Zoom</button><button id="v-del">🗑 Borrar</button><button id="v-x">Cerrar</button></div><div class="vwm"><div class="sc"><img id="v-img" alt="Hoja de signos"></div>
@@ -287,7 +290,7 @@ details{margin-top:12px}summary{padding:6px 0;color:var(--mu);font-weight:600}
 
 <script>
 'use strict';
-const VERSION='11.30';
+const VERSION='11.31';
 const TURNOS=[1,2,3,4,5];
 const DIAS_FOTO=7;
 const ACCESOS=['FAV','Injerto','Catéter tunelizado','Catéter temporal'];
@@ -344,14 +347,72 @@ function openReceta(nombre,exp,dxHint){
      <div class="rxo"><div><label for="rx-dx">Derecha/izquierda (mm)</label><input id="rx-dx" type="number" step="0.5" value="${c.dx}"></div><div><label for="rx-dy">Abajo/arriba (mm)</label><input id="rx-dy" type="number" step="0.5" value="${c.dy}"></div><div><label for="rx-sc">Tamaño (%)</label><input id="rx-sc" type="number" step="1" value="${c.sc}"></div></div></details>
    <b style="display:block;margin-top:10px">Vista previa (A4)</b><div id="rxprev"></div>`;
   const cur=()=>({nombre:$('#rx-nom').value,edad:$('#rx-edad').value,fecha:$('#rx-fec').value,idx:$('#rx-idx').value,lineas:[...box.querySelectorAll('[data-rxl]')].map(x=>x.value)});
-  const prev=()=>{const k=420/210;const pv=$('#rxprev');pv.innerHTML=`<div style="transform:scale(${k*25.4/96});transform-origin:0 0;width:210mm;height:297mm;position:relative">${rxHTML(cur())}</div>`};
+  const prev=()=>{const pv=$('#rxprev');const k=pvK();pv.innerHTML=`<div style="transform:scale(${k});transform-origin:0 0;width:210mm;height:297mm;position:relative">${rxHTML(cur())}</div>`};
   const persist=()=>{const v=cur();try{lsSet(rxKey(exp),JSON.stringify({edad:v.edad,idx:v.idx,lineas:v.lineas}))}catch(e){}};
   box.oninput=ev=>{if(ev.target.id==='rx-dx')lsSet('rxDx',ev.target.value);if(ev.target.id==='rx-dy')lsSet('rxDy',ev.target.value);if(ev.target.id==='rx-sc')lsSet('rxSc',ev.target.value);persist();prev()};
   $('#rx-clr').onclick=()=>{box.querySelectorAll('[data-rxl]').forEach(x=>x.value='');persist();prev()};
   $('#rx-x').onclick=()=>{$('#rxm').classList.remove('on');document.body.classList.remove('lock')};
   $('#rx-print').onclick=()=>{persist();rxPrint(rxPage(rxHTML(cur())))};
+  $('#rx-pdf').onclick=async()=>{persist();const v=cur();await rxShare(pdfBuild([rxOps(v)]),'receta_'+pdfSan(v.nombre)+'.pdf')};
   $('#rxm').classList.add('on');prev();
 }
+const PDFW={H:[278, 278, 355, 556, 556, 889, 667, 191, 333, 333, 389, 584, 278, 333, 278, 278, 556, 556, 556, 556, 556, 556, 556, 556, 556, 556, 278, 278, 584, 584, 584, 556, 1015, 667, 667, 722, 722, 667, 611, 778, 722, 278, 500, 667, 556, 833, 722, 778, 667, 778, 722, 667, 611, 722, 667, 944, 667, 667, 611, 278, 278, 278, 469, 556, 333, 556, 556, 500, 556, 556, 278, 556, 556, 222, 222, 500, 222, 833, 556, 556, 556, 556, 333, 500, 278, 556, 500, 722, 500, 500, 500, 334, 260, 334, 584],HB:[278, 333, 474, 556, 556, 889, 722, 238, 333, 333, 389, 584, 278, 333, 278, 278, 556, 556, 556, 556, 556, 556, 556, 556, 556, 556, 333, 333, 584, 584, 584, 611, 975, 722, 722, 722, 722, 667, 611, 778, 722, 278, 556, 722, 611, 833, 722, 778, 667, 778, 722, 667, 611, 722, 667, 944, 667, 667, 611, 333, 278, 333, 584, 556, 333, 556, 611, 556, 611, 556, 333, 611, 611, 278, 278, 556, 278, 889, 611, 611, 611, 611, 389, 556, 333, 611, 556, 778, 556, 556, 500, 389, 280, 389, 584]};
+const pdfW=(t,f,sz)=>{let w=0;for(const ch of String(t)){if(f==='C'){w+=600;continue}const c=(ch.normalize('NFD')[0]||' ').charCodeAt(0);w+=(c>=32&&c<127?PDFW[f][c-32]:556)}return w*sz/1000};
+const pvK=()=>{const pv=$('#rxprev');const w=(pv&&pv.clientWidth)||320;return w/(210*96/25.4)};
+const winAnsi=t=>{let o='';for(const ch of String(t)){const c=ch.charCodeAt(0);o+=c<256?ch:ch==='•'?'\x95':(ch==='–'?'\x96':(ch==='—'?'\x97':'?'))}return o};
+const pdfEsc=t=>winAnsi(t).replace(/[\\()]/g,m=>'\\'+m);
+function pdfBuild(pages){
+  const PW=595.28,PH=841.89,objs=[];const add=s=>{objs.push(s);return objs.length};
+  add('<< /Type /Catalog /Pages 2 0 R >>');add('');   // 2 = pages (se llena al final)
+  const fH=add('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>'),fB=add('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>'),fC=add('<< /Type /Font /Subtype /Type1 /BaseFont /Courier /Encoding /WinAnsiEncoding >>');
+  const kids=[];
+  for(const ops of pages){
+    let cs='';for(const o of ops){if(!o.t&&o.t!=='0')continue;const F=o.f==='HB'?'F2':o.f==='C'?'F3':'F1';cs+=`BT /${F} ${o.sz.toFixed(2)} Tf 1 0 0 1 ${o.x.toFixed(2)} ${(PH-o.b).toFixed(2)} Tm (${pdfEsc(o.t)}) Tj ET\n`}
+    const c=add(`<< /Length ${cs.length} >>\nstream\n${cs}endstream`);
+    kids.push(add(`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${PW} ${PH}] /Resources << /Font << /F1 ${fH} 0 R /F2 ${fB} 0 R /F3 ${fC} 0 R >> >> /Contents ${c} 0 R >>`))}
+  objs[1]=`<< /Type /Pages /Count ${kids.length} /Kids [${kids.map(k=>k+' 0 R').join(' ')}] >>`;
+  let out='%PDF-1.4\n';const offs=[];
+  objs.forEach((o,i)=>{offs.push(out.length);out+=`${i+1} 0 obj\n${o}\nendobj\n`});
+  const xr=out.length;out+=`xref\n0 ${objs.length+1}\n0000000000 65535 f \n`+offs.map(o=>String(o).padStart(10,'0')+' 00000 n \n').join('')+`trailer\n<< /Size ${objs.length+1} /Root 1 0 R >>\nstartxref\n${xr}\n%%EOF`;
+  const u=new Uint8Array(out.length);for(let i=0;i<out.length;i++)u[i]=out.charCodeAt(i)&255;return u}
+async function rxShare(bytes,name){
+  const blob=new Blob([bytes],{type:'application/pdf'});
+  try{const file=new File([blob],name,{type:'application/pdf'});
+    if(navigator.canShare&&navigator.canShare({files:[file]})){try{await navigator.share({files:[file],title:name});return true}catch(e){if(e&&e.name==='AbortError')return false;throw e}}}catch(e){if(e&&e.name==='AbortError')return false}
+  try{const u=URL.createObjectURL(blob);const a=document.createElement('a');a.href=u;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),30000);return true}catch(e){return false}}
+const pdfSan=t=>String(t||'documento').normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^A-Za-z0-9]+/g,'_').slice(0,40)||'documento';
+// líneas de texto con salto automático según el ancho
+const pdfWrap=(txt,w,f,sz)=>{const out=[];for(const par of String(txt).split('\n')){let cur='';for(const word of par.split(/\s+/).filter(Boolean)){const t=cur?cur+' '+word:word;if(cur&&pdfW(t,f,sz)>w){out.push(cur);cur=word}else cur=t}out.push(cur)}return out};
+const pdfBase=(top,lh,sz)=>top+(lh-1.117*sz)/2+0.905*sz;
+function rxOps(f){
+  const c=rxCfg(),totalPt=7*RX.colPt+RX.hPt,k=72/25.4;
+  const sc=(RX.printable*k/totalPt)*(c.sc/100);
+  const X0=(RX.ml+c.dx)*k,Y0=(RX.mt+c.dy)*k,lh=RX.rowPt*sc,fs=12*sc,pad=2*sc,ops=[];
+  const box=(col0,colW,row,rows,txt,al,wrap)=>{
+    const bw=colW*sc,bl=X0+col0*sc,bb=Y0+(row-1+rows)*lh;
+    let L=wrap?pdfWrap(String(txt||'').toUpperCase(),bw-2*pad,'H',fs):[String(txt||'').toUpperCase()];
+    L=L.slice(0,rows);
+    L.forEach((t,i)=>{if(!t)return;const w=pdfW(t,'H',fs);const top=bb-(L.length-i)*lh;
+      const x=al==='c'?bl+bw/2-w/2:al==='r'?bl+bw-pad-w:bl+pad;ops.push({t,x,b:pdfBase(top,lh,fs),sz:fs,f:'H'})})};
+  box(0,4*RX.colPt,4,1,f.nombre,'c');box(5*RX.colPt,RX.colPt,4,1,f.edad,'r');box(6*RX.colPt,RX.colPt+RX.hPt,4,1,f.fecha,'r');
+  box(0,7*RX.colPt,7,2,f.idx,'l',1);
+  (f.lineas||[]).slice(0,7).forEach((t,i)=>{if(t&&t.trim())box(0,7*RX.colPt,9+2*i,2,t,'l',1)});
+  return ops}
+function labOps(nombre,d){
+  const c=rxCfg(),k=72/25.4,dx=c.dx*k,dy=c.dy*k,ops=[];
+  const P=(x,y,t,f,sz,lh)=>ops.push({t,x:x+dx,b:pdfBase(y+dy,lh,sz),sz,f});
+  const ed=labEdad(d);
+  P(87.81,98.1,String(nombre||'').toUpperCase(),'HB',9,10.4);
+  if(ed)P(385.75,98.1,ed+'  años','HB',9,10.4);
+  P(499.03,98.1,rxFechaTxt(),'HB',9,10.4);
+  const al='Alergias:  '+(d.alerg||'');P(52.9,118.8,al,'HB',9,10.4);
+  if(d.fn)P(52.9+pdfW(al,'HB',9)+12.4,118.8,'FN: '+d.fn,'HB',9,10.4);
+  P(228.75,149.53,'FAVOR DE REALIZAR LOS SIGUIENTES ESTUDIOS','H',9,11);
+  const L=labLines(d);
+  L.forEach((t,i)=>{const y=189.23+i*12.15;P(106.9,y+1.08,'o','C',9,10);P(124.9,y,t.replace(/\s{2,}/g,'     '),'H',9,11)});
+  const y0=Math.max(289.98,189.23+L.length*12.15+14);
+  [d.p1,d.p2].filter(x=>x&&String(x).trim()).forEach((t,i)=>{const y=y0+i*11.85;P(106.35,y,'•','HB',9,10.4);P(124.35,y,t,'HB',9,11)});
+  return ops}
 const rxPage=h=>`<div class="rxp">${h}</div>`;
 function rxPrint(pagesHtml,done){
   $('#rx-page').innerHTML=pagesHtml;document.body.classList.add('prx');
@@ -400,7 +461,7 @@ function openLabs(nombre,exp,api){
    <details style="margin-top:6px"><summary>Ajustar posición de impresión</summary><p class="mu">Es la misma calibración de la receta (milímetros).</p><div class="rxo"><div><label for="rx-dx">Derecha/izquierda (mm)</label><input id="rx-dx" type="number" step="0.5" value="${rxCfg().dx}"></div><div><label for="rx-dy">Abajo/arriba (mm)</label><input id="rx-dy" type="number" step="0.5" value="${rxCfg().dy}"></div></div></details>
    <b style="display:block;margin-top:10px">Vista previa (A4)</b><div id="rxprev"></div>`;
   const cur=()=>({fn:$('#lb-fn').value.trim(),edad:$('#lb-ed').value.trim(),alerg:$('#lb-al').value,sel:[...box.querySelectorAll('[data-lbs]')].filter(x=>x.checked).map(x=>x.dataset.lbs),extra:$('#lb-ex').value,p1:$('#lb-p1').value,p2:$('#lb-p2').value});
-  const prev=()=>{const k=420/210;$('#rxprev').innerHTML=`<div style="transform:scale(${k*25.4/96});transform-origin:0 0;width:210mm;height:297mm;position:relative">${labHTML($('#lb-nom').value,cur())}</div>`};
+  const prev=()=>{const k=pvK();$('#rxprev').innerHTML=`<div style="transform:scale(${k});transform-origin:0 0;width:210mm;height:297mm;position:relative">${labHTML($('#lb-nom').value,cur())}</div>`};
   const persist=()=>{try{lsSet('lab:'+exp,JSON.stringify(cur()))}catch(e){}};
   const refresh=()=>{const m=api&&api.marked&&api.marked();$('#lb-mark').textContent=m?'🧪 Actualizar marca':'🧪 Marcar para imprimir después';$('#lb-unmark').style.display=m?'':'none';$('#lb-info').textContent=m?'Este paciente está en "Labs por imprimir".':'Márcalo para imprimirlo junto con los demás desde Pendientes.'};
   const onChange=ev=>{if(ev.target.id==='rx-dx')lsSet('rxDx',ev.target.value);if(ev.target.id==='rx-dy')lsSet('rxDy',ev.target.value);persist();prev()};
@@ -408,21 +469,23 @@ function openLabs(nombre,exp,api){
   $('#lb-mark').onclick=async()=>{if(!api)return;try{await api.mark(cur());persist();toast('Marcado para imprimir');refresh()}catch(e){logErr('labs',e)}};
   $('#lb-unmark').onclick=async()=>{if(!api)return;try{await api.unmark();toast('Marca quitada');refresh()}catch(e){logErr('labs',e)}};
   $('#rx-print').onclick=()=>{persist();rxPrint(rxPage(labHTML($('#lb-nom').value,cur())),async()=>{const m=api&&api.marked&&api.marked();if(m&&confirm('¿Ya la imprimiste? Se quita de "Labs por imprimir".')){await api.resolve();refresh()}})};
+  $('#rx-pdf').onclick=async()=>{persist();const ok=await rxShare(pdfBuild([labOps($('#lb-nom').value,cur())]),'labs_'+pdfSan($('#lb-nom').value)+'.pdf');const m=api&&api.marked&&api.marked();if(ok&&m&&confirm('¿Ya la mandaste/imprimiste? Se quita de "Labs por imprimir".')){await api.resolve();refresh()}};
   $('#rx-x').onclick=()=>{$('#rxm').classList.remove('on')};
   $('#rxm').classList.add('on');refresh();prev();
 }
 const labItems=pats=>{const out=[];for(const p of pats)for(const x of pAct(p))if(x.tipo==='labs')out.push({p,x});return out.sort((a,b)=>String(a.p.nombre).localeCompare(String(b.p.nombre)))};
 const secLabs=pats=>{const L=labItems(pats);if(!L.length)return '';
-  return `<div class="pg dueb" style="border-color:var(--ac)"><div class="hd"><div><div class="nm">🧪 Labs por imprimir (${L.length})</div></div><button class="btn sec" data-labp="*" style="margin:0">Imprimir todos</button></div>${L.map(({p,x})=>`<div class="pr"><span>${esc(p.nombre||'(sin nombre)')}<small class="mu" style="display:block">${esc(p.expediente)} · ${esc(String(x.texto||'').replace(/^🧪 Labs:\s*/,''))}</small></span><button class="cp2" data-labp="${esc(p.expediente)}|${esc(x.id)}" style="flex:none">Imprimir</button><button class="x" data-labx="${esc(p.expediente)}|${esc(x.id)}">×</button></div>`).join('')}</div>`};
-async function labsPrint(which){
+  return `<div class="pg dueb" style="border-color:var(--ac)"><div class="hd"><div><div class="nm">🧪 Labs por imprimir (${L.length})</div></div><span style="display:flex;gap:6px"><button class="btn sec" data-labp="*" style="margin:0">Imprimir todos</button><button class="btn sec" data-labpdf="*" style="margin:0">PDF todos</button></span></div>${L.map(({p,x})=>`<div class="pr"><span>${esc(p.nombre||'(sin nombre)')}<small class="mu" style="display:block">${esc(p.expediente)} · ${esc(String(x.texto||'').replace(/^🧪 Labs:\s*/,''))}</small></span><button class="cp2" data-labp="${esc(p.expediente)}|${esc(x.id)}" style="flex:none">Imprimir</button><button class="cp2" data-labpdf="${esc(p.expediente)}|${esc(x.id)}" style="flex:none">PDF</button><button class="x" data-labx="${esc(p.expediente)}|${esc(x.id)}">×</button></div>`).join('')}</div>`};
+async function labsPrint(which,asPdf){
   const pats=await all('patients');let L=labItems(pats);
   if(which!=='*'){const [ex,id]=which.split('|');L=L.filter(z=>z.p.expediente===ex&&z.x.id===id)}
   if(!L.length)return;
-  const pages=L.map(({p,x})=>rxPage(labHTML(p.nombre,labDef(p.expediente,x.datos))));
-  rxPrint(pages.join(''),async()=>{
+  const finish=async()=>{
     if(!confirm(L.length===1?'¿Ya la imprimiste? Se quita de "Labs por imprimir".':`¿Ya imprimiste las ${L.length} solicitudes? Se quitan de "Labs por imprimir".`))return;
     for(const {p,x} of L){const q=await get('patients',p.expediente);const it=q&&q.pendientes.find(z=>z.id===x.id);if(it){it.hecho=true;it.hechoEn=now();it.updatedAt=now();q.updatedAt=now();await put('patients',q)}}
-    await render();toast('Listo')})}
+    await render();toast('Listo')};
+  if(asPdf){const ok=await rxShare(pdfBuild(L.map(({p,x})=>labOps(p.nombre,labDef(p.expediente,x.datos)))),L.length===1?'labs_'+pdfSan(L[0].p.nombre)+'.pdf':'labs_'+L.length+'_pacientes.pdf');if(ok)await finish();return}
+  rxPrint(L.map(({p,x})=>rxPage(labHTML(p.nombre,labDef(p.expediente,x.datos)))).join(''),finish)}
 const expPref=()=>{const v=lsGet('expPrefix');return v===null?'RL':v};
 const expFull=x=>{x=String(x||'').trim();return /^[A-Za-z]/.test(x)?x.toUpperCase():expPref()+x};
 
@@ -1577,6 +1640,7 @@ document.addEventListener('click',async ev=>{
     if(live&&live.e.id===nt.dataset.nota){live.e.nota=!live.e.nota;live.drawNota();await live.flush().catch(()=>{});render();return}
     const e=await get('entries',nt.dataset.nota);e.nota=!e.nota;e.updatedAt=now();await put('entries',e);render();return}
   const lbp=t.closest('[data-labp]');if(lbp){await labsPrint(lbp.dataset.labp);return}
+  const lbd=t.closest('[data-labpdf]');if(lbd){await labsPrint(lbd.dataset.labpdf,true);return}
   const lbx=t.closest('[data-labx]');
   if(lbx){const [ex,id]=lbx.dataset.labx.split('|');const p=await get('patients',ex);const x=p&&p.pendientes.find(z=>z.id===id);if(x){x.del=true;x.updatedAt=now();p.updatedAt=now();await put('patients',p);await render()}return}
   const pt=t.closest('[data-pt][data-pe]');
