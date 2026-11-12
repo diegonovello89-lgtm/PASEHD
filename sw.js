@@ -1,12 +1,17 @@
-const V = 'pase-hd-v11-33';
+const V = 'pase-hd-v11-34';
 const FILES = [
   './', './index.html', './manifest.webmanifest', './firebase-config.js',
   './vendor/firebase-app-compat.js', './vendor/firebase-auth-compat.js', './vendor/firebase-firestore-compat.js',
   './icon-180.png', './icon-192.png', './icon-512.png'
 ];
 
+// Opcionales: si faltan en el servidor no se rompe la instalación de la app.
+const OPCIONALES = ['./vendor/pdf-lib.min.js'];
+
 self.addEventListener('install', e => {
-  e.waitUntil(caches.open(V).then(c => c.addAll(FILES)).then(() => self.skipWaiting()));
+  e.waitUntil(caches.open(V)
+    .then(c => c.addAll(FILES).then(() => Promise.allSettled(OPCIONALES.map(u => c.add(u)))))
+    .then(() => self.skipWaiting()));
 });
 
 self.addEventListener('activate', e => {

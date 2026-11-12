@@ -290,7 +290,7 @@ details{margin-top:12px}summary{padding:6px 0;color:var(--mu);font-weight:600}
 
 <script>
 'use strict';
-const VERSION='11.33';
+const VERSION='11.34';
 const TURNOS=[1,2,3,4,5];
 const DIAS_FOTO=7;
 const ACCESOS=['FAV','Injerto','Catéter tunelizado','Catéter temporal'];
@@ -413,6 +413,47 @@ function labOps(nombre,d){
   const y0=Math.max(289.98,189.23+L.length*12.15+14);
   [d.p1,d.p2].filter(x=>x&&String(x).trim()).forEach((t,i)=>{const y=y0+i*11.85;P(106.35,y,'•','HB',9,10.4);P(124.35,y,t,'HB',9,11)});
   return ops}
+// ---- Hojas PDF de HemoHL7 (solo en este dispositivo; no se sincronizan). Se guardan en la tabla meta con la clave hoja:<expediente>
+const hojaKey=x=>'hoja:'+x;
+const hojaGet=x=>get('meta',hojaKey(x));
+const hojaSet=async(x,file)=>put('meta',{k:hojaKey(x),buf:await blobBuf(file),name:file.name||'',size:file.size||0,at:now()},{nosync:true});   // se guarda como ArrayBuffer (más seguro que Blob en IndexedDB de iOS)
+const hojaDel=x=>del('meta',hojaKey(x));
+const hojaKeys=async()=>new Set(await rq(store('meta').getAllKeys(IDBKeyRange.bound('hoja:','hoja:￿'))));
+const hojasAll=async()=>(await all('meta')).filter(m=>m&&typeof m.k==='string'&&m.k.startsWith('hoja:'));
+const nz=s=>String(s||'').replace(/\D/g,'').replace(/^0+/,'');
+const hojaMatch=(fname,pats)=>{const runs=(String(fname).replace(/\.pdf$/i,'').match(/\d+/g)||[]).filter(r=>r.length>=3);
+  for(const p of pats){const pe=nz(p.expediente);if(pe&&runs.some(r=>nz(r)===pe))return p}return null};
+const blobBuf=b=>b.arrayBuffer?b.arrayBuffer():new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result);r.onerror=rej;r.readAsArrayBuffer(b)});
+const diasDesde=t=>Math.floor((Date.now()-t)/864e5);
+function loadPdfLib(){return new Promise((res,rej)=>{if(window.PDFLib)return res(window.PDFLib);
+  const sc=document.createElement('script');sc.src='vendor/pdf-lib.min.js';sc.onload=()=>window.PDFLib?res(window.PDFLib):rej(new Error('pdf-lib vacío'));sc.onerror=()=>rej(new Error('No se encontró vendor/pdf-lib.min.js'));document.head.appendChild(sc)})}
+async function cargarHojas(files){
+  const pats=(await all('patients')).filter(p=>!p.deleted);const okN=[],sin=[];
+  for(const f of files){const p=hojaMatch(f.name,pats);if(!p){sin.push(f.name);continue}
+    await hojaSet(p.expediente,f);okN.push((p.nombre||p.expediente))}
+  return {ok:okN,sin}}
+async function hojasPrint(){
+  const win=window.open('','_blank');   // se abre ya, mientras vale el clic; se llena al terminar
+  const cerrar=()=>{try{win&&win.close()}catch(e){}};
+  try{
+    const ents=(await byDate(S.fecha)).filter(e=>e.turno===S.turno&&!e.temp).sort(cmpSillon);
+    const pats=Object.fromEntries((await all('patients')).map(p=>[p.expediente,p]));
+    const con=[],sin=[],viejas=[];
+    for(const e of ents){const h=await hojaGet(e.expediente);const nm=(pats[e.expediente]&&pats[e.expediente].nombre)||e.expediente;
+      if(h){con.push({e,h,nm});if(diasDesde(h.at)>=1)viejas.push(nm+' (hace '+diasDesde(h.at)+' d)')}else sin.push(nm)}
+    if(!con.length){cerrar();toast('Ningún paciente del turno tiene hoja cargada');return}
+    let msg='';if(sin.length)msg+='Sin hoja: '+sin.join(', ')+'.\n';if(viejas.length)msg+='Hojas de días anteriores: '+viejas.join(', ')+'.\n';
+    if(msg&&!confirm(msg+'\n¿Imprimir las '+con.length+' hojas que sí hay?')){cerrar();return}
+    const L=await loadPdfLib();const out=await L.PDFDocument.create();
+    for(const {h} of con){const src=await L.PDFDocument.load(new Uint8Array(h.buf),{ignoreEncryption:true});(await out.copyPages(src,src.getPageIndices())).forEach(pg=>out.addPage(pg))}
+    const bytes=await out.save();const name='hojas_T'+S.turno+'_'+S.fecha+'.pdf';
+    const url=URL.createObjectURL(new Blob([bytes],{type:'application/pdf'}));
+    if(win){win.location=url}else{await rxShare(bytes,name)}
+    toast(con.length+' hojas listas · Ctrl+P para imprimir');
+  }catch(err){cerrar();logErr('hojas',err);alert('No se pudieron unir las hojas: '+(err&&err.message||err))}}
+async function hjInfo(){
+  const el=$('#hj-info');if(!el)return;const a=await hojasAll();
+  el.textContent=a.length?`${a.length} hoja(s) guardadas · la más antigua: ${fmtFecha(new Date(Math.min(...a.map(x=>x.at))).toISOString().slice(0,10))}`:'Aún no hay hojas guardadas.'}
 const rxPage=h=>`<div class="rxp">${h}</div>`;
 function rxPrint(pagesHtml,done){
   $('#rx-page').innerHTML=pagesHtml;document.body.classList.add('prx');
@@ -591,6 +632,7 @@ async function render(){
   if(S.view==='hoy')await renderHoy();else if(S.view==='pend')await renderPend();else if(S.view==='calc')renderCalc();else if(S.view==='archivo')await renderArchivo();else await renderResp();
   document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',b.dataset.v===S.view));
   sKeepRestore();
+  if($('#hj-info'))hjInfo().catch(()=>{});
   try{
     const pats=await all('patients');const n=pats.reduce((s,p)=>s+pAct(p).length,0);
     const b=$('nav button[data-v=pend]');let em=$('em',b);
@@ -605,6 +647,8 @@ async function renderHoy(){
   const tabs=TURNOS.map(t=>{const es=ents.filter(e=>e.turno===t);const np=es.filter(e=>!e.nota).length;
     return `<button class="tab ${t===S.turno?'on':''}" data-t="${t}">T${t}${es.length?`<i class="${np?'w':'k'}">${np||'✓'}</i>`:''}</button>`}).join('');
   const list=ents.filter(e=>e.turno===S.turno).sort(cmpSillon);
+  const hjK=await hojaKeys();const nHoja=list.filter(e=>!e.temp&&hjK.has(hojaKey(e.expediente))).length;
+  const hojasBtn=hjK.size&&list.length?`<div style="margin:8px 0"><button class="btn sec" data-hojasp style="width:100%">🖨 Imprimir hojas del turno <small>(${nHoja} de ${list.length} con hoja)</small></button></div>`:'';
   const cards=list.map(e=>{
     const pe=P[e.expediente];const open=pe?pAct(pe).length:0;
     return `<div class="card ${e.id===S.sel?'sel':''}" data-id="${e.id}">
@@ -625,7 +669,7 @@ async function renderHoy(){
       <div class="sbar"><input id="s-q" type="search" placeholder="Buscar paciente (atajo: / o Ctrl+K)" autocomplete="off" autocorrect="off" enterkeyhint="search" value="${esc(S.q||'')}"><div id="s-res" class="sres"></div></div></div>
     ${lsGet('safe')==='1'?'<div class="banner"><div>Modo seguro: la app se cerró sola al iniciar la última vez. La sincronización y la limpieza de fotos están en pausa. <button type="button" class="mini" data-resume style="margin-top:6px">Reanudar</button></div></div>':''}
     ${showBanner?`<div class="banner"><div>Para que iOS no borre tus datos, instala la app: botón Compartir → <b>Agregar a pantalla de inicio</b>, y úsala siempre desde ese ícono.</div><button data-bn>×</button></div>`:''}
-    ${esHoy?secHoy(pats):''}${secLabs(pats)}
+    ${esHoy?secHoy(pats):''}${secLabs(pats)}${hojasBtn}
     ${cards||`<div class="empty">Sin pacientes en el turno ${S.turno}.<br><button class="btn" data-loadprev style="margin-top:10px">Cargar desde la sesión anterior</button></div>`}
     <button class="addend" data-add>＋ Agregar paciente</button>`;
   if(S.q)drawSearch().catch(()=>{});
@@ -697,6 +741,11 @@ async function renderResp(){
     <label class="tg ${subjOn()?'on':''}" style="display:inline-block"><input type="checkbox" id="sj-on" ${subjOn()?'checked':''}> Usar el machote por defecto</label>
     <textarea id="sj-tx" rows="4">${esc(subjTxt())}</textarea>
     <button class="btn sec" id="sj-def">Restaurar texto original</button></div>
+  <div class="box"><h3>Hojas PDF (HemoHL7)</h3>
+    <p>Guarda aquí las hojas de monitoreo en PDF de tus pacientes (solo en este dispositivo). En Pase aparecerá <b>Imprimir hojas del turno</b> y las une en un solo PDF. El archivo debe llevar el expediente en el nombre, por ejemplo <code>RL0304.pdf</code>. Cargar otra hoja del mismo paciente reemplaza la anterior; tú las mantienes al día.</p>
+    <input type="file" id="hj-files" accept="application/pdf,.pdf" multiple hidden>
+    <button class="btn sec" id="hj-pick">Cargar PDFs…</button> <button class="btn sec" id="hj-clear">Borrar todas</button>
+    <p class="mu" id="hj-info"></p><div id="hj-res" class="mu"></div></div>
   <div class="box"><h3>Prefijo del expediente</h3>
     <p>Para pegar el expediente en el sistema de la clínica. En pantalla ves el número (por ejemplo 1234) y el botón <b>Copiar</b> copia el prefijo más el número (RL1234 o LE1234).</p>
     <div class="tags"><button class="tg ${expPref()==='RL'?'on':''}" data-px="RL">RL</button><button class="tg ${expPref()==='LE'?'on':''}" data-px="LE">LE</button><button class="tg ${expPref()===''?'on':''}" data-px="">Sin prefijo</button></div>
@@ -967,6 +1016,7 @@ async function openEntry(id){
     <div class="sp" data-pn="pase">
     <div class="evtop"><div class="tags" id="e-tags"></div></div>
     <div class="row"><div><label>Sillón</label><input id="e-sil" inputmode="numeric" value="${esc(e.sillon)}"></div><div style="display:flex;align-items:end"><button type="button" class="btn sec" id="e-cal">Calculadora</button> <button type="button" class="btn sec" id="e-rx" style="margin-left:6px">🖨 Receta</button> <button type="button" class="btn sec" id="e-lab" style="margin-left:6px">🧪 Labs</button></div></div>
+      <div id="e-hoja" style="margin:6px 0"></div><input type="file" id="e-hoja-f" accept="application/pdf,.pdf" hidden>
     <div class="box ncp"><b>Nota completa</b>
       <div class="ncp-b"><button type="button" class="cp" id="nc-quick2">Copiar nota</button><button type="button" class="cp2" id="nc-open2">Abrir en ventana grande</button><button type="button" class="cp2" id="nc-sig2">Signos y pesos</button></div></div>
     <div class="box" style="margin:7px 0;padding:9px">
@@ -1235,6 +1285,14 @@ async function openEntry(id){
       S.keepTab=true;await closeSheet(true);await openEntry(e.id);toast('Expediente asignado');
     }catch(err){logErr('asignar expediente',err);toast('No se pudo asignar')}
   };
+  const drawHoja=async()=>{const el=q('#e-hoja');if(!el)return;const h=e.temp?null:await hojaGet(e.expediente);
+    el.innerHTML=e.temp?'':h?`📄 Hoja PDF guardada (${fmtFecha(new Date(h.at).toISOString().slice(0,10))}${diasDesde(h.at)>=1?' · de hace '+diasDesde(h.at)+' d':''}) <button type="button" class="cp2" data-hv>Ver</button> <button type="button" class="cp2" data-hr>Reemplazar</button> <button type="button" class="cp2" data-hx>Quitar</button>`:`<button type="button" class="cp2" data-hr>📄 Cargar hoja PDF</button>`};
+  drawHoja().catch(()=>{});
+  q('#e-hoja').onclick=async ev=>{const b=ev.target.closest('button');if(!b)return;
+    if(b.hasAttribute('data-hr')){q('#e-hoja-f').click();return}
+    if(b.hasAttribute('data-hx')){await hojaDel(e.expediente);drawHoja();render().catch(()=>{});return}
+    if(b.hasAttribute('data-hv')){const h=await hojaGet(e.expediente);if(!h)return;const w=window.open('','_blank');const u=URL.createObjectURL(new Blob([h.buf],{type:'application/pdf'}));if(w)w.location=u;else location.href=u}};
+  q('#e-hoja-f').onchange=async ev=>{const f=ev.target.files&&ev.target.files[0];ev.target.value='';if(!f)return;await hojaSet(e.expediente,f);toast('Hoja guardada');drawHoja();render().catch(()=>{})};
   q('#e-lab').onclick=()=>{const labMark=()=>pAct(pat).find(x=>x.tipo==='labs');
     openLabs((q('#e-nom').value||pat.nombre||'').trim(),e.expediente,{marked:labMark,
       mark:async d=>{await mutPat(p=>{const it=p.pendientes.find(x=>!x.hecho&&!x.del&&x.tipo==='labs');if(it){it.datos=d;it.texto=labResumen(d);it.updatedAt=now()}else p.pendientes.push({id:uid(),texto:labResumen(d),tipo:'labs',datos:d,hecho:false,creado:now(),updatedAt:now(),vence:null})});sv(true);drawPend();refreshList()},
@@ -1652,6 +1710,9 @@ document.addEventListener('click',async ev=>{
     if(live&&live.e.id===nt.dataset.nota){live.e.nota=!live.e.nota;live.drawNota();await live.flush().catch(()=>{});render();return}
     const e=await get('entries',nt.dataset.nota);e.nota=!e.nota;e.updatedAt=now();await put('entries',e);render();return}
   const lbp=t.closest('[data-labp]');if(lbp){await labsPrint(lbp.dataset.labp);return}
+  if(t.closest('[data-hojasp]')){hojasPrint();return}
+  if(t.id==='hj-pick'){$('#hj-files').click();return}
+  if(t.id==='hj-clear'){if(confirm('¿Borrar todas las hojas PDF guardadas en este dispositivo?')){for(const m of await hojasAll())await del('meta',m.k);hjInfo();render().catch(()=>{});toast('Hojas borradas')}return}
   const lbd=t.closest('[data-labpdf]');if(lbd){await labsPrint(lbd.dataset.labpdf,true);return}
   const lbx=t.closest('[data-labx]');
   if(lbx){const [ex,id]=lbx.dataset.labx.split('|');const p=await get('patients',ex);const x=p&&p.pendientes.find(z=>z.id===id);if(x){x.del=true;x.updatedAt=now();p.updatedAt=now();await put('patients',p);await render()}return}
@@ -1725,7 +1786,8 @@ document.addEventListener('change',async ev=>{
     try{const r=await importar(f);toast(`Importado: ${r.a} pacientes, ${r.b} registros`);render()}catch(err){logErr('importar',err);alert('No se pudo importar: '+err.message)}}
 });
 
-document.addEventListener('change',ev=>{if(ev.target&&ev.target.id==='sj-on')lsSet('subjOn',ev.target.checked?'1':'0')});
+document.addEventListener('change',async ev=>{if(ev.target&&ev.target.id==='hj-files'){const fl=[...ev.target.files];ev.target.value='';try{const r=await cargarHojas(fl);const el=$('#hj-res');if(el)el.innerHTML=(r.ok.length?'✓ '+r.ok.length+' cargada(s): '+esc(r.ok.join(', '))+'.':'')+(r.sin.length?'<br>⚠ Sin coincidencia de expediente (no se guardaron): '+esc(r.sin.join(', '))+'.':'');hjInfo();toast('Hojas cargadas: '+r.ok.length)}catch(err){logErr('hojas',err);alert('No se pudieron guardar: '+err.message)}return}
+  if(ev.target&&ev.target.id==='sj-on')lsSet('subjOn',ev.target.checked?'1':'0')});
 document.addEventListener('click',ev=>{if(ev.target&&ev.target.id==='sj-def'){lsSet('subjTxt','');const t=$('#sj-tx');if(t)t.value=SUBJ_DEF}});
 document.addEventListener('input',ev=>{if(ev.target&&ev.target.id==='sj-tx')lsSet('subjTxt',ev.target.value);if(ev.target&&ev.target.id==='px-in'){const v=ev.target.value.trim().toUpperCase().replace(/[^A-Z0-9]/g,'');lsSet('expPrefix',v);const j=$('#px-ej');if(j)j.textContent='Ejemplo: '+v+'1234'}if(ev.target&&ev.target.id==='s-q'){clearTimeout(drawSearch.t);drawSearch.t=setTimeout(()=>drawSearch().catch(err=>logErr('buscar',err)),120)}});
 
