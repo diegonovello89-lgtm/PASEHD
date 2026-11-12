@@ -283,14 +283,14 @@ details{margin-top:12px}summary{padding:6px 0;color:var(--mu);font-weight:600}
  <div class="g"><div><label>F. cardiaca</label><input data-vk="fc" inputmode="numeric" autocomplete="off"></div><div><label>T/A sist.</label><input data-vk="tas" inputmode="numeric" autocomplete="off"></div><div><label>T/A diast.</label><input data-vk="tad" inputmode="numeric" autocomplete="off"></div></div>
  <div class="g"><div><label>F. respiratoria</label><input data-vk="fr" inputmode="numeric" autocomplete="off"></div><div><label>Temperatura</label><input data-vk="tp" inputmode="decimal" autocomplete="off"></div><div><label>Saturación O2</label><input data-vk="sp" inputmode="numeric" autocomplete="off"></div></div>
  <h4>Ultrafiltración (mL)</h4>
- <div class="g"><div><label>Programada</label><input data-vk="ufp" inputmode="numeric" autocomplete="off"></div><div><label>Tolerada</label><input data-vk="uft" inputmode="numeric" autocomplete="off" placeholder="igual"></div><div></div></div>
+ <div class="g"><div><label>Programada</label><input data-vk="ufp" inputmode="numeric" autocomplete="off" placeholder="0"></div><div><label>Tolerada</label><input data-vk="uft" inputmode="numeric" autocomplete="off" placeholder="igual"></div><div></div></div>
  <h4>Copiar <span><button type="button" class="cp" data-vcp="svpe">Signos y pesos</button> <button type="button" class="cp" data-vcp="uf">UF</button></span></h4>
 </div></div></div>
 <div id="toast"></div>
 
 <script>
 'use strict';
-const VERSION='11.32';
+const VERSION='11.33';
 const TURNOS=[1,2,3,4,5];
 const DIAS_FOTO=7;
 const ACCESOS=['FAV','Injerto','Catéter tunelizado','Catéter temporal'];
@@ -1015,7 +1015,7 @@ async function openEntry(id){
             <div class="row3"><div><label for="nr-fr">FR</label><input id="nr-fr" inputmode="numeric" autocomplete="off"></div><div><label for="nr-tp">Temp °C</label><input id="nr-tp" inputmode="decimal" autocomplete="off"></div><div><label for="nr-sp">SpO2 %</label><input id="nr-sp" inputmode="numeric" autocomplete="off"></div></div>
             <div class="pv" id="nr-svtxt"></div></div>
           <div class="blk"><div class="bh"><b>UF programada y tolerada</b><button type="button" class="cp" data-cp="uf" data-lbl="UF">Copiar</button></div>
-            <div class="row" style="margin-top:6px"><div><label for="nr-ufp">Programada (mL)</label><input id="nr-ufp" inputmode="numeric" autocomplete="off"></div><div><label for="nr-uft">Tolerada (mL)</label><input id="nr-uft" inputmode="numeric" autocomplete="off" placeholder="igual si queda vacío"></div></div>
+            <div class="row" style="margin-top:6px"><div><label for="nr-ufp">Programada (mL)</label><input id="nr-ufp" inputmode="numeric" autocomplete="off" placeholder="0"></div><div><label for="nr-uft">Tolerada (mL)</label><input id="nr-uft" inputmode="numeric" autocomplete="off" placeholder="igual si queda vacío"></div></div>
             <div class="pv" id="nr-uftxt"></div>
             <div style="margin-top:6px"><button type="button" class="cp2" data-cp="uf2" data-lbl="UF corta">Copiar solo "tolera UF … ml"</button></div></div>
         </div>
@@ -1048,8 +1048,8 @@ async function openEntry(id){
   const ganTxt=()=>val('#nr-gan');
   const svTxt=()=>`Signos vitales: FC: ${val('#nr-fc')||'__'} lpm FR: ${val('#nr-fr')||'__'} rpm TA: ${val('#nr-tas')||'__'}/${val('#nr-tad')||'__'}mmHg SpO2 ${val('#nr-sp')||'__'}% Temp ${val('#nr-tp')||'__'}°C`;
   const peTxt=()=>`Peso seco: ${val('#nr-seco')||'__'}kg Peso al ingreso: ${val('#nr-ing')||'__'}kg Ganancia interdialítica: ${ganTxt()||'__'}kg`;
-  const ufT=()=>val('#nr-uft')||val('#nr-ufp')||'__';
-  const ufTxt=()=>`Paciente en sesión de hemodiálisis con UF programada de ${val('#nr-ufp')||'__'} mL y UF tolerada de ${ufT()} mL.`;
+  const ufT=()=>val('#nr-uft')||val('#nr-ufp')||'0';
+  const ufTxt=()=>`Paciente en sesión de hemodiálisis con UF programada de ${val('#nr-ufp')||'0'} mL y UF tolerada de ${ufT()} mL.`;
   const uf2Txt=()=>`tolera UF ${ufT()} ml`;
   const NRIN={'#nr-sala':'sala','#nr-fc':'fc','#nr-fr':'fr','#nr-sp':'sp','#nr-tas':'tas','#nr-tad':'tad','#nr-tp':'tp','#nr-seco':'seco','#nr-ing':'ing','#nr-gan':'gan','#nr-ufp':'ufp','#nr-uft':'uft'};
   const fillNR=()=>{for(const [id,k] of Object.entries(NRIN))q(id).value=nr[k]||''};
@@ -1073,7 +1073,7 @@ async function openEntry(id){
   const genAuto=(kind,tx)=>{
     if(kind==='fecha'){let ch=false;const r=tx.replace(/\d{1,2}\/\d{1,2}\/\d{2,4}/,()=>{ch=true;return fechaTxt()}).replace(/(SALA\s+)\S+/i,(m,a)=>{ch=true;return a+(val('#nr-sala')||'__')}).replace(/(TURNO\s+)\S+/i,(m,a)=>{ch=true;return a+e.turno});return ch?r:encTxt()}
     if(kind==='signos')return svTxt()+(/\n/.test(tx)?'\n':' ')+peTxt();
-    if(kind==='uf'){if(!/UF programada/i.test(tx))return ufTxt();return tx.replace(/(UF programada de\s+)[\d.,_]+/i,(m,a)=>a+(val('#nr-ufp')||'__')).replace(/(UF tolerada de\s+)[\d.,_]+/i,(m,a)=>a+ufT())}
+    if(kind==='uf'){if(!/UF programada/i.test(tx))return ufTxt();return tx.replace(/(UF programada de\s+)[\d.,_]+/i,(m,a)=>a+(val('#nr-ufp')||'0')).replace(/(UF tolerada de\s+)[\d.,_]+/i,(m,a)=>a+ufT())}
     return tx};
   const esSubj=p=>!NCA(p.label)&&fold(p.label).includes('subjetivo');
   const ncDef=p=>esSubj(p)&&subjOn()?subjTxt():p.text;
@@ -1165,13 +1165,12 @@ async function openEntry(id){
   $('#ncm-x').onclick=ncCloseM;
   ncBody.addEventListener('input',grow);
   renderNC();
-  // peso seco, UF programada y sala se arrastran de la sesión anterior del mismo paciente (si aún no hay valor)
+  // el peso seco se arrastra de la sesión anterior del mismo paciente (si aún no hay valor)
   (async()=>{try{
     const prev=(await all('entries')).filter(x=>!x.deleted&&x.nr&&x.expediente===e.expediente&&x.id!==e.id&&((x.fecha||'')<(e.fecha||'')||((x.fecha||'')===(e.fecha||'')&&(x.creado||0)<(e.creado||0))))
       .sort((a,b)=>(b.fecha||'').localeCompare(a.fecha||'')||(b.creado||0)-(a.creado||0))[0];
     if(!prev||sheetEl!==sh)return;
     if(!q('#nr-seco').value&&prev.nr.seco)q('#nr-seco').value=prev.nr.seco;
-    if(!q('#nr-ufp').value&&prev.nr.ufp)q('#nr-ufp').value=prev.nr.ufp;
     drawNR();
   }catch(err){logErr('nota previa',err)}})();
   const freshPat=async()=>(await get('patients',e.expediente))||{expediente:e.expediente,nombre:'',pendientes:[],updatedAt:0,pu:0};
