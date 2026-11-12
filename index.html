@@ -290,7 +290,7 @@ details{margin-top:12px}summary{padding:6px 0;color:var(--mu);font-weight:600}
 
 <script>
 'use strict';
-const VERSION='11.31';
+const VERSION='11.32';
 const TURNOS=[1,2,3,4,5];
 const DIAS_FOTO=7;
 const ACCESOS=['FAV','Injerto','Catéter tunelizado','Catéter temporal'];
@@ -572,12 +572,25 @@ const sillonNum=e=>{const n=parseInt(e.sillon,10);return isNaN(n)?9999:n};
 const cmpSillon=(a,b)=>sillonNum(a)-sillonNum(b)||(a.creado||0)-(b.creado||0);
 
 /* ---------- Render principal ---------- */
+let sKeep=null;
+// Si la barra de búsqueda tenía el cursor y un refresco automático la reconstruye (sincronización, autoguardado, cierre de hoja), se le devuelve el cursor y lo escrito.
+document.addEventListener('focusin',ev=>{if(ev.target&&ev.target.id!=='s-q')sKeep=null});
+function sKeepSave(){const a=document.activeElement;if(a&&a.id==='s-q')sKeep={v:a.value,s:a.selectionStart,e:a.selectionEnd,t:Date.now()}}
+function sKeepRestore(){
+  if(!sKeep||Date.now()-sKeep.t>2000)return;
+  const i=$('#s-q');if(!i||document.activeElement===i)return;
+  const a=document.activeElement;if(a&&a!==document.body&&/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName))return;
+  i.value=sKeep.v;S.q=sKeep.v.trim();i.focus();try{i.setSelectionRange(sKeep.s,sKeep.e)}catch(e){}
+  if(S.q)drawSearch().catch(()=>{})}
+document.addEventListener('input',ev=>{if(ev.target&&ev.target.id==='s-q')sKeepSave()});
 async function render(){
   if(!db)return;
+  sKeepSave();
   sCache.t=0;
   $('#cols').dataset.v=S.view;
   if(S.view==='hoy')await renderHoy();else if(S.view==='pend')await renderPend();else if(S.view==='calc')renderCalc();else if(S.view==='archivo')await renderArchivo();else await renderResp();
   document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',b.dataset.v===S.view));
+  sKeepRestore();
   try{
     const pats=await all('patients');const n=pats.reduce((s,p)=>s+pAct(p).length,0);
     const b=$('nav button[data-v=pend]');let em=$('em',b);
@@ -1528,13 +1541,13 @@ document.addEventListener('pointerup',ev=>{
 async function focusSearch(){
   if(sheetEl&&!sheetDocked)return;
   if(S.view!=='hoy'){if(sheetEl)closeSheet(true);S.view='hoy';await render()}
-  const i=$('#s-q');if(!i)return;i.focus();i.select();window.scrollTo(0,0)}
+  const i=$('#s-q');if(!i)return;i.focus();i.select();sKeepSave();window.scrollTo(0,0)}
 document.addEventListener('keydown',ev=>{
   const tg=ev.target,typing=tg&&(/^(INPUT|TEXTAREA|SELECT)$/.test(tg.tagName)||tg.isContentEditable);
   if(((ev.ctrlKey||ev.metaKey)&&!ev.altKey&&(ev.key||'').toLowerCase()==='k')||(ev.key==='/'&&!typing&&!ev.ctrlKey&&!ev.metaKey&&!ev.altKey)){
     ev.preventDefault();focusSearch().catch(err=>logErr('atajo',err));return}
   if(ev.target&&ev.target.id==='s-q'){
-    if(ev.key==='Escape'){clearSearch();ev.target.blur();return}
+    if(ev.key==='Escape'){sKeep=null;clearSearch();ev.target.blur();return}
     if(ev.key==='Enter'){ev.preventDefault();const f=$('#s-res [data-sexp]');if(f)pickPatient(f.dataset.sexp).catch(err=>logErr('buscar',err));else{const n=$('#s-res [data-snew]');if(n)n.click()}return}
   }
   if(calcFromKeyboard(ev))return;
