@@ -290,7 +290,7 @@ details{margin-top:12px}summary{padding:6px 0;color:var(--mu);font-weight:600}
 
 <script>
 'use strict';
-const VERSION='11.34';
+const VERSION='11.36';
 const TURNOS=[1,2,3,4,5];
 const DIAS_FOTO=7;
 const ACCESOS=['FAV','Injerto','Catéter tunelizado','Catéter temporal'];
@@ -416,10 +416,13 @@ function labOps(nombre,d){
 // ---- Hojas PDF de HemoHL7 (solo en este dispositivo; no se sincronizan). Se guardan en la tabla meta con la clave hoja:<expediente>
 const hojaKey=x=>'hoja:'+x;
 const hojaGet=x=>get('meta',hojaKey(x));
-const hojaSet=async(x,file)=>put('meta',{k:hojaKey(x),buf:await blobBuf(file),name:file.name||'',size:file.size||0,at:now()},{nosync:true});   // se guarda como ArrayBuffer (más seguro que Blob en IndexedDB de iOS)
-const hojaDel=x=>del('meta',hojaKey(x));
+const hojaIdx=async()=>(await get('meta','hojas-at'))||{k:'hojas-at',v:{}};
+const hojaIdxSet=async(x,at)=>{const ix=await hojaIdx();if(at)ix.v[x]=at;else delete ix.v[x];await put('meta',ix,{nosync:true})};
+const hojaSet=async(x,file)=>{const at=now();await put('meta',{k:hojaKey(x),buf:await blobBuf(file),name:file.name||'',size:file.size||0,at},{nosync:true});await hojaIdxSet(x,at)};   // se guarda como ArrayBuffer (más seguro que Blob en IndexedDB de iOS)
+const hojaDel=async x=>{await del('meta',hojaKey(x));await hojaIdxSet(x,0)};
 const hojaKeys=async()=>new Set(await rq(store('meta').getAllKeys(IDBKeyRange.bound('hoja:','hoja:￿'))));
 const hojasAll=async()=>(await all('meta')).filter(m=>m&&typeof m.k==='string'&&m.k.startsWith('hoja:'));
+const hojaIdxFull=async keys=>{let ix=await get('meta','hojas-at');if(ix&&keys.size===Object.keys(ix.v).length)return ix.v;ix={k:'hojas-at',v:{}};for(const m of await hojasAll())ix.v[m.k.slice(5)]=m.at||0;await put('meta',ix,{nosync:true});return ix.v};
 const nz=s=>String(s||'').replace(/\D/g,'').replace(/^0+/,'');
 const hojaMatch=(fname,pats)=>{const runs=(String(fname).replace(/\.pdf$/i,'').match(/\d+/g)||[]).filter(r=>r.length>=3);
   for(const p of pats){const pe=nz(p.expediente);if(pe&&runs.some(r=>nz(r)===pe))return p}return null};
@@ -433,24 +436,29 @@ async function cargarHojas(files){
     await hojaSet(p.expediente,f);okN.push((p.nombre||p.expediente))}
   return {ok:okN,sin}}
 async function hojasPrint(){
-  const win=window.open('','_blank');   // se abre ya, mientras vale el clic; se llena al terminar
+  if(hojasPrint.busy){toast('Ya se están uniendo las hojas…');return}
+  hojasPrint.busy=true;
+  // la pestaña se abre ya (mientras vale el clic) con un aviso de progreso; si el navegador la bloquea se usa descarga/compartir
+  let win=null;try{win=window.open('','_blank');if(win)win.document.write('<title>Hojas del turno</title><body style="font:18px sans-serif;padding:24px">Uniendo hojas del turno…</body>')}catch(e){win=null}
   const cerrar=()=>{try{win&&win.close()}catch(e){}};
+  toast('Uniendo hojas del turno…',15000);
   try{
     const ents=(await byDate(S.fecha)).filter(e=>e.turno===S.turno&&!e.temp).sort(cmpSillon);
     const pats=Object.fromEntries((await all('patients')).map(p=>[p.expediente,p]));
-    const con=[],sin=[],viejas=[];
+    const con=[],sin=[];
     for(const e of ents){const h=await hojaGet(e.expediente);const nm=(pats[e.expediente]&&pats[e.expediente].nombre)||e.expediente;
-      if(h){con.push({e,h,nm});if(diasDesde(h.at)>=1)viejas.push(nm+' (hace '+diasDesde(h.at)+' d)')}else sin.push(nm)}
-    if(!con.length){cerrar();toast('Ningún paciente del turno tiene hoja cargada');return}
-    let msg='';if(sin.length)msg+='Sin hoja: '+sin.join(', ')+'.\n';if(viejas.length)msg+='Hojas de días anteriores: '+viejas.join(', ')+'.\n';
-    if(msg&&!confirm(msg+'\n¿Imprimir las '+con.length+' hojas que sí hay?')){cerrar();return}
+      if(h){con.push({e,h,nm})}else sin.push(nm)}
+    if(!con.length){cerrar();toast('Ningún paciente del turno tiene hoja cargada',4000);return}
     const L=await loadPdfLib();const out=await L.PDFDocument.create();
     for(const {h} of con){const src=await L.PDFDocument.load(new Uint8Array(h.buf),{ignoreEncryption:true});(await out.copyPages(src,src.getPageIndices())).forEach(pg=>out.addPage(pg))}
     const bytes=await out.save();const name='hojas_T'+S.turno+'_'+S.fecha+'.pdf';
     const url=URL.createObjectURL(new Blob([bytes],{type:'application/pdf'}));
-    if(win){win.location=url}else{await rxShare(bytes,name)}
-    toast(con.length+' hojas listas · Ctrl+P para imprimir');
-  }catch(err){cerrar();logErr('hojas',err);alert('No se pudieron unir las hojas: '+(err&&err.message||err))}}
+    if(win&&!win.closed){win.location=url}else{await rxShare(bytes,name)}
+    let m=con.length+' hojas listas · Ctrl+P para imprimir';
+    if(sin.length)m+=' · Sin hoja: '+sin.slice(0,4).join(', ')+(sin.length>4?' y '+(sin.length-4)+' más':'');
+    toast(m,9000);
+  }catch(err){cerrar();logErr('hojas',err);toast('No se pudieron unir las hojas: '+(err&&err.message||err),9000)}
+  finally{hojasPrint.busy=false}}
 async function hjInfo(){
   const el=$('#hj-info');if(!el)return;const a=await hojasAll();
   el.textContent=a.length?`${a.length} hoja(s) guardadas · la más antigua: ${fmtFecha(new Date(Math.min(...a.map(x=>x.at))).toISOString().slice(0,10))}`:'Aún no hay hojas guardadas.'}
@@ -509,8 +517,8 @@ function openLabs(nombre,exp,api){
   box.oninput=onChange;box.onchange=onChange;
   $('#lb-mark').onclick=async()=>{if(!api)return;try{await api.mark(cur());persist();toast('Marcado para imprimir');refresh()}catch(e){logErr('labs',e)}};
   $('#lb-unmark').onclick=async()=>{if(!api)return;try{await api.unmark();toast('Marca quitada');refresh()}catch(e){logErr('labs',e)}};
-  $('#rx-print').onclick=()=>{persist();rxPrint(rxPage(labHTML($('#lb-nom').value,cur())),async()=>{const m=api&&api.marked&&api.marked();if(m&&confirm('¿Ya la imprimiste? Se quita de "Labs por imprimir".')){await api.resolve();refresh()}})};
-  $('#rx-pdf').onclick=async()=>{persist();const ok=await rxShare(pdfBuild([labOps($('#lb-nom').value,cur())]),'labs_'+pdfSan($('#lb-nom').value)+'.pdf');const m=api&&api.marked&&api.marked();if(ok&&m&&confirm('¿Ya la mandaste/imprimiste? Se quita de "Labs por imprimir".')){await api.resolve();refresh()}};
+  $('#rx-print').onclick=()=>{persist();rxPrint(rxPage(labHTML($('#lb-nom').value,cur())),async()=>{const m=api&&api.marked&&api.marked();if(m&&await askUI('¿Ya la imprimiste? Se quita de "Labs por imprimir".')){await api.resolve();refresh()}})};
+  $('#rx-pdf').onclick=async()=>{persist();const ok=await rxShare(pdfBuild([labOps($('#lb-nom').value,cur())]),'labs_'+pdfSan($('#lb-nom').value)+'.pdf');const m=api&&api.marked&&api.marked();if(ok&&m&&await askUI('¿Ya la mandaste/imprimiste? Se quita de "Labs por imprimir".')){await api.resolve();refresh()}};
   $('#rx-x').onclick=()=>{$('#rxm').classList.remove('on')};
   $('#rxm').classList.add('on');refresh();prev();
 }
@@ -522,7 +530,7 @@ async function labsPrint(which,asPdf){
   if(which!=='*'){const [ex,id]=which.split('|');L=L.filter(z=>z.p.expediente===ex&&z.x.id===id)}
   if(!L.length)return;
   const finish=async()=>{
-    if(!confirm(L.length===1?'¿Ya la imprimiste? Se quita de "Labs por imprimir".':`¿Ya imprimiste las ${L.length} solicitudes? Se quitan de "Labs por imprimir".`))return;
+    if(!(await askUI(L.length===1?'¿Ya la imprimiste? Se quita de "Labs por imprimir".':`¿Ya imprimiste las ${L.length} solicitudes? Se quitan de "Labs por imprimir".`)))return;
     for(const {p,x} of L){const q=await get('patients',p.expediente);const it=q&&q.pendientes.find(z=>z.id===x.id);if(it){it.hecho=true;it.hechoEn=now();it.updatedAt=now();q.updatedAt=now();await put('patients',q)}}
     await render();toast('Listo')};
   if(asPdf){const ok=await rxShare(pdfBuild(L.map(({p,x})=>labOps(p.nombre,labDef(p.expediente,x.datos)))),L.length===1?'labs_'+pdfSan(L[0].p.nombre)+'.pdf':'labs_'+L.length+'_pacientes.pdf');if(ok)await finish();return}
@@ -608,7 +616,11 @@ const isIOS=/iphone|ipad|ipod/i.test(navigator.userAgent);
 const standalone=window.navigator.standalone===true||matchMedia('(display-mode: standalone)').matches;
 const isWide=()=>{try{return matchMedia('(min-width:900px)').matches}catch(e){return false}};
 
-function toast(m){const t=$('#toast');t.textContent=m;t.style.display='block';clearTimeout(toast.t);toast.t=setTimeout(()=>t.style.display='none',2200)}
+function toast(m,ms){const t=$('#toast');t.textContent=m;t.style.display='block';clearTimeout(toast.t);toast.t=setTimeout(()=>t.style.display='none',ms||2200)}
+// Confirmación dentro de la app (los cuadros nativos confirm()/alert() de Chrome pueden quedar bloqueados o suprimidos y la acción parece trabarse)
+function askUI(msg,okTxt,noTxt){return new Promise(res=>{const o=document.createElement('div');o.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:80;display:flex;align-items:center;justify-content:center;padding:20px';
+  o.innerHTML=`<div style="background:var(--bg,#fff);color:var(--tx,#111);border-radius:14px;padding:18px;max-width:440px;width:100%;font-size:16px;line-height:1.4"><div style="white-space:pre-wrap">${esc(msg)}</div><div style="display:flex;gap:8px;margin-top:14px;justify-content:flex-end"><button type="button" class="btn sec" data-a="0">${esc(noTxt||'No')}</button><button type="button" class="btn" data-a="1">${esc(okTxt||'Sí')}</button></div></div>`;
+  o.onclick=ev=>{const b=ev.target.closest('[data-a]');if(!b)return;o.remove();res(b.dataset.a==='1')};document.body.appendChild(o)})}
 const sillonNum=e=>{const n=parseInt(e.sillon,10);return isNaN(n)?9999:n};
 const cmpSillon=(a,b)=>sillonNum(a)-sillonNum(b)||(a.creado||0)-(b.creado||0);
 
@@ -1286,7 +1298,7 @@ async function openEntry(id){
     }catch(err){logErr('asignar expediente',err);toast('No se pudo asignar')}
   };
   const drawHoja=async()=>{const el=q('#e-hoja');if(!el)return;const h=e.temp?null:await hojaGet(e.expediente);
-    el.innerHTML=e.temp?'':h?`📄 Hoja PDF guardada (${fmtFecha(new Date(h.at).toISOString().slice(0,10))}${diasDesde(h.at)>=1?' · de hace '+diasDesde(h.at)+' d':''}) <button type="button" class="cp2" data-hv>Ver</button> <button type="button" class="cp2" data-hr>Reemplazar</button> <button type="button" class="cp2" data-hx>Quitar</button>`:`<button type="button" class="cp2" data-hr>📄 Cargar hoja PDF</button>`};
+    el.innerHTML=e.temp?'':h?`📄 Hoja PDF guardada (${fmtFecha(new Date(h.at).toISOString().slice(0,10))}) <button type="button" class="cp2" data-hv>Ver</button> <button type="button" class="cp2" data-hr>Reemplazar</button> <button type="button" class="cp2" data-hx>Quitar</button>`:`<button type="button" class="cp2" data-hr>📄 Cargar hoja PDF</button>`};
   drawHoja().catch(()=>{});
   q('#e-hoja').onclick=async ev=>{const b=ev.target.closest('button');if(!b)return;
     if(b.hasAttribute('data-hr')){q('#e-hoja-f').click();return}
@@ -1712,7 +1724,7 @@ document.addEventListener('click',async ev=>{
   const lbp=t.closest('[data-labp]');if(lbp){await labsPrint(lbp.dataset.labp);return}
   if(t.closest('[data-hojasp]')){hojasPrint();return}
   if(t.id==='hj-pick'){$('#hj-files').click();return}
-  if(t.id==='hj-clear'){if(confirm('¿Borrar todas las hojas PDF guardadas en este dispositivo?')){for(const m of await hojasAll())await del('meta',m.k);hjInfo();render().catch(()=>{});toast('Hojas borradas')}return}
+  if(t.id==='hj-clear'){if(await askUI('¿Borrar todas las hojas PDF guardadas en este dispositivo?','Borrar')){for(const m of await hojasAll())await del('meta',m.k);await put('meta',{k:'hojas-at',v:{}},{nosync:true});hjInfo();render().catch(()=>{});toast('Hojas borradas')}return}
   const lbd=t.closest('[data-labpdf]');if(lbd){await labsPrint(lbd.dataset.labpdf,true);return}
   const lbx=t.closest('[data-labx]');
   if(lbx){const [ex,id]=lbx.dataset.labx.split('|');const p=await get('patients',ex);const x=p&&p.pendientes.find(z=>z.id===id);if(x){x.del=true;x.updatedAt=now();p.updatedAt=now();await put('patients',p);await render()}return}
