@@ -290,7 +290,7 @@ details{margin-top:12px}summary{padding:6px 0;color:var(--mu);font-weight:600}
 
 <script>
 'use strict';
-const VERSION='11.36';
+const VERSION='11.37';
 const TURNOS=[1,2,3,4,5];
 const DIAS_FOTO=7;
 const ACCESOS=['FAV','Injerto','Catéter tunelizado','Catéter temporal'];
@@ -689,14 +689,19 @@ async function renderHoy(){
 
 async function renderPend(){
   const [pats,ents]=await Promise.all([all('patients'),byDate(todayStr())]);
-  const hoy=Object.fromEntries(ents.map(e=>[e.expediente,e]));
-  const gs=pats.map(p=>({p,o:pAct(p)})).filter(g=>g.o.length)
-    .sort((a,b)=>(!!hoy[b.p.expediente])-(!!hoy[a.p.expediente])||String(a.p.nombre).localeCompare(String(b.p.nombre)));
-  const total=gs.reduce((s,g)=>s+g.o.length,0);
-  $('#main').innerHTML=`<div class="top"><div class="datebar"><div class="d">Pendientes abiertos<small>${total} en ${gs.length} paciente${gs.length===1?'':'s'}</small></div></div></div>`+secHoy(pats)+secLabs(pats)+
-   (gs.map(g=>{const h=hoy[g.p.expediente];
-     return `<div class="pg"><div class="hd" ${h?`data-open="${h.id}"`:''}><div><div class="nm">${esc(g.p.nombre||'(sin nombre)')}</div><div class="ex">${esc(g.p.expediente)}</div></div>${h?`<span class="chip">hoy · T${h.turno}${h.sillon?' · S'+esc(h.sillon):''}</span>`:''}</div>
-     ${g.o.map(x=>`<div class="pr"><button class="ck" data-pt="${x.id}" data-pe="${esc(g.p.expediente)}"></button><span>${esc(x.texto)}</span>${x.vence?`<span class="chip ${x.vence<=todayStr()?'w':''}" style="flex:none">${esc(venceTxt(x))}</span>`:''}</div>`).join('')}</div>`}).join('')||`<div class="empty">No hay pendientes abiertos 🎉</div>`);
+  const hoyE=Object.fromEntries(ents.map(e=>[e.expediente,e]));
+  const hoyS=todayStr(),man=addDays(hoyS,1);
+  const items=[];for(const p of pats)for(const x of pAct(p))items.push({p,x});
+  const grupos=new Map();
+  const gk=x=>!x.vence?'~':x.vence<hoyS?'0':x.vence;          // '0' vencidos, fechas ISO, '~' sin fecha
+  for(const it of items){const k=gk(it.x);if(!grupos.has(k))grupos.set(k,[]);grupos.get(k).push(it)}
+  const keys=[...grupos.keys()].sort();
+  const titulo=k=>k==='0'?'Vencidos':k==='~'?'Sin fecha':k===hoyS?'Hoy · '+fmtFecha(k):k===man?'Mañana · '+fmtFecha(k):fmtFecha(k);
+  const fila=({p,x})=>{const h=hoyE[p.expediente];
+    return `<div class="pr"><button class="ck" data-pt="${x.id}" data-pe="${esc(p.expediente)}"></button><span ${h?`data-open="${h.id}"`:''}>${esc(x.texto)}<small class="mu" style="display:block">${esc(p.nombre||'(sin nombre)')} · ${esc(p.expediente)}${h?' · hoy T'+h.turno+(h.sillon?' S'+esc(h.sillon):''):''}</small></span>${x.vence&&x.vence<hoyS?`<span class="chip w" style="flex:none">${esc(venceTxt(x))}</span>`:''}</div>`};
+  const orden=(a,b)=>(a.x.vence||'').localeCompare(b.x.vence||'')||String(a.p.nombre).localeCompare(String(b.p.nombre));
+  $('#main').innerHTML=`<div class="top"><div class="datebar"><div class="d">Pendientes por fecha<small>${items.length} abierto${items.length===1?'':'s'}</small></div></div></div>`+secLabs(pats)+
+   (keys.map(k=>{const L=grupos.get(k).sort(orden);return `<div class="pg ${k==='0'||k===hoyS?'dueb':''}"><div class="hd"><div><div class="nm">${esc(titulo(k))} (${L.length})</div></div></div>${L.map(fila).join('')}</div>`}).join('')||`<div class="empty">No hay pendientes abiertos.</div>`)
 }
 
 const photoStats=()=>new Promise((res,rej)=>{let n=0,b=0;const r=store('photos').openCursor();r.onsuccess=()=>{const c=r.result;if(c){n++;b+=c.value.blob?c.value.blob.size:0;c.continue()}else res({n,b})};r.onerror=()=>rej(r.error)});
@@ -1142,6 +1147,11 @@ async function openEntry(id){
   const ncParts=()=>parseTpl(pat.plantilla||'');
   const ncShown=p=>{const k=NCA(p.label);if(k)return genAuto(k,p.text);const ta=ncBody.querySelector('[data-nb="'+p.i+'"]');return ta?ta.value:(nr.blk&&nr.blk[p.i]!==undefined?nr.blk[p.i]:ncDef(p))};
   const ncFull=()=>ncParts().map(p=>p.b?ncShown(p):p.t).join('');
+  // Aviso (dentro de la app) si la nota lleva signos vitales y faltan datos
+  const signosFalt=()=>{if(!ncParts().some(p=>p.b&&NCA(p.label)==='signos'))return [];
+    return [['FC','#nr-fc'],['FR','#nr-fr'],['TA sistólica','#nr-tas'],['TA diastólica','#nr-tad'],['SpO2','#nr-sp'],['Temp','#nr-tp']].filter(([n,id])=>!val(id)).map(x=>x[0])};
+  const signosOk=async()=>{const f=signosFalt();if(!f.length)return true;
+    return askUI(f.length===6?'No se capturaron los signos vitales.\n\n¿Copiar la nota de todos modos?':'Faltan signos vitales: '+f.join(', ')+'.\n\n¿Copiar la nota de todos modos?','Copiar así','Revisar')};
   const ncBase=()=>ncParts().map(p=>p.b?'['+ncShown(p)+']'+(p.label?'{'+p.label+'}':''):p.t).join('');
   const LABS=['fecha y turno','dx','subjetivo','signos','exploración física','análisis','ultrafiltrado','tratamiento habitual','plan','médico'];
   const ncEditor=txt=>'<textarea id="nc-tpl" rows="12" placeholder="Pega aquí la nota completa del paciente"></textarea>'
@@ -1194,7 +1204,7 @@ async function openEntry(id){
   ncBody.addEventListener('click',async ev=>{
     const id=ev.target.id;if(!id&&!ev.target.dataset.nclab&&ev.target.dataset.nbc===undefined&&ev.target.dataset.nbm===undefined)return;
     try{
-      if(id==='nc-copy'){const ok=await copyText(ncFull());toast(ok?'Copiada la nota completa':'No se pudo copiar');return}
+      if(id==='nc-copy'){if(!(await signosOk()))return;const ok=await copyText(ncFull());toast(ok?'Copiada la nota completa':'No se pudo copiar');return}
       if(id==='nc-save'){const t=ncq('#nc-tpl').value;if(!t.trim()){toast('Pega la nota primero');return}await setTpl(t);renderNC();toast('Plantilla guardada');return}
       if(id==='nc-copyfrom'){const x=normExp(ncq('#nc-from').value);const o=x&&await get('patients',x);if(!o||!o.plantilla){toast('Ese expediente no tiene plantilla');return}await setTpl(o.plantilla);renderNC();toast('Plantilla copiada');return}
       if(id==='nc-base'){await setTpl(ncBase());renderNC();toast('Guardado como base de este paciente');return}
@@ -1221,9 +1231,9 @@ async function openEntry(id){
   q('#nc-del2').onclick=async()=>{if(!(pat.plantilla||'').trim()){toast('Este paciente no tiene nota guardada');return}if(!confirm('¿Borrar la nota de este paciente para volver a crearla? No afecta a otros pacientes.'))return;try{await setTpl('');nr.blk={};renderNC();toast('Nota borrada: pega la nueva en Abrir en ventana grande')}catch(err){logErr('borrar nota',err);toast('No se pudo borrar')}};
   q('#nc-open2').onclick=()=>ncOpenM(q('#nc-open2'));
   q('#nc-sig2').onclick=async()=>{const ok=await copyText(svTxt()+' '+peTxt());toast(ok?'Copiados: signos y pesos':'No se pudo copiar')};
-  const ncQuick=async()=>{if(!(pat.plantilla||'').trim()){ncOpenM(q('#nc-open'));return}const ok=await copyText(ncFull());toast(ok?'Copiada la nota completa':'No se pudo copiar')};
+  const ncQuick=async()=>{if(!(pat.plantilla||'').trim()){ncOpenM(q('#nc-open'));return}if(!(await signosOk()))return;const ok=await copyText(ncFull());toast(ok?'Copiada la nota completa':'No se pudo copiar')};
   q('#nc-quick').onclick=ncQuick;q('#nc-quick2').onclick=ncQuick;
-  $('#ncm-copy').onclick=async()=>{const ok=await copyText(ncFull());toast(ok?'Copiada la nota completa':'No se pudo copiar')};
+  $('#ncm-copy').onclick=async()=>{if(!(await signosOk()))return;const ok=await copyText(ncFull());toast(ok?'Copiada la nota completa':'No se pudo copiar')};
   $('#ncm-x').onclick=ncCloseM;
   ncBody.addEventListener('input',grow);
   renderNC();
