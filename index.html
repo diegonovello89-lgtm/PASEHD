@@ -290,7 +290,7 @@ details{margin-top:12px}summary{padding:6px 0;color:var(--mu);font-weight:600}
 
 <script>
 'use strict';
-const VERSION='11.37';
+const VERSION='11.40';
 const TURNOS=[1,2,3,4,5];
 const DIAS_FOTO=7;
 const ACCESOS=['FAV','Injerto','Catéter tunelizado','Catéter temporal'];
@@ -313,6 +313,9 @@ const subjOn=()=>lsGet('subjOn')!=='0';
 // ---- Receta: posiciones calculadas del formato de la hoja (A4, 7 col. de 66 pt + H de 51 pt, filas de 15.75 pt, ajustada al ancho con márgenes de 0.7 in)
 const RX={rowPt:15.75,colPt:66,hPt:51,ml:17.78,mt:19.05,printable:174.44};
 const rxCfg=()=>({dx:+lsGet('rxDx')||0,dy:+lsGet('rxDy')||0,sc:(+lsGet('rxSc')||100)});
+const rxIdxB=()=>lsGet('rxIdxB')!=='0';
+const rxHdrOn=()=>lsGet('rxHdr')!=='0';
+const rxHdrTxt=()=>((lsGet('rxHdrTxt')||'').trim()||'TRATAMIENTO:');
 const rxKey=x=>'rx:'+x;
 const rxLoad=x=>{try{return JSON.parse(lsGet(rxKey(x))||'{}')}catch(e){return {}}};
 const rxFechaTxt=()=>{const d=new Date();const p=n=>String(n).padStart(2,'0');return p(d.getDate())+'/'+p(d.getMonth()+1)+'/'+d.getFullYear()};
@@ -322,13 +325,14 @@ function rxHTML(f,scalePxPerMm){
   const sc=(RX.printable*(72/25.4)/totalPt)*(c.sc/100);   // factor de ajuste al ancho (como "ajustar a una página de ancho")
   const mm=pt=>pt*sc*25.4/72;
   const X0=RX.ml+c.dx,Y0=RX.mt+c.dy;
-  const box=(col0,colW,row,rows,txt,al,wrap)=>`<div style="position:absolute;left:${X0+mm(col0)}mm;top:${Y0+mm((row-1)*RX.rowPt)}mm;width:${mm(colW)}mm;height:${mm(rows*RX.rowPt)}mm;display:flex;align-items:flex-end;justify-content:${al==='c'?'center':al==='r'?'flex-end':'flex-start'};font:${12*sc}pt Arial,Helvetica,sans-serif;line-height:${mm(RX.rowPt)}mm;overflow:hidden;box-sizing:border-box;padding:0 ${mm(2)}mm;text-align:${al==='c'?'center':al==='r'?'right':'left'};white-space:${wrap?'normal':'nowrap'};word-break:break-word"><div style="width:100%">${esc(String(txt||'').toUpperCase()).replace(/\n/g,'<br>')}</div></div>`;
+  const box=(col0,colW,row,rows,txt,al,wrap,bold)=>`<div style="position:absolute;left:${X0+mm(col0)}mm;top:${Y0+mm((row-1)*RX.rowPt)}mm;width:${mm(colW)}mm;height:${mm(rows*RX.rowPt)}mm;display:flex;align-items:flex-end;justify-content:${al==='c'?'center':al==='r'?'flex-end':'flex-start'};font:${bold?'bold ':''}${12*sc}pt Arial,Helvetica,sans-serif;line-height:${mm(RX.rowPt)}mm;overflow:hidden;box-sizing:border-box;padding:0 ${mm(2)}mm;text-align:${al==='c'?'center':al==='r'?'right':'left'};white-space:${wrap?'normal':'nowrap'};word-break:break-word"><div style="width:100%">${esc(String(txt||'').toUpperCase()).replace(/\n/g,'<br>')}</div></div>`;
   let h='';
   h+=box(0,4*RX.colPt,4,1,f.nombre,'c');
   h+=box(5*RX.colPt,RX.colPt,4,1,f.edad,'r');
   h+=box(6*RX.colPt,RX.colPt+RX.hPt,4,1,f.fecha,'r');
-  h+=box(0,7*RX.colPt,7,2,f.idx,'l',1);
+  h+=box(0,7*RX.colPt,7,2,f.idx,'l',1,rxIdxB());
   (f.lineas||[]).slice(0,7).forEach((t,i)=>{if(t&&t.trim())h+=box(0,7*RX.colPt,9+2*i,2,t,'l',1)});
+  if(rxHdrOn()&&!((f.lineas||[])[0]||'').trim())h+=box(0,7*RX.colPt,9,2,rxHdrTxt(),'l',0,1);
   return h}
 function openReceta(nombre,exp,dxHint){
   const saved=rxLoad(exp);
@@ -341,6 +345,8 @@ function openReceta(nombre,exp,dxHint){
    <label for="rx-idx">Diagnóstico (IDX)</label><textarea id="rx-idx" rows="2">${esc(f.idx)}</textarea>
    <label>Indicaciones / solicitudes (cada una ocupa 2 renglones de la receta)</label>
    ${f.lineas.map((t,i)=>`<textarea data-rxl="${i}" rows="2" placeholder="${i===0?'(la primera queda como espacio, igual que en tu Excel, si la dejas vacía)':'Línea '+(i+1)}">${esc(t)}</textarea>`).join('')}
+   <label style="display:flex;gap:8px;align-items:center;margin-top:8px;font-size:14px"><input type="checkbox" id="rx-idxb" ${rxIdxB()?'checked':''} style="width:auto;min-height:0"> Diagnóstico (IDX) en negritas</label>
+   <label style="display:flex;gap:8px;align-items:center;margin-top:8px;font-size:14px"><input type="checkbox" id="rx-hdr" ${rxHdrOn()?'checked':''} style="width:auto;min-height:0"> Poner «${esc(rxHdrTxt())}» en negritas entre el diagnóstico y los medicamentos <span class="mu">(solo si la 1ª línea está vacía)</span></label>
    <div style="margin-top:8px"><button type="button" class="btn2 sec" id="rx-clr">Limpiar indicaciones</button></div>
    <details style="margin-top:10px"><summary>Ajustar posición de impresión</summary>
      <p class="mu">Si al imprimir sobre la receta algo queda corrido, mueve en milímetros (positivo = derecha / abajo). Se recuerda en este dispositivo.</p>
@@ -349,7 +355,7 @@ function openReceta(nombre,exp,dxHint){
   const cur=()=>({nombre:$('#rx-nom').value,edad:$('#rx-edad').value,fecha:$('#rx-fec').value,idx:$('#rx-idx').value,lineas:[...box.querySelectorAll('[data-rxl]')].map(x=>x.value)});
   const prev=()=>{const pv=$('#rxprev');const k=pvK();pv.innerHTML=`<div style="transform:scale(${k});transform-origin:0 0;width:210mm;height:297mm;position:relative">${rxHTML(cur())}</div>`};
   const persist=()=>{const v=cur();try{lsSet(rxKey(exp),JSON.stringify({edad:v.edad,idx:v.idx,lineas:v.lineas}))}catch(e){}};
-  box.oninput=ev=>{if(ev.target.id==='rx-dx')lsSet('rxDx',ev.target.value);if(ev.target.id==='rx-dy')lsSet('rxDy',ev.target.value);if(ev.target.id==='rx-sc')lsSet('rxSc',ev.target.value);persist();prev()};
+  box.oninput=ev=>{if(ev.target.id==='rx-idxb'){lsSet('rxIdxB',ev.target.checked?'1':'0');prev();return}if(ev.target.id==='rx-hdr'){lsSet('rxHdr',ev.target.checked?'1':'0');prev();return}if(ev.target.id==='rx-dx')lsSet('rxDx',ev.target.value);if(ev.target.id==='rx-dy')lsSet('rxDy',ev.target.value);if(ev.target.id==='rx-sc')lsSet('rxSc',ev.target.value);persist();prev()};
   $('#rx-clr').onclick=()=>{box.querySelectorAll('[data-rxl]').forEach(x=>x.value='');persist();prev()};
   $('#rx-x').onclick=()=>{$('#rxm').classList.remove('on');document.body.classList.remove('lock')};
   $('#rx-print').onclick=()=>{persist();rxPrint(rxPage(rxHTML(cur())))};
@@ -388,15 +394,16 @@ function rxOps(f){
   const c=rxCfg(),totalPt=7*RX.colPt+RX.hPt,k=72/25.4;
   const sc=(RX.printable*k/totalPt)*(c.sc/100);
   const X0=(RX.ml+c.dx)*k,Y0=(RX.mt+c.dy)*k,lh=RX.rowPt*sc,fs=12*sc,pad=2*sc,ops=[];
-  const box=(col0,colW,row,rows,txt,al,wrap)=>{
+  const box=(col0,colW,row,rows,txt,al,wrap,bold)=>{
     const bw=colW*sc,bl=X0+col0*sc,bb=Y0+(row-1+rows)*lh;
-    let L=wrap?pdfWrap(String(txt||'').toUpperCase(),bw-2*pad,'H',fs):[String(txt||'').toUpperCase()];
+    let L=wrap?pdfWrap(String(txt||'').toUpperCase(),bw-2*pad,bold?'HB':'H',fs):[String(txt||'').toUpperCase()];
     L=L.slice(0,rows);
-    L.forEach((t,i)=>{if(!t)return;const w=pdfW(t,'H',fs);const top=bb-(L.length-i)*lh;
-      const x=al==='c'?bl+bw/2-w/2:al==='r'?bl+bw-pad-w:bl+pad;ops.push({t,x,b:pdfBase(top,lh,fs),sz:fs,f:'H'})})};
+    L.forEach((t,i)=>{if(!t)return;const FF=bold?'HB':'H',w=pdfW(t,FF,fs);const top=bb-(L.length-i)*lh;
+      const x=al==='c'?bl+bw/2-w/2:al==='r'?bl+bw-pad-w:bl+pad;ops.push({t,x,b:pdfBase(top,lh,fs),sz:fs,f:FF})})};
   box(0,4*RX.colPt,4,1,f.nombre,'c');box(5*RX.colPt,RX.colPt,4,1,f.edad,'r');box(6*RX.colPt,RX.colPt+RX.hPt,4,1,f.fecha,'r');
-  box(0,7*RX.colPt,7,2,f.idx,'l',1);
+  box(0,7*RX.colPt,7,2,f.idx,'l',1,rxIdxB());
   (f.lineas||[]).slice(0,7).forEach((t,i)=>{if(t&&t.trim())box(0,7*RX.colPt,9+2*i,2,t,'l',1)});
+  if(rxHdrOn()&&!((f.lineas||[])[0]||'').trim())box(0,7*RX.colPt,9,2,rxHdrTxt(),'l',0,1);
   return ops}
 function labOps(nombre,d){
   const c=rxCfg(),k=72/25.4,dx=c.dx*k,dy=c.dy*k,ops=[];
@@ -1042,7 +1049,7 @@ async function openEntry(id){
       <div id="e-prev-info" style="margin-top:5px">Buscando última sesión…</div>
       <button type="button" class="btn sec" id="e-reuse" style="margin-top:5px;font-size:12px">Usar comentario anterior</button>
       <div style="margin-top:9px"><b>Pendientes por sesión</b><div id="e-pend"></div><div class="addrow"><input id="e-pin" placeholder="Nuevo pendiente…" enterkeyhint="done" autocomplete="off"><button id="e-padd">Agregar</button></div>
-      <div class="addrow"><select id="e-pdue" aria-label="Cuándo"><option value="">Sin fecha</option><option value="1">Siguiente sesión</option><option value="2">En 2 días</option><option value="3">En 3 días</option><option value="7">En 7 días</option><option value="14">En 14 días</option><option value="d">Fecha exacta…</option></select><input id="e-pdate" type="date" style="display:none"></div></div>
+      <div class="addrow"><input id="e-pdate" type="date" aria-label="Fecha del pendiente"><button type="button" class="tg" id="e-pnod" style="display:none">Sin fecha</button></div><div id="e-pchips" class="tags" style="margin-top:6px"></div></div>
       <div style="margin-top:10px"><b>Fotos de hoy</b><div class="thumbs" id="e-fotos"></div><label class="btn" for="e-file" style="display:inline-block;margin-top:5px">Tomar o agregar foto</label><input id="e-file" type="file" accept="image/*" hidden multiple></div>
       <div style="margin-top:9px"><b>Fotos anteriores</b><div class="thumbs" id="e-prev-fotos">Buscando hojas recientes…</div><small class="mu">Se eliminan según el plazo de 7 días.</small></div>
     </div>
@@ -1380,10 +1387,14 @@ async function openEntry(id){
     }catch(err){logErr('pendiente',err);sv(false)}
     drawPend();refreshList();
   });
-  const venceSel=()=>{const v=q('#e-pdue').value;if(!v)return null;if(v==='d')return q('#e-pdate').value||null;return addDays(e.fecha||todayStr(),+v)};
-  q('#e-pdue').onchange=()=>{const d=q('#e-pdue').value==='d';q('#e-pdate').style.display=d?'':'none';if(d&&!q('#e-pdate').value)q('#e-pdate').value=addDays(todayStr(),1)};
+  const venceSel=()=>q('#e-pdate').value||null;
+  const pdChips=()=>{const sel=q('#e-pdate').value,h=todayStr();q('#e-pnod').style.display=sel?'':'none';
+    q('#e-pchips').innerHTML=Array.from({length:7},(_,k)=>{const f=addDays(h,k+1);const t=new Date(f+'T12:00:00').toLocaleDateString('es-MX',{weekday:'short',day:'numeric'}).replace(',','');return `<button type="button" class="tg ${sel===f?'on':''}" data-pd="${f}">${esc(t)}</button>`}).join('')};
+  q('#e-pchips').onclick=ev=>{const b=ev.target.closest('[data-pd]');if(!b)return;q('#e-pdate').value=b.dataset.pd;pdChips()};
+  q('#e-pnod').onclick=()=>{q('#e-pdate').value='';pdChips()};
+  q('#e-pdate').onchange=q('#e-pdate').oninput=pdChips;pdChips();
   const addP=async()=>{const i=q('#e-pin');const t=i.value.trim();if(!t)return;
-    try{await mutPat(p=>{p.pendientes.push({id:uid(),texto:t,hecho:false,creado:now(),updatedAt:now(),vence:venceSel()})});i.value='';q('#e-pdue').value='';q('#e-pdate').style.display='none';sv(true)}catch(err){logErr('pendiente',err);sv(false)}
+    try{await mutPat(p=>{p.pendientes.push({id:uid(),texto:t,hecho:false,creado:now(),updatedAt:now(),vence:venceSel()})});i.value='';q('#e-pdate').value='';pdChips();sv(true)}catch(err){logErr('pendiente',err);sv(false)}
     drawPend();refreshList()};
   // cambios que llegan de otro dispositivo mientras esta hoja está abierta
   live={e,flush,drawNota,
