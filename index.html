@@ -290,9 +290,16 @@ details{margin-top:12px}summary{padding:6px 0;color:var(--mu);font-weight:600}
 
 <script>
 'use strict';
-const VERSION='11.40';
+const VERSION='11.42';
 const TURNOS=[1,2,3,4,5];
 const DIAS_FOTO=7;
+const EV_DEF=['Hipotensión','Hipertensión','Calambres','Náuseas / vómito','Cefalea','Dolor torácico','Arritmia','Disnea','Problema de acceso','Coagulación del circuito','Sangrado','Fiebre / escalofríos','Alarma de máquina','Terminó antes de tiempo'];
+const evNom=x=>x.k+(x.n&&x.n.trim()?' ('+x.n.trim()+')':'');
+const evFrase=evs=>', cursando con eventualidades durante el transcurso: '+evs.map(evNom).join(', ')+'.';
+const evRe=/,?\s*sin cursar con eventualidades[^.\n]*\.?/i;
+function evAplica(txt,evs){if(!evs||!evs.length)return {t:txt,ok:true};if(!evRe.test(txt))return {t:txt,ok:false};return {t:txt.replace(evRe,evFrase(evs)),ok:true}}
+const evList=()=>{try{const v=JSON.parse(lsGet('evList')||'null');if(Array.isArray(v)&&v.length)return v}catch(_){}return EV_DEF};
+const DIAS=[['L','Lun'],['M','Mar'],['X','Mié'],['J','Jue'],['V','Vie'],['S','Sáb'],['D','Dom']];
 const ACCESOS=['FAV','Injerto','Catéter tunelizado','Catéter temporal'];
 const DEF_EXF='A la exploración física se encuentra neurológico integra, adecuado color tegumentario, cuello sin adenomegalias, no plétora yugular. Cardiopulmonar sin compromiso aparente, campos pulmonares ventilados sin estertores ni sibilancias. Abdomen asignológico, extremidades integras, sin presencia de edema.';
 const DEF_TAGS=['Disfunción de catéter','Sangrado / hematoma','Sospecha de infección','Hipotensión','Hipertensión','Calambres','Náusea / vómito','Dolor torácico / arritmia','Ganancia alta','Sesión incompleta','Laboratorio','Interconsulta'];
@@ -607,7 +614,7 @@ const patStamp=p=>p.pu||p.updatedAt||0;
 function mergePat(cur,r){
   if(!cur)return r;
   const out={...cur};
-  if(patStamp(r)>patStamp(cur)){out.nombre=r.nombre;out.acceso=r.acceso;out.aviso=r.aviso;out.notaFija=r.notaFija;out.sexo=r.sexo;if(r.plantilla!==undefined)out.plantilla=r.plantilla;out.pu=patStamp(r)}
+  if(patStamp(r)>patStamp(cur)){out.nombre=r.nombre;out.acceso=r.acceso;out.aviso=r.aviso;out.notaFija=r.notaFija;out.sexo=r.sexo;if(r.dias!==undefined)out.dias=r.dias;if(r.turnoHab!==undefined)out.turnoHab=r.turnoHab;if(r.plantilla!==undefined)out.plantilla=r.plantilla;out.pu=patStamp(r)}
   const m=new Map((cur.pendientes||[]).map(x=>[x.id,x]));
   for(const x of r.pendientes||[]){const c=m.get(x.id);if(!c||pStamp(x)>pStamp(c))m.set(x.id,x)}
   out.pendientes=[...m.values()];
@@ -674,7 +681,7 @@ async function renderHoy(){
       <div class="sil"><small>sillón</small><b>${esc(e.sillon||'–')}</b></div>
       <div><div class="nm">${esc(pe&&pe.nombre||'(sin nombre)')}</div><div class="ex">${e.temp?'sin expediente':esc(e.expediente)}</div>
         <div class="chips">${pe&&pe.acceso?`<span class="chip ax">${esc(pe.acceso)}</span>`:''}${pe&&pe.aviso?`<span class="chip al">⚠ ${esc(pe.aviso)}</span>`:''}${(e.tags||[]).map(g=>`<span class="chip ev">${esc(g)}</span>`).join('')}${e.fotos&&e.fotos.length?`<span class="chip">📷 ${e.fotos.length}</span>`:''}${e.notaTxt?'<span class="chip">📝 texto</span>':''}${e.asistencia==='ausente'?'<span class="chip al">No acudió</span>':''}${open?`<span class="chip w">⏳ ${open} pendiente${open>1?'s':''}</span>`:''}</div>
-        ${e.comentario?`<div class="cm">${esc(e.comentario)}</div>`:''}</div>
+        ${e.comentario?`<div class="cm">${esc(e.comentario)}</div>`:''}${(e.evs&&e.evs.length)?`<div class="cm">⚠ ${esc(e.evs.map(evNom).join(', '))}</div>`:''}</div>
       <button class="nota ${e.nota?'ok':''}" data-nota="${e.id}">${e.nota?'✓':'○'}<small>nota</small></button></div>`}).join('');
   const showBanner=isIOS&&!standalone&&lsGet('bannerOff')!=='1';
   const esHoy=S.fecha===todayStr();
@@ -789,6 +796,9 @@ async function renderResp(){
     <label style="display:flex;gap:8px;align-items:center;margin:6px 0"><input type="checkbox" id="r-fot"> Incluir fotos (pesa más)</label>
     <button class="btn" id="r-exp">Exportar archivo</button>
     <p>Se genera un .json; en iPhone sale por el menú de compartir (Archivos, AirDrop, etc.).</p></div>
+  <div class="box"><h3>Lista de pacientes (Excel)</h3>
+    <p>Una fila por paciente: turno, días de la semana, sillón, peso seco, acceso, etiquetas y pendientes. Los días y el turno se capturan en «Editar expediente»; si faltan, se infieren de las últimas 8 semanas y se marcan como (inferido).</p>
+    <button class="btn" id="r-xls">Exportar lista a Excel</button></div>
   <div class="box"><h3>Importar respaldo</h3>
     <p>Combina el archivo con lo que ya tienes; gana el registro más reciente.</p>
     <label class="btn sec" for="r-file">Elegir archivo…</label><input id="r-file" type="file" accept=".json,application/json" hidden></div>
@@ -1044,6 +1054,7 @@ async function openEntry(id){
     <div class="box ncp"><b>Nota completa</b>
       <div class="ncp-b"><button type="button" class="cp" id="nc-quick2">Copiar nota</button><button type="button" class="cp2" id="nc-open2">Abrir en ventana grande</button><button type="button" class="cp2" id="nc-sig2">Signos y pesos</button></div></div>
     <div class="box" style="margin:7px 0;padding:9px">
+      <div id="ev-box" style="border:1px solid var(--bd,#d5dbe3);border-radius:10px;padding:8px 10px;margin:8px 0"><div style="display:flex;justify-content:space-between;align-items:center"><b>Eventualidades</b><span class="mu" id="ev-cnt"></span></div><div class="tags" id="ev-chips" style="margin:6px 0"></div><div id="ev-sel"></div><div class="addrow" style="margin-top:6px"><input id="ev-new" placeholder="Otra eventualidad…" autocomplete="off"><button type="button" class="tg" id="ev-add">Agregar</button></div><p class="mu" id="ev-txt" style="margin:6px 0 0"></p><button type="button" class="tg" id="ev-edit" style="margin-top:6px">Editar lista</button><div id="ev-editbox"></div></div>
       <label for="e-com"><b>Comentario de hoy</b></label>
       <textarea id="e-com" rows="3" placeholder="Comentario de esta sesión…">${esc(e.comentario)}</textarea>
       <div id="e-prev-info" style="margin-top:5px">Buscando última sesión…</div>
@@ -1153,11 +1164,14 @@ async function openEntry(id){
   const ncDef=p=>esSubj(p)&&subjOn()?subjTxt():p.text;
   const ncParts=()=>parseTpl(pat.plantilla||'');
   const ncShown=p=>{const k=NCA(p.label);if(k)return genAuto(k,p.text);const ta=ncBody.querySelector('[data-nb="'+p.i+'"]');return ta?ta.value:(nr.blk&&nr.blk[p.i]!==undefined?nr.blk[p.i]:ncDef(p))};
-  const ncFull=()=>ncParts().map(p=>p.b?ncShown(p):p.t).join('');
+  const ncRaw=()=>ncParts().map(p=>p.b?ncShown(p):p.t).join('');
+  const ncFull=()=>evAplica(ncRaw(),e.evs).t;
   // Aviso (dentro de la app) si la nota lleva signos vitales y faltan datos
   const signosFalt=()=>{if(!ncParts().some(p=>p.b&&NCA(p.label)==='signos'))return [];
     return [['FC','#nr-fc'],['FR','#nr-fr'],['TA sistólica','#nr-tas'],['TA diastólica','#nr-tad'],['SpO2','#nr-sp'],['Temp','#nr-tp']].filter(([n,id])=>!val(id)).map(x=>x[0])};
-  const signosOk=async()=>{const f=signosFalt();if(!f.length)return true;
+  const signosOk=async()=>{
+    if(e.evs&&e.evs.length&&!evAplica(ncRaw(),e.evs).ok&&!(await askUI('Registraste eventualidades, pero no encontré la frase «sin cursar con eventualidades» en la nota, así que no se incluyeron.\n\n¿Copiar la nota de todos modos?','Copiar así','Revisar')))return false;
+    const f=signosFalt();if(!f.length)return true;
     return askUI(f.length===6?'No se capturaron los signos vitales.\n\n¿Copiar la nota de todos modos?':'Faltan signos vitales: '+f.join(', ')+'.\n\n¿Copiar la nota de todos modos?','Copiar así','Revisar')};
   const ncBase=()=>ncParts().map(p=>p.b?'['+ncShown(p)+']'+(p.label?'{'+p.label+'}':''):p.t).join('');
   const LABS=['fecha y turno','dx','subjetivo','signos','exploración física','análisis','ultrafiltrado','tratamiento habitual','plan','médico'];
@@ -1260,7 +1274,28 @@ async function openEntry(id){
     e.nr={blk:nr.blk||{},blkSig:nr.blkSig||''};
     for(const [id,k] of Object.entries(NRIN))e.nr[k]=val(id);
   };
-  const sig=()=>JSON.stringify([e.comentario||'',e.sillon||'',e.extras,e.nr,!!e.nota,e.tags,e.turno,e.asistencia||'',e.fotos]);
+  const sig=()=>JSON.stringify([e.comentario||'',e.sillon||'',e.extras,e.nr,!!e.nota,e.tags,e.turno,e.asistencia||'',e.fotos,e.evs||[]]);
+  const drawEv=()=>{
+    const evs=e.evs||(e.evs=[]),lst=evList(),sel=new Set(evs.map(x=>x.k)),all2=[...lst,...evs.map(x=>x.k).filter(k=>!lst.includes(k))];
+    q('#ev-chips').innerHTML=all2.map(k=>`<button type="button" class="tg ${sel.has(k)?'on':''}" data-evk="${esc(k)}">${esc(k)}</button>`).join('');
+    q('#ev-sel').innerHTML=evs.map((x,i)=>`<div class="row" style="margin:4px 0;display:flex;gap:6px;align-items:center"><b style="min-width:96px;font-size:13px">${esc(x.k)}</b><input data-evn="${i}" placeholder="Nota corta (hora, manejo)…" value="${esc(x.n||'')}" autocomplete="off" style="flex:1"><button type="button" class="tg" data-evx="${i}" aria-label="Quitar">✕</button></div>`).join('');
+    q('#ev-cnt').textContent=evs.length?evs.length+' registrada'+(evs.length>1?'s':''):'ninguna';
+    drawEvTxt();
+  };
+  const drawEvTxt=()=>{const evs=e.evs||[];q('#ev-txt').textContent=evs.length?'En la nota: '+evFrase(evs).replace(/^, /,'Termina sesión, '):'En la nota: sin cursar con eventualidades.'};
+  const evSet=()=>{later();if(ncUpd)ncUpd()};
+  q('#ev-box').addEventListener('click',ev=>{
+    const b=ev.target.closest('button');if(!b)return;
+    if(b.dataset.evk!==undefined){const k=b.dataset.evk,i=(e.evs||[]).findIndex(x=>x.k===k);if(i>=0)e.evs.splice(i,1);else{(e.evs=e.evs||[]).push({k,n:''})}drawEv();evSet();if(i<0){const ins=q('#ev-sel').querySelectorAll('[data-evn]');ins[ins.length-1]&&ins[ins.length-1].focus()}return}
+    if(b.dataset.evx!==undefined){e.evs.splice(+b.dataset.evx,1);drawEv();evSet();return}
+    if(b.id==='ev-add'){const v=q('#ev-new').value.trim();if(!v)return;e.evs=e.evs||[];if(!e.evs.some(x=>x.k.toLowerCase()===v.toLowerCase()))e.evs.push({k:v,n:''});q('#ev-new').value='';drawEv();evSet();return}
+    if(b.id==='ev-edit'){const bx=q('#ev-editbox');if(bx.innerHTML){bx.innerHTML='';return}bx.innerHTML=`<textarea id="ev-lst" rows="8" style="margin-top:6px">${esc(evList().join('\n'))}</textarea><p class="mu" style="margin:4px 0">Una por línea. Se guarda en este dispositivo.</p><button type="button" class="tg" id="ev-lsave">Guardar lista</button> <button type="button" class="tg" id="ev-lreset">Restablecer</button>`;return}
+    if(b.id==='ev-lsave'){const l=q('#ev-lst').value.split(/\r?\n/).map(x=>x.trim()).filter(Boolean);lsSet('evList',l.length?JSON.stringify(l):'');q('#ev-editbox').innerHTML='';drawEv();return}
+    if(b.id==='ev-lreset'){lsSet('evList','');q('#ev-editbox').innerHTML='';drawEv();return}
+  });
+  q('#ev-box').addEventListener('input',ev=>{const t=ev.target;if(t.dataset.evn!==undefined){e.evs[+t.dataset.evn].n=t.value;drawEvTxt();evSet()}});
+  q('#ev-new').addEventListener('keydown',ev=>{if(ev.key==='Enter'){ev.preventDefault();q('#ev-add').click()}});
+  drawEv();
   collect();let savedSig=sig();
   const flushRaw=async()=>{clearTimeout(tm);tm=null;
     collect();
@@ -1591,6 +1626,79 @@ async function purge(){
   return old.length;
 }
 
+/* ---------- Lista de pacientes en Excel ---------- */
+const DIAN={L:'Lunes',M:'Martes',X:'Miércoles',J:'Jueves',V:'Viernes',S:'Sábado',D:'Domingo'};
+const diaDe=f=>'DLMXJVS'[new Date(f+'T12:00:00').getDay()];
+function diasTxt(str){return DIAS.filter(d=>str.includes(d[0])).map(d=>DIAN[d[0]]).join(', ')}
+async function listaFilas(){
+  const hoy=todayStr(),pats=(await all('patients')).filter(p=>!p.deleted),ents=(await all('entries')).filter(e=>!e.deleted);
+  const por={};for(const e of ents)(por[e.expediente]=por[e.expediente]||[]).push(e);
+  const filas=[];
+  for(const p of pats){
+    const es=(por[p.expediente]||[]).sort((a,b)=>(b.fecha||'').localeCompare(a.fecha||'')||(b.creado||0)-(a.creado||0));
+    const rec=es.filter(e=>diasEntre(e.fecha,hoy)<=56&&diasEntre(e.fecha,hoy)>=0);
+    // turno
+    let tur=+p.turnoHab||0,turInf=false;
+    if(!tur&&rec.length){const c={};rec.forEach(e=>{c[e.turno]=(c[e.turno]||0)+1});tur=+Object.keys(c).sort((a,b)=>c[b]-c[a])[0]||0;turInf=!!tur}
+    // días
+    let dias=p.dias||'',diasInf=false;
+    if(!dias&&rec.length>=3){const c={};rec.forEach(e=>{const d=diaDe(e.fecha);c[d]=(c[d]||0)+1});dias=DIAS.map(d=>d[0]).filter(d=>c[d]>=Math.max(2,rec.length*0.2)).join('');diasInf=!!dias}
+    const ult=es[0]||null;
+    let seco='';for(const e of es){const v=((e.nr||{}).seco||(e.extras||{}).peso||'').toString().trim();if(v){seco=v;break}}
+    const pend=pAct(p),labs=pend.filter(x=>x.tipo==='labs'),otros=pend.filter(x=>x.tipo!=='labs');
+    const sil=(es.find(e=>e.sillon)||{}).sillon||'';
+    filas.push({nombre:p.nombre||'',exp:p.expediente,turno:tur,turTxt:tur?('Turno '+tur+(turInf?' (inferido)':'')):'',dias,diasTxt:(diasTxt(dias)||'')+(diasInf&&dias?' (inferido)':''),sil,seco,acceso:p.acceso||'',tags:(ult&&ult.tags||[]).join(', '),aviso:p.aviso||'',ult:ult?ult.fecha:'',ses:rec.length,labs:labs.map(x=>x.texto).join('; '),pend:otros.map(x=>(x.vence?'['+x.vence+'] ':'')+x.texto).join('; ')});
+  }
+  const ordD=f=>{const s=f.dias||'';const i=DIAS.findIndex(d=>s.includes(d[0]));return i<0?9:i};
+  filas.sort((a,b)=>(a.turno||9)-(b.turno||9)||(a.dias||'~').localeCompare(b.dias||'~')||ordD(a)-ordD(b)||String(a.nombre).localeCompare(String(b.nombre),'es'));
+  return filas;
+}
+/* xlsx mínimo (zip sin compresión) */
+const CRC=(()=>{const t=new Uint32Array(256);for(let n=0;n<256;n++){let c=n;for(let k=0;k<8;k++)c=c&1?0xEDB88320^(c>>>1):c>>>1;t[n]=c>>>0}return t})();
+const crc32=b=>{let c=0xFFFFFFFF;for(let i=0;i<b.length;i++)c=CRC[(c^b[i])&255]^(c>>>8);return(c^0xFFFFFFFF)>>>0};
+function zipStore(files){
+  const enc=new TextEncoder(),parts=[],cen=[];let off=0;
+  const u16=n=>[n&255,(n>>8)&255],u32=n=>[n&255,(n>>8)&255,(n>>16)&255,(n>>>24)&255];
+  for(const [name,txt] of files){
+    const nb=enc.encode(name),db=enc.encode(txt),crc=crc32(db);
+    const lh=new Uint8Array([0x50,0x4b,3,4,...u16(20),...u16(0x0800),...u16(0),...u16(0),...u16(0x21),...u32(crc),...u32(db.length),...u32(db.length),...u16(nb.length),...u16(0)]);
+    parts.push(lh,nb,db);
+    cen.push(new Uint8Array([0x50,0x4b,1,2,...u16(20),...u16(20),...u16(0x0800),...u16(0),...u16(0),...u16(0x21),...u32(crc),...u32(db.length),...u32(db.length),...u16(nb.length),...u16(0),...u16(0),...u16(0),...u16(0),...u32(0),...u32(off)]),nb);
+    off+=lh.length+nb.length+db.length;
+  }
+  let cs=0;cen.forEach(x=>cs+=x.length);
+  const end=new Uint8Array([0x50,0x4b,5,6,...u16(0),...u16(0),...u16(files.length),...u16(files.length),...u32(cs),...u32(off),...u16(0)]);
+  return new Blob([...parts,...cen,end],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+}
+const xe=t=>String(t).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])).replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/g,'');
+const colL=i=>String.fromCharCode(65+i);
+function xlsxBlob(titulo,cols,rows,anchos){
+  const cell=(r,c,v,st)=>`<c r="${colL(c)}${r}" t="inlineStr"${st?` s="${st}"`:''}><is><t xml:space="preserve">${xe(v)}</t></is></c>`;
+  let sd=`<row r="1" ht="22" customHeight="1">${cols.map((h,i)=>cell(1,i,h,1)).join('')}</row>`;
+  rows.forEach((f,ri)=>{sd+=`<row r="${ri+2}">${f.map((v,i)=>cell(ri+2,i,v,2)).join('')}</row>`});
+  const sheet=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetViews><sheetView workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews><cols>${anchos.map((w,i)=>`<col min="${i+1}" max="${i+1}" width="${w}" customWidth="1"/>`).join('')}</cols><sheetData>${sd}</sheetData><autoFilter ref="A1:${colL(cols.length-1)}${rows.length+1}"/><pageSetup orientation="landscape" fitToHeight="0"/></worksheet>`;
+  const styles=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="2"><font><sz val="11"/><name val="Calibri"/></font><font><b/><color rgb="FFFFFFFF"/><sz val="11"/><name val="Calibri"/></font></fonts><fills count="3"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FF0B6BCB"/><bgColor indexed="64"/></patternFill></fill></fills><borders count="2"><border><left/><right/><top/><bottom/><diagonal/></border><border><left style="thin"><color rgb="FFBFC7D1"/></left><right style="thin"><color rgb="FFBFC7D1"/></right><top style="thin"><color rgb="FFBFC7D1"/></top><bottom style="thin"><color rgb="FFBFC7D1"/></bottom><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="3"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="2" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyBorder="1" applyAlignment="1"><alignment vertical="top" wrapText="1"/></xf></cellXfs></styleSheet>`;
+  return zipStore([
+   ['[Content_Types].xml','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/></Types>'],
+   ['_rels/.rels','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>'],
+   ['xl/workbook.xml',`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="${xe(titulo)}" sheetId="1" r:id="rId1"/></sheets></workbook>`],
+   ['xl/_rels/workbook.xml.rels','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>'],
+   ['xl/styles.xml',styles],['xl/worksheets/sheet1.xml',sheet]]);
+}
+async function exportarLista(){
+  const filas=await listaFilas();
+  if(!filas.length){toast('No hay pacientes para exportar');return false}
+  const cols=['Paciente','Expediente','Turno','Días','Sillón','Peso seco (kg)','Acceso vascular','Etiquetas','Aviso','Última sesión','Sesiones (8 sem)','Labs por pedir','Pendientes'];
+  const rows=filas.map(f=>[f.nombre,f.exp,f.turTxt,f.diasTxt,f.sil,f.seco,f.acceso,f.tags,f.aviso,f.ult?fmtFecha(f.ult):'',f.ses||'',f.labs,f.pend]);
+  const blob=xlsxBlob('Pacientes',cols,rows,[30,14,16,28,9,13,18,26,24,16,12,30,48]);
+  const name=`lista-pacientes-${todayStr()}.xlsx`;
+  const file=new File([blob],name,{type:blob.type});
+  if(navigator.canShare&&navigator.canShare({files:[file]})){
+    try{await navigator.share({files:[file],title:name});return true}catch(err){if(err&&err.name==='AbortError')return false}
+  }
+  const a=document.createElement('a');a.href=URL.createObjectURL(file);a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),30000);
+  return true;
+}
 /* ---------- Respaldo ---------- */
 const blobToData=b=>new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result);r.onerror=()=>rej(r.error);r.readAsDataURL(b)});
 async function exportar(conFotos){
@@ -1695,9 +1803,10 @@ async function loadHistory(exp,current,host){
 }
 async function openProfile(exp){
  const p=await get('patients',exp);if(!p)return;
- const sh=openSheet(`<div class="sh-head"><b>Editar expediente</b><button data-close>Cerrar</button></div><label>Expediente (identificador)</label><input id="pr-exp" value="${esc(p.expediente)}" readonly><p class="mu">El número de expediente no se cambia aquí para evitar separar notas y sesiones del paciente.</p><label>Nombre</label><input id="pr-nom" value="${esc(p.nombre)}"><label>Acceso vascular</label><select id="pr-ac"><option value="">—</option>${ACCESOS.map(a=>`<option ${p.acceso===a?'selected':''}>${esc(a)}</option>`).join('')}</select><label>Aviso fijo</label><input id="pr-av" value="${esc(p.aviso)}"><label>Nota fija</label><textarea id="pr-fija" rows="4">${esc(p.notaFija)}</textarea><button class="btn" id="pr-save">Guardar cambios</button><h4>Historial</h4><div id="e-hist-list"></div><button class="dng" id="pr-del">Eliminar expediente</button>`);
+ const sh=openSheet(`<div class="sh-head"><b>Editar expediente</b><button data-close>Cerrar</button></div><label>Expediente (identificador)</label><input id="pr-exp" value="${esc(p.expediente)}" readonly><p class="mu">El número de expediente no se cambia aquí para evitar separar notas y sesiones del paciente.</p><label>Nombre</label><input id="pr-nom" value="${esc(p.nombre)}"><label>Acceso vascular</label><select id="pr-ac"><option value="">—</option>${ACCESOS.map(a=>`<option ${p.acceso===a?'selected':''}>${esc(a)}</option>`).join('')}</select><label>Aviso fijo</label><input id="pr-av" value="${esc(p.aviso)}"><label>Turno habitual</label><select id="pr-tur"><option value="">—</option>${[1,2,3,4].map(t=>`<option value="${t}" ${+p.turnoHab===t?'selected':''}>Turno ${t}</option>`).join('')}</select><label>Días de hemodiálisis</label><div class="tags" id="pr-dias">${DIAS.map(d=>`<button type="button" class="tg ${(p.dias||'').includes(d[0])?'on':''}" data-dia="${d[0]}">${d[1]}</button>`).join('')}</div><label>Nota fija</label><textarea id="pr-fija" rows="4">${esc(p.notaFija)}</textarea><button class="btn" id="pr-save">Guardar cambios</button><h4>Historial</h4><div id="e-hist-list"></div><button class="dng" id="pr-del">Eliminar expediente</button>`);
  loadHistory(exp,null,sh);
- $('#pr-save',sh).onclick=async()=>{const cur=await get('patients',exp);cur.nombre=$('#pr-nom',sh).value.trim();cur.acceso=$('#pr-ac',sh).value;cur.aviso=$('#pr-av',sh).value.trim();cur.notaFija=$('#pr-fija',sh).value;cur.updatedAt=now();cur.pu=now();await put('patients',cur);toast('Expediente actualizado');closeSheet()};
+ $('#pr-dias',sh).onclick=ev=>{const b=ev.target.closest('[data-dia]');if(b)b.classList.toggle('on')};
+ $('#pr-save',sh).onclick=async()=>{const cur=await get('patients',exp);cur.nombre=$('#pr-nom',sh).value.trim();cur.acceso=$('#pr-ac',sh).value;cur.aviso=$('#pr-av',sh).value.trim();cur.notaFija=$('#pr-fija',sh).value;cur.turnoHab=+$('#pr-tur',sh).value||0;cur.dias=[...sh.querySelectorAll('#pr-dias .tg.on')].map(b=>b.dataset.dia).join('');cur.updatedAt=now();cur.pu=now();await put('patients',cur);toast('Expediente actualizado');closeSheet()};
  $('#pr-del',sh).onclick=async()=>{const entries=(await all('entries')).filter(e=>e.expediente===exp&&!e.deleted);if(entries.length){alert(`Este expediente tiene ${entries.length} sesiones. Por seguridad no se elimina junto con sus notas. Primero debe resolverse la conservación de su historial.`);return}if(!confirm('¿Eliminar este expediente sin sesiones? Esta acción no se puede deshacer.'))return;const cur=await get('patients',exp);cur.deleted=true;cur.updatedAt=now();cur.pu=now();await put('patients',cur);closeSheet();toast('Expediente marcado como eliminado; comprueba la sincronización.')};
 }
 async function openBatch(){
@@ -1808,6 +1917,7 @@ document.addEventListener('click',async ev=>{
     for(const p of await all('photos')){await del('photos',p.id);SYNC.dropPhoto(p)}
     for(const e of await all('entries'))if(e.fotos&&e.fotos.length){e.fotos=[];e.updatedAt=now();await put('entries',e)}
     toast('Fotos borradas');render()}return}
+  if(t.id==='r-xls'){const ok=await exportarLista();if(ok)toast('Lista lista');return}
   if(t.id==='r-exp'){const ok=await exportar($('#r-fot').checked);if(ok){toast('Respaldo listo');render()}return}
 });
 async function cpInfo(){const i=$('#cp-info');if(!i)return;const f=$('#cp-date').value,t=+$('#cp-turn').value,s=$('#cp-src').value;if(!f||!s){i.textContent='';return}
@@ -1839,7 +1949,7 @@ const SYNC=(()=>{
   const fail=(err,n=1)=>{if(err&&err.code==='permission-denied')st.denied+=n;else logErr('subir',err)};
 
   /* --- registros --- */
-  const recPat=p=>{const r={expediente:p.expediente,acceso:p.acceso||'',aviso:p.aviso||'',sexo:p.sexo||'',updatedAt:patStamp(p)};if(st.syncNames){r.nombre=p.nombre||'';if(p.plantilla!==undefined)r.plantilla=p.plantilla}return r};
+  const recPat=p=>{const r={expediente:p.expediente,acceso:p.acceso||'',aviso:p.aviso||'',sexo:p.sexo||'',updatedAt:patStamp(p)};if(p.dias)r.dias=p.dias;if(p.turnoHab)r.turnoHab=p.turnoHab;if(st.syncNames){r.nombre=p.nombre||'';if(p.plantilla!==undefined)r.plantilla=p.plantilla}return r};
   const recPend=(p,x)=>({id:x.id,expediente:p.expediente,texto:x.texto,hecho:!!x.hecho,hechoEn:x.hechoEn||null,creado:x.creado||0,del:!!x.del,vence:x.vence||null,tipo:x.tipo||null,datos:x.datos||null,updatedAt:pStamp(x)});
   const recEnt=e=>{const r={...e};delete r.fotos;r.deleted=!!e.deleted;r.updatedAt=e.updatedAt||0;return r};
   // Fotos: ya vienen comprimidas (ligeras ~100-150 KB); van dentro del documento como texto base64.
@@ -1918,7 +2028,7 @@ const SYNC=(()=>{
       const p=cur||{expediente:r.expediente,nombre:'',pendientes:[],updatedAt:0};
       if(st.syncNames&&typeof r.nombre==='string')p.nombre=r.nombre;
       if(st.syncNames&&typeof r.plantilla==='string')p.plantilla=r.plantilla;
-      if('acceso' in r)p.acceso=r.acceso;if('aviso' in r)p.aviso=r.aviso;if('sexo' in r)p.sexo=r.sexo;
+      if('acceso' in r)p.acceso=r.acceso;if('aviso' in r)p.aviso=r.aviso;if('sexo' in r)p.sexo=r.sexo;if('dias' in r)p.dias=r.dias;if('turnoHab' in r)p.turnoHab=r.turnoHab;
       p.pu=rs;p.updatedAt=Math.max(p.updatedAt||0,rs);
       await put('patients',p,{nosync:true});return p;
     }
