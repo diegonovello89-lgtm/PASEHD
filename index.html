@@ -56,6 +56,9 @@ button{cursor:pointer;border:0;background:none}
 .tags{display:flex;flex-wrap:wrap;gap:8px}
 .tg{padding:9px 13px;border-radius:20px;border:1px solid var(--bd);background:var(--card);font-size:14px}
 .tg.on{background:var(--ac);color:var(--onac);border-color:var(--ac);font-weight:700}
+.fcg{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}.fcl{display:flex;flex-direction:column;font-size:12px;gap:3px}.fcl input,.fcl select{min-width:0}
+.fcr{display:flex;gap:6px;margin:6px 0;align-items:center;flex-wrap:wrap}.fcr input,.fcr select{min-width:0}.fcm{border:1px solid var(--bd);border-radius:10px;padding:6px 8px;margin:8px 0}.fcm.no{opacity:.65}
+.fcq{margin:8px 0}.fcc details{margin:4px 0}.fcc .tg{padding:5px 9px;font-size:12px;margin:2px}
 .tgrow{display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--bd)}
 .tgrow span{flex:1}
 .empty{text-align:center;color:var(--mu);padding:40px 10px}
@@ -290,7 +293,7 @@ details{margin-top:12px}summary{padding:6px 0;color:var(--mu);font-weight:600}
 
 <script>
 'use strict';
-const VERSION='11.42';
+const VERSION='11.46';
 const TURNOS=[1,2,3,4,5];
 const DIAS_FOTO=7;
 const EV_DEF=['Hipotensión','Hipertensión','Calambres','Náuseas / vómito','Cefalea','Dolor torácico','Arritmia','Disnea','Problema de acceso','Coagulación del circuito','Sangrado','Fiebre / escalofríos','Alarma de máquina','Terminó antes de tiempo'];
@@ -299,6 +302,8 @@ const evFrase=evs=>', cursando con eventualidades durante el transcurso: '+evs.m
 const evRe=/,?\s*sin cursar con eventualidades[^.\n]*\.?/i;
 function evAplica(txt,evs){if(!evs||!evs.length)return {t:txt,ok:true};if(!evRe.test(txt))return {t:txt,ok:false};return {t:txt.replace(evRe,evFrase(evs)),ok:true}}
 const evList=()=>{try{const v=JSON.parse(lsGet('evList')||'null');if(Array.isArray(v)&&v.length)return v}catch(_){}return EV_DEF};
+const accOpen=k=>{try{return JSON.parse(lsGet('acc')||'{}')[k]?' open':''}catch(_){return ''}};
+document.addEventListener('toggle',ev=>{const d=ev.target;if(!d||!d.dataset||!d.dataset.acc)return;try{const o=JSON.parse(lsGet('acc')||'{}');o[d.dataset.acc]=d.open?1:0;lsSet('acc',JSON.stringify(o))}catch(_){}},true);
 const DIAS=[['L','Lun'],['M','Mar'],['X','Mié'],['J','Jue'],['V','Vie'],['S','Sáb'],['D','Dom']];
 const ACCESOS=['FAV','Injerto','Catéter tunelizado','Catéter temporal'];
 const DEF_EXF='A la exploración física se encuentra neurológico integra, adecuado color tegumentario, cuello sin adenomegalias, no plétora yugular. Cardiopulmonar sin compromiso aparente, campos pulmonares ventilados sin estertores ni sibilancias. Abdomen asignológico, extremidades integras, sin presencia de edema.';
@@ -614,7 +619,7 @@ const patStamp=p=>p.pu||p.updatedAt||0;
 function mergePat(cur,r){
   if(!cur)return r;
   const out={...cur};
-  if(patStamp(r)>patStamp(cur)){out.nombre=r.nombre;out.acceso=r.acceso;out.aviso=r.aviso;out.notaFija=r.notaFija;out.sexo=r.sexo;if(r.dias!==undefined)out.dias=r.dias;if(r.turnoHab!==undefined)out.turnoHab=r.turnoHab;if(r.plantilla!==undefined)out.plantilla=r.plantilla;out.pu=patStamp(r)}
+  if(patStamp(r)>patStamp(cur)){out.nombre=r.nombre;out.acceso=r.acceso;out.aviso=r.aviso;out.notaFija=r.notaFija;out.sexo=r.sexo;if(r.dias!==undefined)out.dias=r.dias;if(r.turnoHab!==undefined)out.turnoHab=r.turnoHab;if(r.plantilla!==undefined)out.plantilla=r.plantilla;if(r.ficha!==undefined)out.ficha=r.ficha;out.pu=patStamp(r)}
   const m=new Map((cur.pendientes||[]).map(x=>[x.id,x]));
   for(const x of r.pendientes||[]){const c=m.get(x.id);if(!c||pStamp(x)>pStamp(c))m.set(x.id,x)}
   out.pendientes=[...m.values()];
@@ -749,64 +754,64 @@ async function renderResp(){
     <p>Las fotos de la hoja de signos se suben a tu cuenta de Firebase y se bajan en tus otros dispositivos; se borran a los ${DIAS_FOTO} días también en la nube. Si la hoja trae el nombre del paciente, quedará en la foto. En datos del celular, apaga las fotos.</p>
     <button class="btn" id="sy-now">Sincronizar ahora</button><button class="btn sec" id="sy-out">Cerrar sesión</button>`;
   $('#main').innerHTML=`<div class="top"><div class="datebar"><div class="d">Ajustes y respaldo</div></div></div>
-  <div class="box"><h3>Sincronización</h3>${syHtml}</div>
-  <div class="box"><h3>📁 Expedientes</h3><p>Consulta, corrige y revisa el historial de los pacientes.</p><button class="btn sec" id="settings-archivo">Administrar expedientes</button></div>
-  <details class="box"><summary><b>Cargar turno desde una sesión anterior</b></summary>
+  <details class="box" data-acc="sincronizaci-n"${accOpen('sincronizaci-n')}><summary><b>Sincronización</b></summary>${syHtml}</details>
+  <details class="box" data-acc="-expedientes"${accOpen('-expedientes')}><summary><b>📁 Expedientes</b></summary><p>Consulta, corrige y revisa el historial de los pacientes.</p><button class="btn sec" id="settings-archivo">Administrar expedientes</button></details>
+  <details class="box" data-acc="cargar-turno-desde-una-s"${accOpen('cargar-turno-desde-una-s')}><summary><b>Cargar turno desde una sesión anterior</b></summary>
     <p>Copia los pacientes de un turno de una sesión anterior (por defecto, la del mismo grupo de días: lunes-miércoles-viernes o martes-jueves-sábado). Los pacientes se cargan sin sillón (como siempre los mueven); se lo pones conforme van llegando. En la ficha de cada uno ves en qué sillón estuvo la última vez.</p>
     <label for="cp-date">Cargar en la fecha</label><input id="cp-date" type="date" value="${esc(S.fecha)}"><label for="cp-turn">Turno</label><select id="cp-turn">${turnoOpts(S.turno)}</select>
     <label for="cp-src">Copiar de la fecha</label><input id="cp-src" type="date" value="${esc(fechaBase(S.fecha))}">
     <p id="cp-info" class="hint"></p><button class="btn" id="cp-go">Cargar pacientes</button></details>
-  <details class="box"><summary><b>Cargar sillones vacíos</b></summary>
+  <details class="box" data-acc="cargar-sillones-vac-os"${accOpen('cargar-sillones-vac-os')}><summary><b>Cargar sillones vacíos</b></summary>
     <p>Crea de una vez los sillones del turno (1 al número que indiques) sin expediente. Luego abres cada uno y le asignas el expediente. Los sillones que ya existen en ese turno no se duplican.</p>
     <label for="sl-date">Fecha</label><input id="sl-date" type="date" value="${esc(S.fecha)}"><label for="sl-turn">Turno</label><select id="sl-turn">${turnoOpts(S.turno)}</select>
     <label for="sl-n">Número de sillones</label><input id="sl-n" type="number" min="1" max="60" inputmode="numeric" value="20">
     <button class="btn" id="sl-go">Cargar sillones</button><p id="sl-msg" class="hint"></p></details>
-  <div class="box"><h3>Etiquetas de eventos</h3>
+  <details class="box" data-acc="etiquetas-de-eventos"${accOpen('etiquetas-de-eventos')}><summary><b>Etiquetas de eventos</b></summary>
     <p>Son los chips que aparecen en cada paciente. Mantén la lista corta para que el pase sea rápido.</p>
     ${tags.map((g,i)=>`<div class="tgrow"><span>${esc(g)}</span><span><button class="tg ${esFija(g)?'on':''}" data-tgfix="${i}" title="La etiqueta fija pasa sola a la siguiente sesión del paciente">${esFija(g)?'Fija':'Fijar'}</button> <button class="x" data-tgi="${i}" aria-label="Quitar">×</button></span></div>`).join('')||'<p>Sin etiquetas.</p>'}
     <p class="hint">Una etiqueta <b>fija</b> (↻) se queda en el paciente: aparece sola en su siguiente sesión hasta que la desmarques. Úsala para cosas como "transgresor" o "infección de catéter".</p>
     <div class="addrow"><input id="tg-in" placeholder="Nueva etiqueta…" autocomplete="off"><button id="tg-add">+</button></div>
-    <button class="btn sec" id="tg-def">Restaurar lista por defecto</button></div>
-  <div class="box"><h3>Machote de subjetivo</h3>
+    <button class="btn sec" id="tg-def">Restaurar lista por defecto</button></details>
+  <details class="box" data-acc="machote-de-subjetivo"${accOpen('machote-de-subjetivo')}><summary><b>Machote de subjetivo</b></summary>
     <p>En la Nota completa, el bloque marcado como <b>subjetivo</b> sale con este texto de "todo bien". Si el paciente hoy refiere algo, lo editas en el sillón (solo cambia ese día). El botón <b>Machote</b> del bloque lo vuelve a poner.</p>
     <label class="tg ${subjOn()?'on':''}" style="display:inline-block"><input type="checkbox" id="sj-on" ${subjOn()?'checked':''}> Usar el machote por defecto</label>
     <textarea id="sj-tx" rows="4">${esc(subjTxt())}</textarea>
-    <button class="btn sec" id="sj-def">Restaurar texto original</button></div>
-  <div class="box"><h3>Hojas PDF (HemoHL7)</h3>
+    <button class="btn sec" id="sj-def">Restaurar texto original</button></details>
+  <details class="box" data-acc="hojas-pdf-hemohl7-"${accOpen('hojas-pdf-hemohl7-')}><summary><b>Hojas PDF (HemoHL7)</b></summary>
     <p>Guarda aquí las hojas de monitoreo en PDF de tus pacientes (solo en este dispositivo). En Pase aparecerá <b>Imprimir hojas del turno</b> y las une en un solo PDF. El archivo debe llevar el expediente en el nombre, por ejemplo <code>RL0304.pdf</code>. Cargar otra hoja del mismo paciente reemplaza la anterior; tú las mantienes al día.</p>
     <input type="file" id="hj-files" accept="application/pdf,.pdf" multiple hidden>
     <button class="btn sec" id="hj-pick">Cargar PDFs…</button> <button class="btn sec" id="hj-clear">Borrar todas</button>
-    <p class="mu" id="hj-info"></p><div id="hj-res" class="mu"></div></div>
-  <div class="box"><h3>Prefijo del expediente</h3>
+    <p class="mu" id="hj-info"></p><div id="hj-res" class="mu"></div></details>
+  <details class="box" data-acc="prefijo-del-expediente"${accOpen('prefijo-del-expediente')}><summary><b>Prefijo del expediente</b></summary>
     <p>Para pegar el expediente en el sistema de la clínica. En pantalla ves el número (por ejemplo 1234) y el botón <b>Copiar</b> copia el prefijo más el número (RL1234 o LE1234).</p>
     <div class="tags"><button class="tg ${expPref()==='RL'?'on':''}" data-px="RL">RL</button><button class="tg ${expPref()==='LE'?'on':''}" data-px="LE">LE</button><button class="tg ${expPref()===''?'on':''}" data-px="">Sin prefijo</button></div>
     <label for="px-in">Otro prefijo</label><input id="px-in" value="${esc(expPref())}" maxlength="6" autocomplete="off" autocapitalize="characters">
-    <p id="px-ej" class="hint">Ejemplo: ${esc(expPref())}1234</p></div>
-  <div class="box"><h3>Calidad de las fotos</h3>
+    <p id="px-ej" class="hint">Ejemplo: ${esc(expPref())}1234</p></details>
+  <details class="box" data-acc="calidad-de-las-fotos"${accOpen('calidad-de-las-fotos')}><summary><b>Calidad de las fotos</b></summary>
     <p>Ligera (recomendada): escala de grises y menor tamaño, aprox. 100-150 KB por foto. Normal: a color, aprox. 300 KB. Aplica a las fotos nuevas.</p>
-    <div class="tags"><button class="tg ${modo==='ligera'?'on':''}" data-fq="ligera">Ligera</button><button class="tg ${modo==='normal'?'on':''}" data-fq="normal">Normal</button></div></div>
-  <div class="box"><h3>Almacenamiento</h3>
+    <div class="tags"><button class="tg ${modo==='ligera'?'on':''}" data-fq="ligera">Ligera</button><button class="tg ${modo==='normal'?'on':''}" data-fq="normal">Normal</button></div></details>
+  <details class="box" data-acc="almacenamiento"${accOpen('almacenamiento')}><summary><b>Almacenamiento</b></summary>
     <p>${pats.length} paciente${pats.length===1?'':'s'} guardado${pats.length===1?'':'s'} · ${ents.filter(x=>!x.deleted).length} registro${ents.filter(x=>!x.deleted).length===1?'':'s'} de sesión</p>
     <p>${phs.n} foto${phs.n===1?'':'s'} de hoja de signos: ${mb(bytes)}. Se borran solas a los ${DIAS_FOTO} días.</p>
     ${est&&est.quota?`<p>Uso total de la app: ${mb(est.usage||0)}</p>`:''}
     <p>Almacenamiento persistente: ${per===true?'sí ✓':per===false?'no concedido (instala la app en la pantalla de inicio)':'no disponible'}</p>
-    <button class="btn sec" id="r-del">Borrar todas las fotos ahora</button></div>
-  <div class="box"><h3>Exportar respaldo</h3>
+    <button class="btn sec" id="r-del">Borrar todas las fotos ahora</button></details>
+  <details class="box" data-acc="exportar-respaldo"${accOpen('exportar-respaldo')}><summary><b>Exportar respaldo</b></summary>
     <p>Último respaldo: ${last?new Date(last.v).toLocaleString('es-MX'):'nunca'}</p>
     <label style="display:flex;gap:8px;align-items:center;margin:6px 0"><input type="checkbox" id="r-fot"> Incluir fotos (pesa más)</label>
     <button class="btn" id="r-exp">Exportar archivo</button>
-    <p>Se genera un .json; en iPhone sale por el menú de compartir (Archivos, AirDrop, etc.).</p></div>
-  <div class="box"><h3>Lista de pacientes (Excel)</h3>
-    <p>Una fila por paciente: turno, días de la semana, sillón, peso seco, acceso, etiquetas y pendientes. Los días y el turno se capturan en «Editar expediente»; si faltan, se infieren de las últimas 8 semanas y se marcan como (inferido).</p>
-    <button class="btn" id="r-xls">Exportar lista a Excel</button></div>
-  <div class="box"><h3>Importar respaldo</h3>
+    <p>Se genera un .json; en iPhone sale por el menú de compartir (Archivos, AirDrop, etc.).</p></details>
+  <details class="box" data-acc="lista-de-pacientes-excel"${accOpen('lista-de-pacientes-excel')}><summary><b>Lista de pacientes (Excel)</b></summary>
+    <p>Hoja «Censo» con una fila por paciente (turno, días, sillón, peso seco, acceso, etiquetas, pendientes) y una pestaña por paciente con las sesiones del mes elegido: signos, pesos, UF y eventualidades. Los días y el turno se capturan en «Editar expediente»; si faltan, se infieren de las últimas 8 semanas y se marcan como (inferido).</p>
+    <label for="xl-mes">Mes a incluir</label><input id="xl-mes" type="month" value="${todayStr().slice(0,7)}"><button class="btn" id="r-xls">Exportar lista a Excel</button></details>
+  <details class="box" data-acc="importar-respaldo"${accOpen('importar-respaldo')}><summary><b>Importar respaldo</b></summary>
     <p>Combina el archivo con lo que ya tienes; gana el registro más reciente.</p>
-    <label class="btn sec" for="r-file">Elegir archivo…</label><input id="r-file" type="file" accept=".json,application/json" hidden></div>
-  <div class="box"><h3>Registro de errores</h3>
+    <label class="btn sec" for="r-file">Elegir archivo…</label><input id="r-file" type="file" accept=".json,application/json" hidden></details>
+  <details class="box" data-acc="registro-de-errores"${accOpen('registro-de-errores')}><summary><b>Registro de errores</b></summary>
     <p>Si algo falla, aquí queda el motivo. Puedes copiarlo y mandármelo.</p>
     ${errs.length?errs.map(x=>`<p style="font-size:12px;word-break:break-word">${esc(new Date(x.t).toLocaleTimeString('es-MX'))} · ${esc(x.d)}: ${esc(x.m)}</p>`).join(''):'<p>Sin errores registrados ✓</p>'}
-    <button class="btn sec" id="er-copy">Copiar</button><button class="btn sec" id="er-clear">Borrar</button></div>
-  <div class="box"><h3>Notas</h3><p>Los datos se guardan localmente y se sincronizan cuando Firebase está conectado. Realiza respaldos periódicos.</p><p>Versión ${VERSION}</p></div>`;
+    <button class="btn sec" id="er-copy">Copiar</button><button class="btn sec" id="er-clear">Borrar</button></details>
+  <details class="box" data-acc="notas"${accOpen('notas')}><summary><b>Notas</b></summary><p>Los datos se guardan localmente y se sincronizan cuando Firebase está conectado. Realiza respaldos periódicos.</p><p>Versión ${VERSION}</p></details>`;
 }
 
 /* ---------- Calculadora simple (suma, resta, multiplicación, división, %, signo) ---------- */
@@ -1161,7 +1166,8 @@ async function openEntry(id){
     if(kind==='uf'){if(!/UF programada/i.test(tx))return ufTxt();return tx.replace(/(UF programada de\s+)[\d.,_]+/i,(m,a)=>a+(val('#nr-ufp')||'0')).replace(/(UF tolerada de\s+)[\d.,_]+/i,(m,a)=>a+ufT())}
     return tx};
   const esSubj=p=>!NCA(p.label)&&fold(p.label).includes('subjetivo');
-  const ncDef=p=>esSubj(p)&&subjOn()?subjTxt():p.text;
+  const ncFic=p=>{const k=NCA(p.label)?'':FK(p.label);return k&&fHas(pat.ficha,k)?fBlock(k,pat.ficha,p.text):null};
+  const ncDef=p=>{if(esSubj(p)&&subjOn())return subjTxt();const f=ncFic(p);return f!==null?f:p.text};
   const ncParts=()=>parseTpl(pat.plantilla||'');
   const ncShown=p=>{const k=NCA(p.label);if(k)return genAuto(k,p.text);const ta=ncBody.querySelector('[data-nb="'+p.i+'"]');return ta?ta.value:(nr.blk&&nr.blk[p.i]!==undefined?nr.blk[p.i]:ncDef(p))};
   const ncRaw=()=>ncParts().map(p=>p.b?ncShown(p):p.t).join('');
@@ -1174,7 +1180,7 @@ async function openEntry(id){
     const f=signosFalt();if(!f.length)return true;
     return askUI(f.length===6?'No se capturaron los signos vitales.\n\n¿Copiar la nota de todos modos?':'Faltan signos vitales: '+f.join(', ')+'.\n\n¿Copiar la nota de todos modos?','Copiar así','Revisar')};
   const ncBase=()=>ncParts().map(p=>p.b?'['+ncShown(p)+']'+(p.label?'{'+p.label+'}':''):p.t).join('');
-  const LABS=['fecha y turno','dx','subjetivo','signos','exploración física','análisis','ultrafiltrado','tratamiento habitual','plan','médico'];
+  const LABS=['fecha y turno','dx','subjetivo','signos','exploración física','análisis','ultrafiltrado','tratamiento habitual','prescripción','plan','médico'];
   const ncEditor=txt=>'<textarea id="nc-tpl" rows="12" placeholder="Pega aquí la nota completa del paciente"></textarea>'
     +'<p class="mu" style="margin:6px 0 0">Selecciona un texto de la nota y toca una etiqueta para marcarlo (como ocultar en Anki).</p>'
     +'<div class="nclabs">'+LABS.map(l=>`<button type="button" data-nclab="${esc(l)}">${esc(l)}</button>`).join('')+'</div>'
@@ -1214,7 +1220,7 @@ async function openEntry(id){
     if(!tpl.trim()){ncBody.innerHTML='<p class="mu">Este paciente aún no tiene plantilla. Pega su nota y marca los textos que cambian. Las etiquetas «fecha y turno», «signos» y «ultrafiltrado» se llenan solas con los datos de arriba.</p>'+ncEditor()+'<label for="nc-from">O copia la plantilla de otro paciente (expediente)</label><div class="row"><input id="nc-from" autocomplete="off"><button type="button" class="cp2" id="nc-copyfrom">Copiar</button></div>';return}
     const parts=ncParts();
     ncBody.innerHTML='<div class="bh"><b>Nota completa</b><button type="button" class="cp" id="nc-copy">Copiar nota</button></div><div style="margin:8px 0"><button type="button" class="cp2" id="nc-reset">Restablecer cambios de hoy</button> <button type="button" class="cp2" id="nc-del" style="background:#b3261e!important">Borrar nota y empezar de nuevo</button></div>'
-      +parts.filter(p=>p.b).map(p=>{const k=NCA(p.label);return `<div class="ncb"><div class="bl"><label>${esc(p.label||('Bloque '+(p.i+1)))}${k?' <small>(automático)</small>':''}</label>${esSubj(p)?`<button type="button" data-nbm="${p.i}" class="cp2">Machote</button> `:''}<button type="button" data-nbc="${p.i}">Copiar bloque</button></div><textarea data-nb="${p.i}" rows="${Math.min(10,Math.max(2,String(k?genAuto(k,p.text):(nr.blk[p.i]!==undefined?nr.blk[p.i]:ncDef(p))).split('\n').length))}" ${k?'readonly':''}></textarea></div>`}).join('')
+      +parts.filter(p=>p.b).map(p=>{const k=NCA(p.label);return `<div class="ncb"><div class="bl"><label>${esc(p.label||('Bloque '+(p.i+1)))}${k?' <small>(automático)</small>':''}${ncFic(p)!==null?' <small>(de la ficha)</small>':''}</label>${FK(p.label)&&!k?(ncFic(p)!==null?`<button type="button" data-nbf="${p.i}" class="cp2">Plantilla</button> `:'')+`<button type="button" data-nbg="${p.i}" class="cp2">Guardar en ficha</button> `:''}${esSubj(p)?`<button type="button" data-nbm="${p.i}" class="cp2">Machote</button> `:''}<button type="button" data-nbc="${p.i}">Copiar bloque</button></div><textarea data-nb="${p.i}" rows="${Math.min(10,Math.max(2,String(k?genAuto(k,p.text):(nr.blk[p.i]!==undefined?nr.blk[p.i]:ncDef(p))).split('\n').length))}" ${k?'readonly':''}></textarea></div>`}).join('')
       +'<div style="margin-top:8px"><button type="button" class="cp2" id="nc-base">Guardar cambios como base del paciente</button> <button type="button" class="cp2" id="nc-edit">Editar plantilla</button></div><div id="nc-editbox"></div>';
     parts.filter(p=>p.b).forEach(p=>{const k=NCA(p.label);ncBody.querySelector('[data-nb="'+p.i+'"]').value=k?genAuto(k,p.text):(nr.blk[p.i]!==undefined?nr.blk[p.i]:ncDef(p))});
     grow();
@@ -1223,7 +1229,7 @@ async function openEntry(id){
   ncBody.addEventListener('mousedown',ev=>{if(ev.target.closest('[data-nclab],#nc-auto,#nc-unmark,#nc-mark'))ev.preventDefault()});
   ncBody.addEventListener('input',ev=>{const ta=ev.target.closest('[data-nb]');if(ta){nr.blk[ta.dataset.nb]=ta.value;later()}});
   ncBody.addEventListener('click',async ev=>{
-    const id=ev.target.id;if(!id&&!ev.target.dataset.nclab&&ev.target.dataset.nbc===undefined&&ev.target.dataset.nbm===undefined)return;
+    const id=ev.target.id;if(!id&&!ev.target.dataset.nclab&&ev.target.dataset.nbc===undefined&&ev.target.dataset.nbm===undefined&&ev.target.dataset.nbf===undefined&&ev.target.dataset.nbg===undefined)return;
     try{
       if(id==='nc-copy'){if(!(await signosOk()))return;const ok=await copyText(ncFull());toast(ok?'Copiada la nota completa':'No se pudo copiar');return}
       if(id==='nc-save'){const t=ncq('#nc-tpl').value;if(!t.trim()){toast('Pega la nota primero');return}await setTpl(t);renderNC();toast('Plantilla guardada');return}
@@ -1232,6 +1238,11 @@ async function openEntry(id){
       if(id==='nc-reset'){nr.blk={};renderNC();later();toast('Se restableció la nota a la plantilla');return}
       if(id==='nc-del'){if(!confirm('¿Borrar la nota de este paciente para volver a crearla? No afecta a otros pacientes.'))return;await setTpl('');nr.blk={};renderNC();toast('Nota borrada: pega la nueva');return}
       if(id==='nc-edit'){ncq('#nc-editbox').innerHTML=ncEditor();ncq('#nc-tpl').value=pat.plantilla||'';return}
+      if(ev.target.dataset.nbf!==undefined){const i=ev.target.dataset.nbf,p=ncParts().find(x=>x.b&&String(x.i)===i),ta=ncq('[data-nb="'+i+'"]');if(p&&ta){ta.value=p.text;nr.blk[i]=p.text;later();grow();toast('Texto de la plantilla puesto (ya no usa la ficha en este bloque)')}return}
+      if(ev.target.dataset.nbg!==undefined){const i=ev.target.dataset.nbg,p=ncParts().find(x=>x.b&&String(x.i)===i),ta=ncq('[data-nb="'+i+'"]');if(!p||!ta)return;const k=FK(p.label);
+        const nf=fMerge(pat.ficha,k,ta.value);const n=k==='dx'?nf.dxs.length+' diagnóstico(s)':k==='meds'?nf.meds.length+' medicamento(s)':'la prescripción';
+        if(!(await askUI('¿Actualizar la ficha con este texto?\n\nQuedará con '+n+'. Esto cambia la ficha del paciente para las próximas notas y el Excel.','Actualizar ficha','Cancelar')))return;
+        await mutPat(x=>{x.ficha=nf;x.pu=now()});renderNC();toast('Ficha actualizada');return}
       if(ev.target.dataset.nbm!==undefined){const ta=ncq('[data-nb="'+ev.target.dataset.nbm+'"]');if(ta){ta.value=subjTxt();nr.blk[ev.target.dataset.nbm]=ta.value;later();toast('Machote puesto')}return}
       if(ev.target.dataset.nbc!==undefined){const ta=ncq('[data-nb="'+ev.target.dataset.nbc+'"]');const ok=ta&&await copyText(ta.value);toast(ok?'Bloque copiado':'No se pudo copiar');return}
       if(ev.target.dataset.nclab){wrapSel(ev.target.dataset.nclab);return}
@@ -1630,7 +1641,8 @@ async function purge(){
 const DIAN={L:'Lunes',M:'Martes',X:'Miércoles',J:'Jueves',V:'Viernes',S:'Sábado',D:'Domingo'};
 const diaDe=f=>'DLMXJVS'[new Date(f+'T12:00:00').getDay()];
 function diasTxt(str){return DIAS.filter(d=>str.includes(d[0])).map(d=>DIAN[d[0]]).join(', ')}
-async function listaFilas(){
+async function listaFilas(ym){
+  ym=ym||todayStr().slice(0,7);
   const hoy=todayStr(),pats=(await all('patients')).filter(p=>!p.deleted),ents=(await all('entries')).filter(e=>!e.deleted);
   const por={};for(const e of ents)(por[e.expediente]=por[e.expediente]||[]).push(e);
   const filas=[];
@@ -1647,7 +1659,8 @@ async function listaFilas(){
     let seco='';for(const e of es){const v=((e.nr||{}).seco||(e.extras||{}).peso||'').toString().trim();if(v){seco=v;break}}
     const pend=pAct(p),labs=pend.filter(x=>x.tipo==='labs'),otros=pend.filter(x=>x.tipo!=='labs');
     const sil=(es.find(e=>e.sillon)||{}).sillon||'';
-    filas.push({nombre:p.nombre||'',exp:p.expediente,turno:tur,turTxt:tur?('Turno '+tur+(turInf?' (inferido)':'')):'',dias,diasTxt:(diasTxt(dias)||'')+(diasInf&&dias?' (inferido)':''),sil,seco,acceso:p.acceso||'',tags:(ult&&ult.tags||[]).join(', '),aviso:p.aviso||'',ult:ult?ult.fecha:'',ses:rec.length,labs:labs.map(x=>x.texto).join('; '),pend:otros.map(x=>(x.vence?'['+x.vence+'] ':'')+x.texto).join('; ')});
+    const mes=es.filter(x=>(x.fecha||'').startsWith(ym)).sort((a,b)=>(a.fecha||'').localeCompare(b.fecha||'')||(a.turno||0)-(b.turno||0));
+    filas.push({ficha:p.ficha?fNorm(p.ficha):null,mes,nombre:p.nombre||'',exp:p.expediente,turno:tur,turTxt:tur?('Turno '+tur+(turInf?' (inferido)':'')):'',dias,diasTxt:(diasTxt(dias)||'')+(diasInf&&dias?' (inferido)':''),sil,seco,acceso:p.acceso||'',tags:(ult&&ult.tags||[]).join(', '),aviso:p.aviso||'',ult:ult?ult.fecha:'',ses:rec.length,labs:labs.map(x=>x.texto).join('; '),pend:otros.map(x=>(x.vence?'['+x.vence+'] ':'')+x.texto).join('; ')});
   }
   const ordD=f=>{const s=f.dias||'';const i=DIAS.findIndex(d=>s.includes(d[0]));return i<0?9:i};
   filas.sort((a,b)=>(a.turno||9)-(b.turno||9)||(a.dias||'~').localeCompare(b.dias||'~')||ordD(a)-ordD(b)||String(a.nombre).localeCompare(String(b.nombre),'es'));
@@ -1672,27 +1685,91 @@ function zipStore(files){
 }
 const xe=t=>String(t).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])).replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/g,'');
 const colL=i=>String.fromCharCode(65+i);
-function xlsxBlob(titulo,cols,rows,anchos){
-  const cell=(r,c,v,st)=>`<c r="${colL(c)}${r}" t="inlineStr"${st?` s="${st}"`:''}><is><t xml:space="preserve">${xe(v)}</t></is></c>`;
-  let sd=`<row r="1" ht="22" customHeight="1">${cols.map((h,i)=>cell(1,i,h,1)).join('')}</row>`;
-  rows.forEach((f,ri)=>{sd+=`<row r="${ri+2}">${f.map((v,i)=>cell(ri+2,i,v,2)).join('')}</row>`});
-  const sheet=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetViews><sheetView workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews><cols>${anchos.map((w,i)=>`<col min="${i+1}" max="${i+1}" width="${w}" customWidth="1"/>`).join('')}</cols><sheetData>${sd}</sheetData><autoFilter ref="A1:${colL(cols.length-1)}${rows.length+1}"/><pageSetup orientation="landscape" fitToHeight="0"/></worksheet>`;
-  const styles=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="2"><font><sz val="11"/><name val="Calibri"/></font><font><b/><color rgb="FFFFFFFF"/><sz val="11"/><name val="Calibri"/></font></fonts><fills count="3"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FF0B6BCB"/><bgColor indexed="64"/></patternFill></fill></fills><borders count="2"><border><left/><right/><top/><bottom/><diagonal/></border><border><left style="thin"><color rgb="FFBFC7D1"/></left><right style="thin"><color rgb="FFBFC7D1"/></right><top style="thin"><color rgb="FFBFC7D1"/></top><bottom style="thin"><color rgb="FFBFC7D1"/></bottom><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="3"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="2" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyBorder="1" applyAlignment="1"><alignment vertical="top" wrapText="1"/></xf></cellXfs></styleSheet>`;
+const XS={H:1,B:2,L:3,T:4,K:5};
+const xH=v=>({v,s:1}),xB=v=>({v,s:2}),xN=v=>{const t=String(v==null?'':v).replace(',','.').trim();return /^-?\d+(\.\d+)?$/.test(t)?{n:+t,s:2}:{v:v==null?'':v,s:2}};
+function xlsxBook(sheets){
+  const cellXml=(rn,ci,c)=>{
+    if(c==null||c==='')return '';
+    if(typeof c!=='object')c={v:c};
+    const st=c.s?` s="${c.s}"`:'',ref=`${colL(ci)}${rn}`;
+    if(c.n!==undefined)return `<c r="${ref}"${st}><v>${c.n}</v></c>`;
+    if(c.v===''||c.v==null)return c.s?`<c r="${ref}"${st}/>`:'';
+    return `<c r="${ref}"${st} t="inlineStr"><is><t xml:space="preserve">${xe(c.v)}</t></is></c>`;
+  };
+  const nombres=[];
+  const sheetXml=sh=>{
+    let sd='';
+    sh.rows.forEach((r,ri)=>{const rn=ri+1,ht=sh.heights&&sh.heights[ri];sd+=`<row r="${rn}"${ht?` ht="${ht}" customHeight="1"`:''}>${r.map((c,ci)=>cellXml(rn,ci,c)).join('')}</row>`});
+    const fz=sh.freeze?`<pane ySplit="${sh.freeze}" topLeftCell="A${sh.freeze+1}" activePane="bottomLeft" state="frozen"/>`:'';
+    return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetPr><pageSetUpPr fitToPage="1"/></sheetPr><sheetViews><sheetView workbookViewId="0">${fz}</sheetView></sheetViews><cols>${sh.widths.map((w,i)=>`<col min="${i+1}" max="${i+1}" width="${w}" customWidth="1"/>`).join('')}</cols><sheetData>${sd}</sheetData>${sh.filter?`<autoFilter ref="${sh.filter}"/>`:''}${(sh.links&&sh.links.length)?`<hyperlinks>${sh.links.map(l=>`<hyperlink ref="${l.ref}" location="${xe(l.loc)}" display="${xe(l.tip||'')}"/>`).join('')}</hyperlinks>`:''}<pageSetup orientation="landscape" fitToWidth="1" fitToHeight="0"/></worksheet>`;
+  };
+  const styles=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="5"><font><sz val="11"/><name val="Calibri"/></font><font><b/><color rgb="FFFFFFFF"/><sz val="11"/><name val="Calibri"/></font><font><u/><color rgb="FF0B6BCB"/><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="15"/><name val="Calibri"/></font><font><b/><sz val="11"/><name val="Calibri"/></font></fonts><fills count="4"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FF0B6BCB"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFEAF1FB"/><bgColor indexed="64"/></patternFill></fill></fills><borders count="2"><border><left/><right/><top/><bottom/><diagonal/></border><border><left style="thin"><color rgb="FFBFC7D1"/></left><right style="thin"><color rgb="FFBFC7D1"/></right><top style="thin"><color rgb="FFBFC7D1"/></top><bottom style="thin"><color rgb="FFBFC7D1"/></bottom><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="8"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="2" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyBorder="1" applyAlignment="1"><alignment vertical="top" wrapText="1"/></xf><xf numFmtId="0" fontId="2" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1" applyAlignment="1"><alignment vertical="top" wrapText="1"/></xf><xf numFmtId="0" fontId="3" fillId="0" borderId="0" xfId="0" applyFont="1"/><xf numFmtId="0" fontId="4" fillId="3" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment vertical="top" wrapText="1"/></xf><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1"/></cellXfs></styleSheet>`;
+  const hojas=sheets.map((sh,i)=>({...sh,id:i+1}));
   return zipStore([
-   ['[Content_Types].xml','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/></Types>'],
+   ['[Content_Types].xml','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>'+hojas.map(h=>`<Override PartName="/xl/worksheets/sheet${h.id}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>`).join('')+'</Types>'],
    ['_rels/.rels','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>'],
-   ['xl/workbook.xml',`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="${xe(titulo)}" sheetId="1" r:id="rId1"/></sheets></workbook>`],
-   ['xl/_rels/workbook.xml.rels','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>'],
-   ['xl/styles.xml',styles],['xl/worksheets/sheet1.xml',sheet]]);
+   ['xl/workbook.xml',`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets>${hojas.map(h=>`<sheet name="${xe(h.name)}" sheetId="${h.id}" r:id="rId${h.id}"/>`).join('')}</sheets></workbook>`],
+   ['xl/_rels/workbook.xml.rels','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'+hojas.map(h=>`<Relationship Id="rId${h.id}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet${h.id}.xml"/>`).join('')+`<Relationship Id="rId${hojas.length+1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>`],
+   ['xl/styles.xml',styles],
+   ...hojas.map(h=>['xl/worksheets/sheet'+h.id+'.xml',sheetXml(h)])]);
 }
-async function exportarLista(){
-  const filas=await listaFilas();
-  if(!filas.length){toast('No hay pacientes para exportar');return false}
-  const cols=['Paciente','Expediente','Turno','Días','Sillón','Peso seco (kg)','Acceso vascular','Etiquetas','Aviso','Última sesión','Sesiones (8 sem)','Labs por pedir','Pendientes'];
-  const rows=filas.map(f=>[f.nombre,f.exp,f.turTxt,f.diasTxt,f.sil,f.seco,f.acceso,f.tags,f.aviso,f.ult?fmtFecha(f.ult):'',f.ses||'',f.labs,f.pend]);
-  const blob=xlsxBlob('Pacientes',cols,rows,[30,14,16,28,9,13,18,26,24,16,12,30,48]);
-  const name=`lista-pacientes-${todayStr()}.xlsx`;
-  const file=new File([blob],name,{type:blob.type});
+function xlsxBlob(titulo,cols,rows,anchos){
+  return xlsxBook([{name:titulo,widths:anchos,freeze:1,filter:`A1:${colL(cols.length-1)}${rows.length+1}`,rows:[cols.map(xH),...rows.map(r=>r.map(xB))],heights:[22]}]);
+}
+const nomHoja=(txt,usados)=>{let b=String(txt||'Paciente').replace(/[\\\/\?\*\[\]:]/g,'-').replace(/^'+|'+$/g,'').trim().slice(0,31)||'Paciente';let n=b,k=2;while(usados.has(n.toLowerCase())){const suf=' ('+k+')';n=b.slice(0,31-suf.length)+suf;k++}usados.add(n.toLowerCase());return n};
+const ganSes=nr=>{if(nr.gan&&String(nr.gan).trim())return nr.gan;const a=parseFloat(String(nr.ing||'').replace(',','.')),b=parseFloat(String(nr.seco||'').replace(',','.'));return isNaN(a)||isNaN(b)?'':String(parseFloat((a-b).toFixed(3)))};
+async function libroLista(ym){
+  ym=ym||todayStr().slice(0,7);
+  const filas=await listaFilas(ym);
+  const mesTxt=new Date(ym+'-15T12:00:00').toLocaleDateString('es-MX',{month:'long',year:'numeric'});
+  const usados=new Set(['censo']);
+  const nom=new Map();
+  filas.forEach(f=>{if(f.mes.length)nom.set(f.exp,nomHoja(f.nombre||('Exp '+f.exp),usados))});
+  const colsC=['Paciente','Expediente','Turno','Días','Sillón','Peso seco (kg)','Acceso vascular','Edad','Inicio HD','Diagnósticos','Medicamentos (toma)','Prescripción','Etiquetas','Aviso','Última sesión','Sesiones del mes','Eventualidades del mes','Labs por pedir','Pendientes'];
+  const rowsC=[colsC.map(xH)],links=[];
+  filas.forEach((f,i)=>{
+    const evs=f.mes.flatMap(x=>(x.evs||[]).map(v=>x.fecha.slice(8)+'/'+x.fecha.slice(5,7)+': '+evNom(v)));
+    const hoja=nom.get(f.exp),fx=f.ficha;
+    rowsC.push([hoja?{v:f.nombre||('Exp '+f.exp),s:3}:xB(f.nombre),xB(f.exp),xB(f.turTxt),xB(f.diasTxt),xB(f.sil),xN(f.seco),xB(f.acceso),xN(fx?fEdad(fx.nac):''),xB(fx?fFec(fx.ini):''),xB(fx?fx.dxs.map(d=>d.t+(d.y?' ('+d.y+')':'')).join('\n'):''),xB(fx?fx.meds.map(m=>fMedTxt(m)+(m.toma?'':' — NO la toma')).join('\n'):''),xB(fx?fRxTxt(fx.rx):''),xB(f.tags),xB(f.aviso),xB(f.ult?fmtFecha(f.ult):''),xN(f.mes.length||''),xB(evs.join('\n')),xB(f.labs),xB(f.pend)]);
+    if(hoja)links.push({ref:'A'+(i+2),loc:`'${hoja.replace(/'/g,"''")}'!A1`,tip:'Ir a '+hoja});
+  });
+  const hojas=[{name:'Censo',widths:[30,13,16,28,9,13,18,7,11,40,44,50,24,22,16,11,40,28,44],freeze:1,filter:`A1:${colL(colsC.length-1)}${rowsC.length}`,rows:rowsC,heights:[26],links}];
+  const colsP=['Fecha','Día','Turno','Sillón','Peso seco (kg)','Peso ingreso (kg)','Ganancia (kg)','FC','TA','FR','SpO2 %','Temp °C','UF prog. (mL)','UF tol. (mL)','Eventualidades','Comentario','Etiquetas','Nota del día'];
+  filas.forEach(f=>{
+    if(!f.mes.length)return;const hoja=nom.get(f.exp);
+    const ses=f.mes.map(x=>{const nr=x.nr||{},ex=x.extras||{};const ta=(nr.tas||nr.tad)?(nr.tas||'__')+'/'+(nr.tad||'__'):(ex.ta||'');
+      return [xB(x.fecha.split('-').reverse().join('/')),xB(DIAN[diaDe(x.fecha)].slice(0,3)),xN(x.turno),xB(x.sillon||''),xN(nr.seco),xN(nr.ing||ex.peso),xN(ganSes(nr)||ex.gan),xN(nr.fc),xB(ta),xN(nr.fr),xN(nr.sp),xN(nr.tp),xN(nr.ufp),xN(nr.uft),xB((x.evs||[]).map(evNom).join('; ')),xB(x.comentario||''),xB((x.tags||[]).join(', ')),{v:String(x.notaTxt||'').replace(/\r/g,''),s:6}]});
+    const gans=f.mes.map(x=>parseFloat(String(ganSes(x.nr||{})||'').replace(',','.'))).filter(v=>!isNaN(v));
+    const gp=gans.length?(gans.reduce((a,b)=>a+b,0)/gans.length).toFixed(2):'—';
+    const nev=f.mes.reduce((a,x)=>a+(x.evs||[]).length,0);
+    const P=t=>({v:t,s:6});
+    const l1=`Expediente: ${f.exp}   ·   ${f.turTxt||'Turno: —'}   ·   Días: ${f.diasTxt||'—'}`;
+    const l2=`Acceso vascular: ${f.acceso||'—'}   ·   Aviso: ${f.aviso||'—'}   ·   Etiquetas: ${f.tags||'—'}`;
+    const l3=`${mesTxt}: ${f.mes.length} sesión(es)  ·  ganancia promedio ${gp} kg  ·  ${nev} eventualidad(es)`;
+    const fx=f.ficha,fl=[];
+    if(fx){
+      const ed=fEdad(fx.nac);
+      const dg=[];if(fx.nac)dg.push('Nacimiento: '+fFec(fx.nac)+(ed!==''?' ('+ed+' años)':''));if(fx.ini)dg.push('Inicio HD: '+fFec(fx.ini));if(fx.ing)dg.push('Ingreso a la clínica: '+fFec(fx.ing));if(fx.gpo)dg.push('Gpo y Rh: '+fx.gpo);if(fx.alerg)dg.push('Alergias: '+fx.alerg);if(fx.trasp)dg.push('Trasplante: '+fx.trasp);
+      if(dg.length)fl.push(dg.join('   ·   '));
+      const ac=[];if(fx.accF)ac.push('Acceso: '+fx.accF);if(fx.accI)ac.push('Infección del acceso: '+fx.accI);if(fx.ures)ac.push('Uresis residual: '+fx.ures);if(fx.bact)ac.push('Bacteriemias: '+fx.bact);
+      if(ac.length)fl.push(ac.join('   ·   '));
+      if(fx.dxs.length){fl.push('Diagnósticos:');fx.dxs.forEach(d=>fl.push('   • '+d.t+(d.y?' ('+d.y+')':'')))}
+      if(fx.meds.length){fl.push('Medicamentos indicados:');fx.meds.forEach(m=>fl.push('   • '+fMedTxt(m)+'  —  '+(m.toma?'SÍ lo toma':'NO lo toma')))}
+      const rt=fRxTxt(fx.rx);if(rt)fl.push('Prescripción de diálisis: '+rt);
+    }
+    const hdr=[[{v:f.nombre||('Exp '+f.exp),s:4}],[{v:'← Volver al Censo',s:7}],[P(l1)],[P(l2)],[P(l3)],...fl.map(t=>[P(t)]),[]];
+    const hRow=hdr.length+1;
+    const rows=[...hdr,colsP.map(xH),...ses];
+    const hs=[24];for(let z=1;z<hRow-1;z++)hs.push(null);hs.push(34);
+    hojas.push({name:hoja,widths:[13,7,8,8,12,13,12,8,10,8,9,9,12,12,40,36,22,60],rows,heights:hs,filter:`A${hRow}:${colL(colsP.length-1)}${hRow+ses.length}`,links:[{ref:'A2',loc:"'Censo'!A1",tip:'Volver al Censo'}]});
+  });
+  return {libro:xlsxBook(hojas),pacientes:filas.length,hojas:hojas.length-1,mesTxt};
+}
+async function exportarLista(ym){
+  const r=await libroLista(ym);
+  if(!r.pacientes){toast('No hay pacientes para exportar');return false}
+  const name=`lista-pacientes-${(ym||todayStr().slice(0,7))}.xlsx`;
+  const blob=r.libro,file=new File([blob],name,{type:blob.type});
   if(navigator.canShare&&navigator.canShare({files:[file]})){
     try{await navigator.share({files:[file],title:name});return true}catch(err){if(err&&err.name==='AbortError')return false}
   }
@@ -1801,12 +1878,182 @@ async function loadHistory(exp,current,host){
  target.innerHTML=entries.length?entries.map(x=>`<div class="box" style="margin:8px 0"><b>${esc(x.fecha)} · Turno ${esc(x.turno)}</b><p>Asistencia: ${esc(x.asistencia||'sin registrar')} · Nota ${x.nota?'hecha':'pendiente'}</p>${x.comentario?`<p>${esc(x.comentario)}</p>`:''}${x.notaTxt?`<details><summary>Ver nota previa</summary><pre style="white-space:pre-wrap;overflow-wrap:anywhere">${esc(x.notaTxt)}</pre></details>`:''}<button type="button" data-hopen="${esc(x.id)}">Abrir sesión</button>${(x.fotos||[]).length?`<p>📷 ${x.fotos.length} hoja(s) registradas (pueden caducar a los 7 días)</p>`:''}</div>`).join(''):'<p>No hay sesiones anteriores.</p>';
  target.onclick=ev=>{const b=ev.target.closest('[data-hopen]');if(b)openEntry(b.dataset.hopen)};
 }
+/* ---------- Ficha del paciente (datos fijos que alimentan la nota y el Excel) ---------- */
+const DXC=[
+['Etiología de la ERC',['Enfermedad renal crónica 5 KDIGO secundaria a nefropatía diabética','Enfermedad renal crónica 5 KDIGO secundaria a nefropatía hipertensiva','Enfermedad renal crónica 5 KDIGO de etiología no determinada','Enfermedad renal crónica 5 KDIGO secundaria a glomerulopatía','Enfermedad renal crónica 5 KDIGO secundaria a nefritis lúpica','Enfermedad renal crónica 5 KDIGO secundaria a enfermedad renal poliquística','Enfermedad renal crónica 5 KDIGO secundaria a uropatía obstructiva','Enfermedad renal crónica 5 KDIGO secundaria a nefropatía tubulointersticial','Enfermedad renal crónica 5 KDIGO por pérdida de injerto renal','Lesión renal aguda sobre enfermedad renal crónica','Lesión renal aguda que requiere terapia sustitutiva','Enfermedad renal crónica KDIGO 5 en terapia de sustitución renal con hemodiálisis']],
+['Metabólicos',['Diabetes Mellitus tipo 2','Diabetes Mellitus tipo 1','Obesidad','Dislipidemia','Hipotiroidismo','Hiperuricemia / gota','Desnutrición proteico-calórica','Síndrome metabólico']],
+['Cardiovasculares',['Hipertensión Arterial Sistémica','Cardiopatía isquémica','Infarto agudo al miocardio previo','Insuficiencia cardíaca crónica','Fibrilación auricular','Valvulopatía','Hipertensión pulmonar','Enfermedad arterial periférica','Enfermedad vascular cerebral previa','Miocardiopatía hipertensiva','Hipotensión intradialítica recurrente','Intervención coronaria percutánea previa','Cirugía de revascularización coronaria previa']],
+['Alteraciones de la ERC',['Anemia asociada a enfermedad renal crónica','Anemia ferropénica','Trastorno mineral óseo asociado a ERC','Hiperparatiroidismo secundario','Hiperfosfatemia','Hipocalcemia','Hiperkalemia','Acidosis metabólica','Probable alteración hidroelectrolítica','Sobrecarga hídrica','Uremia','Prurito urémico','Osteodistrofia renal','Calcificación vascular']],
+['Complicaciones diabéticas',['Retinopatía diabética','Neuropatía diabética','Pie diabético','Amputación supracondílea previa','Amputación infracondílea previa','Amputación de ortejos previa']],
+['Infecciosos / hepáticos',['Hepatitis C crónica','Hepatitis B','Infección por VIH','Tuberculosis previa','Bacteriemia relacionada a catéter','Cirrosis hepática']],
+['Angioacceso',['Catéter tunelizado yugular derecho','Catéter tunelizado yugular izquierdo','Catéter tunelizado femoral','Catéter no tunelizado','Fístula arteriovenosa radiocefálica','Fístula arteriovenosa braquiocefálica','Injerto arteriovenoso','Disfunción de angioacceso','Trombosis de angioacceso']],
+['Otros',['Enfermedad pulmonar obstructiva crónica','Asma','Lupus eritematoso sistémico','Neoplasia (especificar)','Epilepsia','Depresión','Síndrome de piernas inquietas','Hiperplasia prostática','Hernia / eventración','Cirrosis','Hipertensión portal','Trombocitopenia','Insuficiencia venosa crónica','Gastropatía / enfermedad ácido péptica','Osteoporosis','Fractura de cadera previa','Alergia a medicamentos (especificar)']]];
+/* ---- Catálogo de medicamentos [nombre, presentación/vía, dosis, frecuencia] ---- */
+const MDC=[
+['Hemodiálisis / anemia',[['Eritropoyetina alfa','SC','4000 UI','tres veces por semana'],['Eritropoyetina alfa','SC','12000 UI','dos veces por semana'],['Darbepoetina alfa','SC','40 mcg','una vez por semana'],['Hierro sacarosa','IV post-hemodiálisis','100 mg','una vez por semana'],['MVI','IV post-hemodiálisis','','una vez por semana'],['Ácido fólico','tableta','5 mg','cada 24 horas'],['Complejo B','tableta','','cada 24 horas'],['Levocarnitina','IV post-hemodiálisis','1 g','en cada sesión'],['Vitamina B12','IM','1000 mcg','una vez por semana'],['Ácido fólico','tableta','1 mg','cada 24 horas'],['Hierro oral (sulfato ferroso)','tableta','300 mg','cada 24 horas'],['Hierro carboximaltosa','IV','500 mg','una vez por semana'],['Vitamina C','tableta','500 mg','cada 24 horas'],['Zinc','tableta','','cada 24 horas'],['Heparina de bajo peso molecular','SC','','cada 24 horas']]],
+['Mineral óseo / fósforo',[['Carbonato de calcio','tableta','500 mg','con alimentos'],['Sevelámero','tableta','800 mg','con alimentos'],['Calcitriol','cápsula','0.25 mcg','cada 24 horas'],['Paricalcitol','IV post-hemodiálisis','5 mcg','tres veces por semana'],['Cinacalcet','tableta','30 mg','cada 24 horas'],['Colecalciferol (vit. D3)','cápsula','','una vez por semana'],['Bicarbonato de sodio','tableta','650 mg','cada 8 horas'],['Resina de intercambio catiónico','sobre','30 g','cada 24 horas']]],
+['Antihipertensivos',[['Nifedipino','tableta','30 mg','cada 12 horas'],['Amlodipino','tableta','5 mg','cada 24 horas'],['Losartán','tableta','50 mg','cada 24 horas'],['Captopril','tableta','25 mg','cada 8 horas'],['Carvedilol','tableta','6.25 mg','cada 12 horas'],['Metoprolol','tableta','50 mg','cada 12 horas'],['Hidralazina','tableta','50 mg','cada 8 horas'],['Clonidina','tableta','0.15 mg','cada 12 horas'],['Prazosina','tableta','1 mg','cada 12 horas'],['Furosemida','tableta','40 mg','cada 12 horas'],['Isosorbide','tableta','10 mg','cada 8 horas'],['Telmisartán','tableta','40 mg','cada 24 horas'],['Valsartán','tableta','80 mg','cada 24 horas'],['Enalapril','tableta','10 mg','cada 12 horas'],['Bisoprolol','tableta','5 mg','cada 24 horas'],['Labetalol','tableta','100 mg','cada 12 horas'],['Doxazosina','tableta','2 mg','por las noches'],['Espironolactona','tableta','25 mg','cada 24 horas']]],
+['Diabetes',[['Insulina glargina','SC','20 UI','por las noches'],['Insulina NPH','SC','10 UI','cada 12 horas'],['Insulina lispro / rápida','SC','6 UI','antes de los alimentos'],['Linagliptina','tableta','5 mg','cada 24 horas'],['Sitagliptina','tableta','25 mg','cada 24 horas'],['Glibenclamida','tableta','5 mg','cada 24 horas'],['Gliclazida','tableta','30 mg','cada 24 horas'],['Insulina detemir / degludec','SC','10 UI','por las noches'],['Insulina aspart','SC','6 UI','antes de los alimentos']]],
+['Cardio / antitrombóticos',[['Ácido acetilsalicílico','tableta','100 mg','cada 24 horas'],['Clopidogrel','tableta','75 mg','cada 24 horas'],['Atorvastatina','tableta','40 mg','por las noches'],['Acenocumarina','tableta','4 mg','cada 24 horas'],['Amiodarona','tableta','200 mg','cada 24 horas'],['Rosuvastatina','tableta','10 mg','por las noches'],['Ezetimiba','tableta','10 mg','cada 24 horas'],['Rivaroxabán','tableta','15 mg','cada 24 horas'],['Apixabán','tableta','2.5 mg','cada 12 horas'],['Digoxina','tableta','0.25 mg','cada 24 horas'],['Ranolazina','tableta','500 mg','cada 12 horas'],['Trimetazidina','tableta','35 mg','cada 12 horas']]],
+['Antidepresivos / psiquiatría / neuro',[['Sertralina','tableta','50 mg','cada 24 horas'],['Escitalopram','tableta','10 mg','cada 24 horas'],['Fluoxetina','cápsula','20 mg','cada 24 horas'],['Paroxetina','tableta','20 mg','cada 24 horas'],['Mirtazapina','tableta','15 mg','por las noches'],['Amitriptilina','tableta','25 mg','por las noches'],]],
+['Benzodiacepinas e hipnóticos',[['Clonazepam','tableta','0.5 mg','por las noches'],['Alprazolam','tableta','0.25 mg','por las noches'],['Lorazepam','tableta','1 mg','por las noches'],['Diazepam','tableta','5 mg','por las noches'],['Bromazepam','tableta','3 mg','por las noches'],['Midazolam','tableta','7.5 mg','por las noches'],['Zolpidem','tableta','10 mg','por las noches'],['Melatonina','tableta','3 mg','por las noches']]],
+['Anticonvulsivos / antipsicóticos',[['Quetiapina','tableta','25 mg','por las noches'],['Haloperidol','tableta','5 mg','por las noches'],['Risperidona','tableta','1 mg','cada 12 horas'],['Carbamazepina','tableta','200 mg','cada 12 horas'],['Fenitoína','tableta','100 mg','cada 8 horas'],['Ácido valproico','tableta','500 mg','cada 12 horas'],['Levetiracetam','tableta','500 mg','cada 12 horas'],['Pregabalina','cápsula','75 mg','por las noches']]],
+['Otros',[['Omeprazol','cápsula','20 mg','cada 24 horas'],['Pantoprazol','tableta','40 mg','cada 24 horas'],['Alopurinol','tableta','100 mg','cada 24 horas'],['Levotiroxina','tableta','50 mcg','cada 24 horas'],['Gabapentina','cápsula','100 mg','por las noches'],['Paracetamol','tableta','500 mg','cada 8 horas'],['Loratadina','tableta','10 mg','cada 24 horas'],['Miccil','tableta','1 mg','cada 8 horas'],['Tramadol','tableta','50 mg','cada 8 horas'],['Ketorolaco','tableta','10 mg','en caso necesario'],['Metoclopramida','tableta','10 mg','cada 8 horas'],['Ondansetrón','tableta','8 mg','cada 8 horas'],['Cetirizina','tableta','10 mg','cada 24 horas'],['Hidroxicina','tableta','25 mg','por las noches'],['Difenhidramina','tableta','25 mg','por las noches'],['Lactulosa','jarabe','15 mL','cada 12 horas'],['Senósidos','tableta','','por las noches'],['Salbutamol','inhalado','2 disparos','en caso necesario'],['Prednisona','tableta','5 mg','cada 24 horas'],['Tamsulosina','cápsula','0.4 mg','por las noches'],['Finasterida','tableta','5 mg','cada 24 horas'],['Colchicina','tableta','0.5 mg','cada 24 horas'],['Febuxostat','tableta','40 mg','cada 24 horas']]]];
+const PRES=['','tableta','cápsula','sobre','jarabe','SC','IV','IV post-hemodiálisis','IM','inhalado','tópico','oftálmico'];
+const ORAL=['tableta','cápsula','sobre','jarabe'];
+const FREC=['cada 8 horas','cada 12 horas','cada 24 horas','por las noches','por las mañanas','con alimentos','antes de los alimentos','una vez por semana','dos veces por semana','tres veces por semana','en cada sesión','cada 15 días','cada mes','en caso necesario'];
+const FRXL={ses:'Sesiones/sem',tiempo:'Tiempo',qs:'QS',qd:'QD',filtro:'Filtro',na:'Na',k:'K',ca:'Ca',tmp:'Temp (°C)',hep:'Heparina bolo/inf',sello:'Sello de catéter',otros:'Otros (EPO, etc.)'};
+const fS=x=>String(x==null?'':x).trim();
+function fNorm(f){
+  f=f||{};const o={nac:fS(f.nac),ini:fS(f.ini),ing:fS(f.ing),gpo:fS(f.gpo),alerg:fS(f.alerg),trasp:fS(f.trasp),accF:fS(f.accF),accI:fS(f.accI),ures:fS(f.ures),bact:fS(f.bact)};
+  o.dxs=(Array.isArray(f.dxs)?f.dxs:[]).map(d=>({t:fS(d.t),y:fS(d.y)})).filter(d=>d.t);
+  o.meds=(Array.isArray(f.meds)?f.meds:[]).map(m=>({n:fS(m.n),pr:fS(m.pr),d:fS(m.d),f:fS(m.f),toma:m.toma!==false})).filter(m=>m.n);
+  o.rx={};Object.keys(FRXL).forEach(k=>{o.rx[k]=fS((f.rx||{})[k])});
+  return o;
+}
+const fVacia=f=>{f=fNorm(f);return !(f.nac||f.ini||f.ing||f.gpo||f.alerg||f.trasp||f.accF||f.accI||f.ures||f.bact||f.dxs.length||f.meds.length||Object.values(f.rx).some(Boolean))};
+function fEdad(nac,ref){
+  const m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(nac||'');if(!m)return '';
+  const r=ref||todayStr(),y=+r.slice(0,4),mo=+r.slice(5,7),d=+r.slice(8,10);
+  let a=y-(+m[1]);if(mo<+m[2]||(mo===+m[2]&&d<+m[3]))a--;return a>=0&&a<130?a:'';
+}
+const fFec=s=>{const m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(s||'');return m?m[3]+'/'+m[2]+'/'+m[1]:(s||'')};
+const fDot=s=>String(s).replace(/[.\s]+$/,'');
+function fMedTxt(m){
+  const n=fS(m.n),pr=m.pr||'',d=fS(m.d);let f=fS(m.f);
+  const oral=ORAL.indexOf(pr)>=0;let s=n;
+  if(oral){s+=' '+pr+(d?' '+d:'')}else{s+=(d?' '+d:'')+(pr?' '+pr:'')}
+  if(f){if(oral&&/^cada /.test(f)&&!/\d/.test(f.split(' ')[0]))f='1 '+f;s+=', '+f}
+  return fDot(s);
+}
+function fRxTxt(rx){
+  rx=rx||{};const o=[];
+  if(rx.ses)o.push(rx.ses+' sesiones por semana');
+  [['tiempo','Tiempo'],['qs','QS'],['qd','QD'],['filtro','Filtro'],['na','Na'],['k','K'],['ca','Ca']].forEach(([k,l])=>{if(rx[k])o.push(l+': '+rx[k])});
+  if(rx.tmp)o.push('Temp: '+rx.tmp+(/^[\d.,]+$/.test(rx.tmp)?' °C':''));
+  if(rx.hep)o.push('Heparina bolo/inf: '+rx.hep);
+  if(rx.sello)o.push('Sello de catéter: '+rx.sello);
+  if(rx.otros)o.push(rx.otros);
+  return o.join(', ');
+}
+const FK=l=>{const f=fold(l);return /^(dx|diagn)/.test(f)?'dx':(f.includes('medicament')||f.includes('tratamiento habitual'))?'meds':f.includes('prescrip')?'rx':''};
+function fHas(f,k){if(!f)return false;f=fNorm(f);return k==='dx'?f.dxs.length>0:k==='meds'?f.meds.length>0:k==='rx'?!!fRxTxt(f.rx):false}
+// Texto de un bloque de la nota hecho con la ficha; conserva el encabezado y el tipo de viñeta del texto anterior
+function fBlock(k,f,old){
+  f=fNorm(f);if(k==='rx')return fRxTxt(f.rx);
+  const items=k==='dx'?f.dxs.map(d=>fDot(d.t)):f.meds.filter(m=>m.toma).map(fMedTxt);
+  const ls=String(old||'').split('\n'),bi=ls.findIndex(l=>/^\s*[-*•]\s/.test(l));
+  const head=bi>0?ls.slice(0,bi).join('\n')+'\n':'';
+  const b=bi>=0?/^\s*([-*•])\s/.exec(ls[bi])[1]:'-';
+  return head+(items.length?items.map(x=>b+' '+x).join('\n'):b+' ____');
+}
+const fLines=(t,stop)=>{const out=[];for(const l of String(t||'').split('\n')){if(!l.trim())break;if(stop&&stop.test(l))break;out.push(l)}return out};
+const fUnb=l=>fDot(String(l).replace(/^\s*[-*•·]\s*/,'').trim());
+function fParseRx(t){
+  t=String(t||'');const g=re=>{const m=re.exec(t);return m?m[1].trim():''};const o={};
+  o.ses=g(/(\d)\s*(?:sesiones|ses\b)/i);
+  o.tiempo=g(/tiempo\s*:?\s*(\d{2,3}\s*min[^,;\n]*)/i)||g(/(\d{2,3}\s*min)\b/i);
+  o.qs=g(/\bQS\s*:?\s*(\d{3})/i);o.qd=g(/\bQD\s*:?\s*(\d{3})/i);
+  o.filtro=g(/filtro\s*:?\s*([^,;\n]+)/i)||g(/\b((?:Elisio|Amical|FX|Optiflux|Revaclear|Polyflux|Xevonta|Theranova)\s*[\w-]*?\d+\s*[A-Za-z]{0,2})\b/i);
+  o.na=g(/\bNa\s*:?\s*(\d{3})/);o.k=g(/\bK\s*:?\s*(\d(?:[.,]\d)?)(?!\d)/);o.ca=g(/\bCa\s*:?\s*(\d(?:[.,]\d+)?)/);
+  o.tmp=g(/\bT(?:emp(?:eratura)?)?\s*:?\s*(3\d(?:[.,]\d)?)/);
+  o.hep=g(/heparina[^:\d\n]*:?\s*(\d[\d.,]*\s*(?:UI)?\s*\/\s*\d[\d.,]*\s*(?:UI)?)/i);
+  o.sello=fDot(g(/sello(?:\s+de\s+cat[eé]ter)?\s*:?\s*([^,;\n]+)/i));
+  const e=/\b(?:EPO|eritropoyetina)(?:[^,;\n.]|\.(?=\d))*/i.exec(t);o.otros=e?fDot(e[0]):'';
+  return o;
+}
+function fParseNote(txt){
+  const t=String(txt||'').replace(/\[([^\[\]]*)\](?:\{[^{}\n]*\}|[ \t]*[^\n]*)?/g,(m,a)=>a).replace(/\r/g,'');
+  const L=t.split('\n'),out={};
+  const iDx=L.findIndex(l=>/diagn[oó]sticos?/i.test(l));
+  if(iDx>=0){
+    let rest=L.slice(iDx+1);while(rest.length&&!rest[0].trim())rest.shift();
+    const x=fLines(rest.join('\n'),/^\s*(subjetivo|signos|s:|o:)/i).map(fUnb).filter(Boolean);if(x.length)out.dxs=x.map(a=>({t:a,y:''}));
+  }
+  const iMd=L.findIndex(l=>/^\s*(medicamentos|tratamiento(\s+habitual)?)\s*:?\s*$/i.test(l));
+  if(iMd>=0){
+    let rest=L.slice(iMd+1);while(rest.length&&!rest[0].trim())rest.shift();
+    const x=fLines(rest.join('\n'),/^\s*plan\s*:/i).map(fUnb).filter(Boolean);if(x.length)out.meds=x.map(a=>({n:a,pr:'',d:'',f:'',toma:true}));
+  }
+  const iPl=L.findIndex(l=>/^\s*plan\s*:/i.test(l));
+  if(iPl>=0){const pl=fLines(L.slice(iPl).join('\n')).filter((l,i)=>i===0||/\b(QS|QD|filtro|heparina|sello|sesion|tiempo|EPO)\b/i.test(l));const rx=fParseRx(pl.join(' '));if(Object.values(rx).some(Boolean))out.rx=rx}
+  const u=/uresis(?:\s+residual)?\s*:?\s*([^.\n]+)/i.exec(t);if(u)out.ures=u[1].trim();
+  const b=/bacteriemias?\s*:?\s*([^.\n]+)/i.exec(t);if(b)out.bact=b[1].trim();
+  return out;
+}
+// Mezcla lo leído de un bloque de la nota con la ficha (conserva año, toma NO y estructura)
+function fMerge(f,k,text){
+  f=fNorm(f);
+  if(k==='rx'){const r=fParseRx(text);Object.keys(r).forEach(x=>{if(r[x])f.rx[x]=r[x]});return f}
+  const ls=String(text||'').split('\n').filter(l=>l.trim()&&!(/:\s*$/.test(l)&&!/^\s*[-*•]/.test(l))).map(fUnb).filter(Boolean);
+  if(k==='dx'){f.dxs=ls.map(a=>f.dxs.find(d=>fold(d.t)===fold(a))||{t:a,y:''});return f}
+  const keep=f.meds.filter(m=>!m.toma&&!ls.some(a=>fold(a)===fold(fMedTxt(m))));
+  f.meds=ls.map(a=>f.meds.find(m=>m.toma&&fold(fMedTxt(m))===fold(a))||{n:a,pr:'',d:'',f:'',toma:true}).concat(keep);
+  return f;
+}
+const fEsc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+function fichaHTML(){
+  const dl=`<datalist id="fc-fr">${FREC.map(x=>`<option value="${fEsc(x)}">`).join('')}</datalist>`;
+  const rxs=Object.keys(FRXL).map(k=>`<label class="fcl">${FRXL[k]}<input data-fr="${k}" autocomplete="off"></label>`).join('');
+  return `<h4>Ficha del paciente</h4><p class="mu">Se captura una vez. La nota y el Excel la usan. Nada se guarda hasta que toques «Guardar cambios».</p>${dl}
+  <details class="box" data-fc="imp"><summary><b>Importar desde la nota</b></summary><p class="mu">Lee diagnósticos, medicamentos y plan de una nota ya escrita y llena la ficha para que la revises.</p><textarea id="fc-impt" rows="6" placeholder="Pega aquí una nota, o deja la plantilla de este paciente"></textarea><button type="button" class="cp2" id="fc-impgo">Leer nota</button></details>
+  <details class="box" data-fc="dat"><summary><b>Datos generales</b></summary>
+   <div class="fcg"><label class="fcl">Fecha de nacimiento<input type="date" data-fk="nac"></label><label class="fcl">Edad<input id="fc-edad" readonly></label><label class="fcl">Inicio de hemodiálisis<input type="date" data-fk="ini"></label><label class="fcl">Ingreso a la clínica<input type="date" data-fk="ing"></label><label class="fcl">Gpo y Rh<input data-fk="gpo" placeholder="O Rh+" autocomplete="off"></label><label class="fcl">Protocolo de trasplante<select data-fk="trasp"><option value="">—</option><option>No</option><option>Sí, en protocolo</option><option>Sí, lista de espera</option></select></label></div>
+   <label>Alergias</label><input data-fk="alerg" placeholder="Negadas / especificar" autocomplete="off"></details>
+  <details class="box" data-fc="dx"><summary><b>Diagnósticos con año</b> <span class="mu" id="fc-dxn"></span></summary><div id="fc-dxl"></div><button type="button" class="cp2" data-fnew="dx">+ Escribir otro</button><div class="fcq"><input id="fc-dxq" placeholder="Buscar en el catálogo (diabetes, hepatitis, catéter…)" autocomplete="off"></div><div id="fc-dxc" class="fcc"></div></details>
+  <details class="box" data-fc="med"><summary><b>Medicamentos</b> <span class="mu" id="fc-mdn"></span></summary><div id="fc-mdl"></div><button type="button" class="cp2" data-fnew="med">+ Escribir otro</button><div class="fcq"><input id="fc-mdq" placeholder="Buscar en el catálogo (insulina, sertralina…)" autocomplete="off"></div><div id="fc-mdc" class="fcc"></div></details>
+  <details class="box" data-fc="rx"><summary><b>Prescripción de diálisis</b></summary><div class="fcg">${rxs}</div></details>
+  <details class="box" data-fc="ot"><summary><b>Acceso, uresis y bacteriemias</b></summary><div class="fcg"><label class="fcl">Acceso: funcionalidad<select data-fk="accF"><option value="">—</option><option>Funcional</option><option>Disfuncional</option></select></label><label class="fcl">Acceso: infección<select data-fk="accI"><option value="">—</option><option>No</option><option>Sí</option></select></label><label class="fcl">Uresis residual<input data-fk="ures" placeholder="Anuria / 300 mL/día" autocomplete="off"></label><label class="fcl">Eventos de bacteriemia<input data-fk="bact" placeholder="No / fecha y germen" autocomplete="off"></label></div></details>`;
+}
+function fichaBind(sh,p){
+  let F=fNorm(p.ficha);const q=x=>sh.querySelector(x);
+  const nz=s=>fold(s);
+  const dxRows=()=>{q('#fc-dxl').innerHTML=F.dxs.map((d,i)=>`<div class="fcr"><input data-di="${i}" data-f="t" placeholder="Diagnóstico" value="${fEsc(d.t)}" style="flex:1 1 200px"><input data-di="${i}" data-f="y" placeholder="Año" inputmode="numeric" maxlength="4" value="${fEsc(d.y)}" style="width:64px"><button type="button" class="cp2" data-frm="dx" data-i="${i}">✕</button></div>`).join('');q('#fc-dxn').textContent=F.dxs.length?'('+F.dxs.length+')':''};
+  const medRows=()=>{q('#fc-mdl').innerHTML=F.meds.map((m,i)=>`<div class="fcm${m.toma?'':' no'}"><div class="fcr"><input data-mi="${i}" data-f="n" placeholder="Fármaco" value="${fEsc(m.n)}" style="flex:1 1 150px"><button type="button" class="tg${m.toma?' on':''}" data-toma="${i}" style="${m.toma?'':'background:#b3261e;color:#fff;border-color:#b3261e'}">Toma: ${m.toma?'SÍ':'NO'}</button><button type="button" class="cp2" data-frm="med" data-i="${i}">✕</button></div><div class="fcr"><select data-mi="${i}" data-f="pr">${PRES.map(x=>`<option value="${fEsc(x)}"${x===m.pr?' selected':''}>${x||'(presentación/vía)'}</option>`).join('')}</select><input data-mi="${i}" data-f="d" placeholder="Dosis" value="${fEsc(m.d)}" style="width:90px"><input data-mi="${i}" data-f="f" list="fc-fr" placeholder="Frecuencia" value="${fEsc(m.f)}" style="flex:1 1 130px"></div></div>`).join('');q('#fc-mdn').textContent=F.meds.length?'('+F.meds.length+')':''};
+  const catHTML=(cat,kind,qq)=>{qq=nz((qq||'').trim());const name=it=>kind==='dx'?it:it[0]+(it[2]?' '+it[2]:'')+(it[1]?' '+it[1]:'');let h='';
+    cat.forEach((g,gi)=>{const its=g[1].map((it,ii)=>[it,ii]).filter(x=>!qq||nz(name(x[0])).indexOf(qq)>=0||nz(g[0]).indexOf(qq)>=0);if(!its.length)return;
+      h+=`<details${qq?' open':''}><summary>${fEsc(g[0])} (${its.length})</summary><div>${its.map(x=>`<button type="button" class="tg" data-cat="${kind}" data-g="${gi}" data-i="${x[1]}">+ ${fEsc(kind==='dx'?(x[0].length>46?x[0].slice(0,46)+'…':x[0]):name(x[0]))}</button>`).join('')}</div></details>`});
+    return h||'<p class="mu">Sin coincidencias. Usa «Escribir otro».</p>'};
+  const cats=()=>{q('#fc-dxc').innerHTML=catHTML(DXC,'dx',q('#fc-dxq').value);q('#fc-mdc').innerHTML=catHTML(MDC,'med',q('#fc-mdq').value)};
+  const fill=()=>{sh.querySelectorAll('[data-fk]').forEach(el=>{el.value=F[el.dataset.fk]||''});sh.querySelectorAll('[data-fr]').forEach(el=>{el.value=F.rx[el.dataset.fr]||''});q('#fc-edad').value=fEdad(F.nac)===''?'':fEdad(F.nac)+' años';dxRows();medRows();cats()};
+  fill();
+  // la plantilla del paciente (sin marcas) como texto inicial del importador
+  q('#fc-impt').value=String(p.plantilla||'').replace(/\[([^\[\]]*)\](?:\{[^{}\n]*\}|[ \t]*[^\n]*)?/g,(m,a)=>a);
+  sh.addEventListener('input',ev=>{const t=ev.target;
+    if(t.dataset.fk!==undefined){F[t.dataset.fk]=t.value;if(t.dataset.fk==='nac')q('#fc-edad').value=fEdad(F.nac)===''?'':fEdad(F.nac)+' años';return}
+    if(t.dataset.fr!==undefined){F.rx[t.dataset.fr]=t.value;return}
+    if(t.dataset.di!==undefined){F.dxs[+t.dataset.di][t.dataset.f]=t.value;return}
+    if(t.dataset.mi!==undefined){F.meds[+t.dataset.mi][t.dataset.f]=t.value;return}
+    if(t.id==='fc-dxq'||t.id==='fc-mdq')cats()});
+  sh.addEventListener('change',ev=>{const t=ev.target;if(t.dataset&&t.dataset.mi!==undefined&&t.dataset.f==='pr')F.meds[+t.dataset.mi].pr=t.value});
+  sh.addEventListener('click',ev=>{const b=ev.target.closest('button');if(!b)return;
+    if(b.dataset.fnew==='dx'){F.dxs.push({t:'',y:''});dxRows();const i=q('#fc-dxl').querySelectorAll('input[data-f="t"]');i[i.length-1].focus();return}
+    if(b.dataset.fnew==='med'){F.meds.push({n:'',pr:'',d:'',f:'',toma:true});medRows();const i=q('#fc-mdl').querySelectorAll('input[data-f="n"]');i[i.length-1].focus();return}
+    if(b.dataset.frm){const a=b.dataset.frm==='dx'?F.dxs:F.meds;a.splice(+b.dataset.i,1);b.dataset.frm==='dx'?dxRows():medRows();return}
+    if(b.dataset.toma!==undefined){const m=F.meds[+b.dataset.toma];m.toma=!m.toma;medRows();return}
+    if(b.dataset.cat){const it=(b.dataset.cat==='dx'?DXC:MDC)[+b.dataset.g][1][+b.dataset.i];
+      if(b.dataset.cat==='dx'){if(!F.dxs.some(d=>fold(d.t)===fold(it)))F.dxs.push({t:it,y:''});q('#fc-dxq').value='';dxRows()}
+      else{F.meds.push({n:it[0],pr:it[1]||'',d:it[2]||'',f:it[3]||'',toma:true});q('#fc-mdq').value='';medRows()}
+      cats();return}
+    if(b.id==='fc-impgo'){const r=fParseNote(q('#fc-impt').value);const got=[];
+      if(r.dxs){F.dxs=r.dxs.map(d=>F.dxs.find(x=>fold(x.t)===fold(d.t))||d);got.push(r.dxs.length+' diagnósticos')}
+      if(r.meds){const keep=F.meds.filter(m=>!m.toma&&!r.meds.some(x=>fold(x.n)===fold(fMedTxt(m))));F.meds=r.meds.map(m=>F.meds.find(x=>x.toma&&fold(fMedTxt(x))===fold(m.n))||m).concat(keep);got.push(r.meds.length+' medicamentos')}
+      if(r.rx){Object.keys(r.rx).forEach(k=>{if(r.rx[k])F.rx[k]=r.rx[k]});got.push('prescripción')}
+      if(r.ures){F.ures=r.ures;got.push('uresis')}
+      if(r.bact){F.bact=r.bact;got.push('bacteriemias')}
+      fill();toast(got.length?'Leído: '+got.join(', ')+'. Revisa y guarda.':'No encontré diagnósticos, medicamentos ni plan en ese texto');
+      if(got.length)['dx','med','rx'].forEach(k=>{const d=q('[data-fc="'+k+'"]');if(d)d.open=true});return}
+  });
+  return {get:()=>fNorm(F)};
+}
+
 async function openProfile(exp){
  const p=await get('patients',exp);if(!p)return;
- const sh=openSheet(`<div class="sh-head"><b>Editar expediente</b><button data-close>Cerrar</button></div><label>Expediente (identificador)</label><input id="pr-exp" value="${esc(p.expediente)}" readonly><p class="mu">El número de expediente no se cambia aquí para evitar separar notas y sesiones del paciente.</p><label>Nombre</label><input id="pr-nom" value="${esc(p.nombre)}"><label>Acceso vascular</label><select id="pr-ac"><option value="">—</option>${ACCESOS.map(a=>`<option ${p.acceso===a?'selected':''}>${esc(a)}</option>`).join('')}</select><label>Aviso fijo</label><input id="pr-av" value="${esc(p.aviso)}"><label>Turno habitual</label><select id="pr-tur"><option value="">—</option>${[1,2,3,4].map(t=>`<option value="${t}" ${+p.turnoHab===t?'selected':''}>Turno ${t}</option>`).join('')}</select><label>Días de hemodiálisis</label><div class="tags" id="pr-dias">${DIAS.map(d=>`<button type="button" class="tg ${(p.dias||'').includes(d[0])?'on':''}" data-dia="${d[0]}">${d[1]}</button>`).join('')}</div><label>Nota fija</label><textarea id="pr-fija" rows="4">${esc(p.notaFija)}</textarea><button class="btn" id="pr-save">Guardar cambios</button><h4>Historial</h4><div id="e-hist-list"></div><button class="dng" id="pr-del">Eliminar expediente</button>`);
+ const sh=openSheet(`<div class="sh-head"><b>Editar expediente</b><button data-close>Cerrar</button></div><label>Expediente (identificador)</label><input id="pr-exp" value="${esc(p.expediente)}" readonly><p class="mu">El número de expediente no se cambia aquí para evitar separar notas y sesiones del paciente.</p><label>Nombre</label><input id="pr-nom" value="${esc(p.nombre)}"><label>Acceso vascular</label><select id="pr-ac"><option value="">—</option>${ACCESOS.map(a=>`<option ${p.acceso===a?'selected':''}>${esc(a)}</option>`).join('')}</select><label>Aviso fijo</label><input id="pr-av" value="${esc(p.aviso)}"><label>Turno habitual</label><select id="pr-tur"><option value="">—</option>${[1,2,3,4].map(t=>`<option value="${t}" ${+p.turnoHab===t?'selected':''}>Turno ${t}</option>`).join('')}</select><label>Días de hemodiálisis</label><div class="tags" id="pr-dias">${DIAS.map(d=>`<button type="button" class="tg ${(p.dias||'').includes(d[0])?'on':''}" data-dia="${d[0]}">${d[1]}</button>`).join('')}</div><label>Nota fija</label><textarea id="pr-fija" rows="4">${esc(p.notaFija)}</textarea>${fichaHTML()}<button class="btn" id="pr-save">Guardar cambios</button><h4>Historial</h4><div id="e-hist-list"></div><button class="dng" id="pr-del">Eliminar expediente</button>`);
  loadHistory(exp,null,sh);
+ const FB=fichaBind(sh,p);
  $('#pr-dias',sh).onclick=ev=>{const b=ev.target.closest('[data-dia]');if(b)b.classList.toggle('on')};
- $('#pr-save',sh).onclick=async()=>{const cur=await get('patients',exp);cur.nombre=$('#pr-nom',sh).value.trim();cur.acceso=$('#pr-ac',sh).value;cur.aviso=$('#pr-av',sh).value.trim();cur.notaFija=$('#pr-fija',sh).value;cur.turnoHab=+$('#pr-tur',sh).value||0;cur.dias=[...sh.querySelectorAll('#pr-dias .tg.on')].map(b=>b.dataset.dia).join('');cur.updatedAt=now();cur.pu=now();await put('patients',cur);toast('Expediente actualizado');closeSheet()};
+ $('#pr-save',sh).onclick=async()=>{const cur=await get('patients',exp);cur.nombre=$('#pr-nom',sh).value.trim();cur.acceso=$('#pr-ac',sh).value;cur.aviso=$('#pr-av',sh).value.trim();cur.notaFija=$('#pr-fija',sh).value;cur.turnoHab=+$('#pr-tur',sh).value||0;{const fx=FB.get();if(fVacia(fx)){if(cur.ficha)cur.ficha=fx}else cur.ficha=fx}cur.dias=[...sh.querySelectorAll('#pr-dias .tg.on')].map(b=>b.dataset.dia).join('');cur.updatedAt=now();cur.pu=now();await put('patients',cur);toast('Expediente actualizado');closeSheet()};
  $('#pr-del',sh).onclick=async()=>{const entries=(await all('entries')).filter(e=>e.expediente===exp&&!e.deleted);if(entries.length){alert(`Este expediente tiene ${entries.length} sesiones. Por seguridad no se elimina junto con sus notas. Primero debe resolverse la conservación de su historial.`);return}if(!confirm('¿Eliminar este expediente sin sesiones? Esta acción no se puede deshacer.'))return;const cur=await get('patients',exp);cur.deleted=true;cur.updatedAt=now();cur.pu=now();await put('patients',cur);closeSheet();toast('Expediente marcado como eliminado; comprueba la sincronización.')};
 }
 async function openBatch(){
@@ -1917,7 +2164,7 @@ document.addEventListener('click',async ev=>{
     for(const p of await all('photos')){await del('photos',p.id);SYNC.dropPhoto(p)}
     for(const e of await all('entries'))if(e.fotos&&e.fotos.length){e.fotos=[];e.updatedAt=now();await put('entries',e)}
     toast('Fotos borradas');render()}return}
-  if(t.id==='r-xls'){const ok=await exportarLista();if(ok)toast('Lista lista');return}
+  if(t.id==='r-xls'){const ok=await exportarLista(($('#xl-mes')&&$('#xl-mes').value)||undefined);if(ok)toast('Lista lista');return}
   if(t.id==='r-exp'){const ok=await exportar($('#r-fot').checked);if(ok){toast('Respaldo listo');render()}return}
 });
 async function cpInfo(){const i=$('#cp-info');if(!i)return;const f=$('#cp-date').value,t=+$('#cp-turn').value,s=$('#cp-src').value;if(!f||!s){i.textContent='';return}
@@ -1949,7 +2196,7 @@ const SYNC=(()=>{
   const fail=(err,n=1)=>{if(err&&err.code==='permission-denied')st.denied+=n;else logErr('subir',err)};
 
   /* --- registros --- */
-  const recPat=p=>{const r={expediente:p.expediente,acceso:p.acceso||'',aviso:p.aviso||'',sexo:p.sexo||'',updatedAt:patStamp(p)};if(p.dias)r.dias=p.dias;if(p.turnoHab)r.turnoHab=p.turnoHab;if(st.syncNames){r.nombre=p.nombre||'';if(p.plantilla!==undefined)r.plantilla=p.plantilla}return r};
+  const recPat=p=>{const r={expediente:p.expediente,acceso:p.acceso||'',aviso:p.aviso||'',sexo:p.sexo||'',updatedAt:patStamp(p)};if(p.dias)r.dias=p.dias;if(p.turnoHab)r.turnoHab=p.turnoHab;if(st.syncNames){r.nombre=p.nombre||'';if(p.plantilla!==undefined)r.plantilla=p.plantilla;if(p.ficha)r.ficha=fNorm(p.ficha)}return r};
   const recPend=(p,x)=>({id:x.id,expediente:p.expediente,texto:x.texto,hecho:!!x.hecho,hechoEn:x.hechoEn||null,creado:x.creado||0,del:!!x.del,vence:x.vence||null,tipo:x.tipo||null,datos:x.datos||null,updatedAt:pStamp(x)});
   const recEnt=e=>{const r={...e};delete r.fotos;r.deleted=!!e.deleted;r.updatedAt=e.updatedAt||0;return r};
   // Fotos: ya vienen comprimidas (ligeras ~100-150 KB); van dentro del documento como texto base64.
@@ -2027,7 +2274,7 @@ const SYNC=(()=>{
       if(!st.forceNames&&cur&&patStamp(cur)>=rs)return null;
       const p=cur||{expediente:r.expediente,nombre:'',pendientes:[],updatedAt:0};
       if(st.syncNames&&typeof r.nombre==='string')p.nombre=r.nombre;
-      if(st.syncNames&&typeof r.plantilla==='string')p.plantilla=r.plantilla;
+      if(st.syncNames&&typeof r.plantilla==='string')p.plantilla=r.plantilla;if(st.syncNames&&r.ficha&&typeof r.ficha==='object')p.ficha=r.ficha;
       if('acceso' in r)p.acceso=r.acceso;if('aviso' in r)p.aviso=r.aviso;if('sexo' in r)p.sexo=r.sexo;if('dias' in r)p.dias=r.dias;if('turnoHab' in r)p.turnoHab=r.turnoHab;
       p.pu=rs;p.updatedAt=Math.max(p.updatedAt||0,rs);
       await put('patients',p,{nosync:true});return p;
