@@ -293,7 +293,7 @@ details{margin-top:12px}summary{padding:6px 0;color:var(--mu);font-weight:600}
 
 <script>
 'use strict';
-const VERSION='11.46';
+const VERSION='11.47';
 const TURNOS=[1,2,3,4,5];
 const DIAS_FOTO=7;
 const EV_DEF=['Hipotensión','Hipertensión','Calambres','Náuseas / vómito','Cefalea','Dolor torácico','Arritmia','Disnea','Problema de acceso','Coagulación del circuito','Sangrado','Fiebre / escalofríos','Alarma de máquina','Terminó antes de tiempo'];
@@ -1077,6 +1077,7 @@ async function openEntry(id){
     <details class="compact-details"><summary>Datos del paciente y turno</summary>
       <div class="row"><div><label>Turno</label><select id="e-tur">${turnoOpts(e.turno)}</select></div><div><label>Acceso fijo</label><select id="e-ac"><option value="">—</option>${ACCESOS.map(a=>`<option ${pat.acceso===a?'selected':''}>${esc(a)}</option>`).join('')}</select></div></div>
       <label>Aviso fijo</label><input id="e-av" value="${esc(pat.aviso)}">
+      <button type="button" class="cp2" id="e-ficha" style="margin-top:8px">Editar expediente y ficha (medicamentos, diagnósticos…)</button>
     </details>
     <details id="e-hist"><summary>Historial completo</summary><div id="e-hist-list">Cargando…</div></details>
     <button class="dng" id="e-del">Quitar de la lista</button>
@@ -1231,7 +1232,7 @@ async function openEntry(id){
   ncBody.addEventListener('click',async ev=>{
     const id=ev.target.id;if(!id&&!ev.target.dataset.nclab&&ev.target.dataset.nbc===undefined&&ev.target.dataset.nbm===undefined&&ev.target.dataset.nbf===undefined&&ev.target.dataset.nbg===undefined)return;
     try{
-      if(id==='nc-copy'){if(!(await signosOk()))return;const ok=await copyText(ncFull());toast(ok?'Copiada la nota completa':'No se pudo copiar');return}
+      if(id==='nc-copy'){if(!(await signosOk()))return;const ok=await copyText(ncFull());if(ok)await ncKeep();toast(ok?'Copiada la nota completa':'No se pudo copiar');return}
       if(id==='nc-save'){const t=ncq('#nc-tpl').value;if(!t.trim()){toast('Pega la nota primero');return}await setTpl(t);renderNC();toast('Plantilla guardada');return}
       if(id==='nc-copyfrom'){const x=normExp(ncq('#nc-from').value);const o=x&&await get('patients',x);if(!o||!o.plantilla){toast('Ese expediente no tiene plantilla');return}await setTpl(o.plantilla);renderNC();toast('Plantilla copiada');return}
       if(id==='nc-base'){await setTpl(ncBase());renderNC();toast('Guardado como base de este paciente');return}
@@ -1263,9 +1264,9 @@ async function openEntry(id){
   q('#nc-del2').onclick=async()=>{if(!(pat.plantilla||'').trim()){toast('Este paciente no tiene nota guardada');return}if(!confirm('¿Borrar la nota de este paciente para volver a crearla? No afecta a otros pacientes.'))return;try{await setTpl('');nr.blk={};renderNC();toast('Nota borrada: pega la nueva en Abrir en ventana grande')}catch(err){logErr('borrar nota',err);toast('No se pudo borrar')}};
   q('#nc-open2').onclick=()=>ncOpenM(q('#nc-open2'));
   q('#nc-sig2').onclick=async()=>{const ok=await copyText(svTxt()+' '+peTxt());toast(ok?'Copiados: signos y pesos':'No se pudo copiar')};
-  const ncQuick=async()=>{if(!(pat.plantilla||'').trim()){ncOpenM(q('#nc-open'));return}if(!(await signosOk()))return;const ok=await copyText(ncFull());toast(ok?'Copiada la nota completa':'No se pudo copiar')};
+  const ncQuick=async()=>{if(!(pat.plantilla||'').trim()){ncOpenM(q('#nc-open'));return}if(!(await signosOk()))return;const ok=await copyText(ncFull());if(ok)await ncKeep();toast(ok?'Copiada la nota completa':'No se pudo copiar')};
   q('#nc-quick').onclick=ncQuick;q('#nc-quick2').onclick=ncQuick;
-  $('#ncm-copy').onclick=async()=>{if(!(await signosOk()))return;const ok=await copyText(ncFull());toast(ok?'Copiada la nota completa':'No se pudo copiar')};
+  $('#ncm-copy').onclick=async()=>{if(!(await signosOk()))return;const ok=await copyText(ncFull());if(ok)await ncKeep();toast(ok?'Copiada la nota completa':'No se pudo copiar')};
   $('#ncm-x').onclick=ncCloseM;
   ncBody.addEventListener('input',grow);
   renderNC();
@@ -1320,6 +1321,7 @@ async function openEntry(id){
       cur.nombre=nn;cur.acceso=ac;cur.aviso=av;cur.notaFija=nf;cur.pu=now();cur.updatedAt=now();await put('patients',cur)}
     pat=cur;
     refreshList()};
+  const ncKeep=async()=>{try{const t=ncFull();if(!t.trim()||e.notaTxt===t)return;e.notaTxt=t;e.updatedAt=now();await put('entries',e)}catch(err){logErr('guardar nota',err)}};
   const mutPat=async fn=>{const cur=await freshPat();fn(cur);cur.updatedAt=now();await put('patients',cur);pat=cur};
   const flush=async()=>{try{await flushRaw();sv(true)}catch(err){logErr('guardar',err);sv(false);throw err}};
   const later=()=>{clearTimeout(tm);tm=setTimeout(()=>flush().catch(()=>{}),400)};
@@ -1509,6 +1511,7 @@ async function openEntry(id){
     }catch(err){logErr('foto',err);toast('No se pudo procesar la foto')}}
     await flush().catch(()=>{});await drawFotos();toast('Foto guardada');
   };
+  q('#e-ficha').onclick=async()=>{try{await flush()}catch(_){}openProfile(e.expediente)};
   q('#e-del').onclick=async()=>{
     if(!confirm('¿Quitar a este paciente de la lista de esta fecha? Se borran sus fotos de hoja de signos; el paciente y sus pendientes se conservan.'))return;
     sheetCb=null;clearTimeout(tm);
