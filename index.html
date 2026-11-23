@@ -293,7 +293,7 @@ details{margin-top:12px}summary{padding:6px 0;color:var(--mu);font-weight:600}
 
 <script>
 'use strict';
-const VERSION='11.49';
+const VERSION='11.50';
 const TURNOS=[1,2,3,4,5];
 const DIAS_FOTO=7;
 const EV_DEF=['Hipotensión','Hipertensión','Calambres','Náuseas / vómito','Cefalea','Dolor torácico','Arritmia','Disnea','Problema de acceso','Coagulación del circuito','Sangrado','Fiebre / escalofríos','Alarma de máquina','Terminó antes de tiempo'];
@@ -1742,7 +1742,7 @@ async function libroLista(ym){
   filas.forEach(f=>{
     if(!f.mes.length)return;const hoja=nom.get(f.exp);
     const ses=f.mes.map(x=>{const nr=x.nr||{},ex=x.extras||{};const ta=(nr.tas||nr.tad)?(nr.tas||'__')+'/'+(nr.tad||'__'):(ex.ta||'');
-      return [xB(x.fecha.split('-').reverse().join('/')),xB(DIAN[diaDe(x.fecha)].slice(0,3)),xN(x.turno),xB(x.sillon||''),xN(nr.seco),xN(nr.ing||ex.peso),xN(ganSes(nr)||ex.gan),xN(nr.fc),xB(ta),xN(nr.fr),xN(nr.sp),xN(nr.tp),xN(nr.ufp),xN(nr.uft),xB((x.evs||[]).map(evNom).join('; ')),xB(x.comentario||''),xB((x.tags||[]).join(', ')),{v:String(x.notaTxt||'').replace(/\r/g,''),s:6}]});
+      return [xB(x.fecha.split('-').reverse().join('/')),xB(DIAN[diaDe(x.fecha)].slice(0,3)),xN(x.turno),xB(x.sillon||''),xN(nr.seco),xN(nr.ing||ex.peso),xN(ganSes(nr)||ex.gan),xN(nr.fc),xB(ta),xN(nr.fr),xN(nr.sp),xN(nr.tp),xN(nr.ufp),xN(nr.uft),xB((x.evs||[]).map(evNom).join('; ')),xB(x.comentario||''),xB((x.tags||[]).join(', ')),{v:String(x.notaTxt||'').replace(/\r/g,''),s:2}]});
     const gans=f.mes.map(x=>parseFloat(String(ganSes(x.nr||{})||'').replace(',','.'))).filter(v=>!isNaN(v));
     const gp=gans.length?(gans.reduce((a,b)=>a+b,0)/gans.length).toFixed(2):'—';
     const nev=f.mes.reduce((a,x)=>a+(x.evs||[]).length,0);
@@ -1764,7 +1764,7 @@ async function libroLista(ym){
     const hdr=[[{v:f.nombre||('Exp '+f.exp),s:4}],[{v:'← Volver al Censo',s:7}],[P(l1)],[P(l2)],[P(l3)],...fl.map(t=>[P(t)]),[]];
     const hRow=hdr.length+1;
     const rows=[...hdr,colsP.map(xH),...ses];
-    const hs=[24];for(let z=1;z<hRow-1;z++)hs.push(null);hs.push(34);
+    const hs=[24];for(let z=1;z<hRow-1;z++)hs.push(null);hs.push(34);ses.forEach(()=>hs.push(30));
     hojas.push({name:hoja,widths:[13,7,8,8,12,13,12,8,10,8,9,9,12,12,40,36,22,60],rows,heights:hs,filter:`A${hRow}:${colL(colsP.length-1)}${hRow+ses.length}`,links:[{ref:'A2',loc:"'Censo'!A1",tip:'Volver al Censo'}]});
   });
   return {libro:xlsxBook(hojas),pacientes:filas.length,hojas:hojas.length-1,mesTxt};
@@ -1947,8 +1947,13 @@ function fBlock(k,f,old){
   f=fNorm(f);if(k==='rx')return fRxTxt(f.rx);
   const items=k==='dx'?f.dxs.map(d=>fDot(d.t)):f.meds.filter(m=>m.toma).map(fMedTxt);
   const ls=String(old||'').split('\n'),bi=ls.findIndex(l=>/^\s*[-*•]\s/.test(l));
-  const head=bi>0?ls.slice(0,bi).join('\n')+'\n':'';
+  let head=bi>0?ls.slice(0,bi).join('\n')+'\n':'';
   const b=bi>=0?/^\s*([-*•])\s/.exec(ls[bi])[1]:'-';
+  if(bi<0&&String(old||'').trim()){
+    // texto corrido sin viñetas: se conserva la parte inicial («…, con diagnóstico de») y la lista va debajo
+    const m=/^[\s\S]*?\bcon\s+(?:el\s+|los\s+)?(?:siguientes\s+)?diagn[oó]sticos?(?:\s+de)?\s*:?/i.exec(String(old));
+    if(k==='dx'&&m)head=m[0].replace(/\s+$/,'')+'\n';else if(k==='meds'&&/^\s*medicamentos?\s*:?\s*$/i.test(ls[0]||''))head=ls[0].trim()+'\n';else return null;
+  }
   return head+(items.length?items.map(x=>b+' '+x).join('\n'):b+' ____');
 }
 const fLines=(t,stop)=>{const out=[];for(const l of String(t||'').split('\n')){if(!l.trim())break;if(stop&&stop.test(l))break;out.push(l)}return out};
