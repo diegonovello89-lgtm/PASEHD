@@ -293,7 +293,7 @@ details{margin-top:12px}summary{padding:6px 0;color:var(--mu);font-weight:600}
 
 <script>
 'use strict';
-const VERSION='11.47';
+const VERSION='11.48';
 const TURNOS=[1,2,3,4,5];
 const DIAS_FOTO=7;
 const EV_DEF=['Hipotensión','Hipertensión','Calambres','Náuseas / vómito','Cefalea','Dolor torácico','Arritmia','Disnea','Problema de acceso','Coagulación del circuito','Sangrado','Fiebre / escalofríos','Alarma de máquina','Terminó antes de tiempo'];
@@ -892,7 +892,7 @@ const settle=()=>Promise.race([lastClose,new Promise(r=>setTimeout(r,600))]);
 function refreshList(){if(sheetDocked&&sheetEl){clearTimeout(refreshList.t);refreshList.t=setTimeout(()=>render().catch(()=>{}),250)}}
 function openSheet(html){
   if(sheetEl)closeSheet(true);
-  const docked=isWide();sheetDocked=docked;
+  const pn=$('#pane');const docked=isWide()&&!!pn&&getComputedStyle(pn).display!=='none';sheetDocked=docked;
   const host=docked?$('#pane'):$('#ov');
   host.innerHTML=`<div class="sheet ${docked?'docked':''}" role="dialog">${html}</div>`;
   if(!docked){host.classList.add('on');document.body.classList.add('lock')}
