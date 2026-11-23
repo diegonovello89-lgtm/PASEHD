@@ -293,7 +293,7 @@ details{margin-top:12px}summary{padding:6px 0;color:var(--mu);font-weight:600}
 
 <script>
 'use strict';
-const VERSION='11.48';
+const VERSION='11.49';
 const TURNOS=[1,2,3,4,5];
 const DIAS_FOTO=7;
 const EV_DEF=['Hipotensión','Hipertensión','Calambres','Náuseas / vómito','Cefalea','Dolor torácico','Arritmia','Disnea','Problema de acceso','Coagulación del circuito','Sangrado','Fiebre / escalofríos','Alarma de máquina','Terminó antes de tiempo'];
@@ -1245,7 +1245,7 @@ async function openEntry(id){
         if(!(await askUI('¿Actualizar la ficha con este texto?\n\nQuedará con '+n+'. Esto cambia la ficha del paciente para las próximas notas y el Excel.','Actualizar ficha','Cancelar')))return;
         await mutPat(x=>{x.ficha=nf;x.pu=now()});renderNC();toast('Ficha actualizada');return}
       if(ev.target.dataset.nbm!==undefined){const ta=ncq('[data-nb="'+ev.target.dataset.nbm+'"]');if(ta){ta.value=subjTxt();nr.blk[ev.target.dataset.nbm]=ta.value;later();toast('Machote puesto')}return}
-      if(ev.target.dataset.nbc!==undefined){const ta=ncq('[data-nb="'+ev.target.dataset.nbc+'"]');const ok=ta&&await copyText(ta.value);toast(ok?'Bloque copiado':'No se pudo copiar');return}
+      if(ev.target.dataset.nbc!==undefined){const ta=ncq('[data-nb="'+ev.target.dataset.nbc+'"]');const ok=ta&&await copyText(ta.value);if(ok)await ncKeep();toast(ok?'Bloque copiado':'No se pudo copiar');return}
       if(ev.target.dataset.nclab){wrapSel(ev.target.dataset.nclab);return}
       if(id==='nc-mark'){wrapSel(ncq('#nc-lab').value);ncq('#nc-lab').value='';return}
       if(id==='nc-auto'){autoMark();return}
@@ -1311,6 +1311,7 @@ async function openEntry(id){
   collect();let savedSig=sig();
   const flushRaw=async()=>{clearTimeout(tm);tm=null;
     collect();
+    if(e.notaTxt&&(pat.plantilla||'').trim()){try{const t=ncFull();if(t.trim()&&t!==e.notaTxt){e.notaTxt=t;e.updatedAt=now();await put('entries',e)}}catch(_){}}
     if(e.nr.sala)lsSet('sala',e.nr.sala);
     // solo se escribe (y se sincroniza) si algo cambió: abrir y cerrar una ficha no debe pisar cambios hechos en otro dispositivo
     const s2=sig();if(s2!==savedSig){const prevSig=savedSig;savedSig=s2;e.updatedAt=now();try{await put('entries',e)}catch(err){savedSig=prevSig;throw err}}
@@ -1414,7 +1415,7 @@ async function openEntry(id){
   });
   q('#e-tur').onchange=async ev=>{const v=+ev.target.value;ev.target.blur();e.turno=v;S.turno=v;lsSet('turno',v);drawNR();await flush().catch(()=>{})};
   const drawNota=()=>{const b=q('#e-nota');b.className='notabtn'+(e.nota?' ok':'');b.textContent=e.nota?'✓ Nota hecha':'○ Nota pendiente'};
-  q('#e-nota').onclick=async()=>{e.nota=!e.nota;drawNota();await flush().catch(()=>{})};drawNota();
+  q('#e-nota').onclick=async()=>{e.nota=!e.nota;drawNota();if(e.nota&&(pat.plantilla||'').trim())await ncKeep();await flush().catch(()=>{})};drawNota();
   const drawPend=()=>{
     const row=x=>`<div class="pr ${x.hecho?'dn':''}"><button class="ck ${x.hecho?'on':''}" data-pt="${x.id}">${x.hecho?'✓':''}</button><span>${esc(x.texto)}${x.vence&&!x.hecho?` <small class="chip ${x.vence<=todayStr()?'w':''}">${esc(venceTxt(x))}</small>`:''}</span><button class="x" data-px="${x.id}">×</button></div>`;
     const open=pAct(pat),done=pDone(pat);
