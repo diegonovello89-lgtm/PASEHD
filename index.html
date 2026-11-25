@@ -298,7 +298,7 @@ details{margin-top:12px}summary{padding:6px 0;color:var(--mu);font-weight:600}
 
 <script>
 'use strict';
-const VERSION='11.60';
+const VERSION='11.61';
 const TURNOS=[1,2,3,4,5];
 const DIAS_FOTO=7;
 const EV_DEF=['Hipotensión','Hipertensión','Calambres','Náuseas / vómito','Cefalea','Dolor torácico','Arritmia','Disnea','Problema de acceso','Coagulación del circuito','Sangrado','Fiebre / escalofríos','Alarma de máquina','Terminó antes de tiempo'];
@@ -760,6 +760,7 @@ async function renderResp(){
     <button class="btn" id="sy-now">Sincronizar ahora</button><button class="btn sec" id="sy-out">Cerrar sesión</button>`;
   $('#main').innerHTML=`<div class="top"><div class="datebar"><div class="d">Ajustes y respaldo</div></div></div>
   <div class="box"><b>⌨️ Atajos de teclado</b><p>Nota rápida, copiar nota, labs, receta, expediente y más con Alt + una letra.</p><button class="btn sec" id="atj-btn">Ver atajos</button></div>
+  <details class="box"><summary><b>🔢 Decimales de HemoHL7</b></summary><p class="mu">Cuántos decimales acepta cada campo de la plataforma. «Copiar para HemoHL7» redondea a esto (y siempre a lo que quepa en la caja). Si un campo no te acepta decimales, ponle 0.</p>${HEMODEC_UI()}</details>
   <details class="box" data-acc="sincronizaci-n"${accOpen('sincronizaci-n')}><summary><b>Sincronización</b></summary>${syHtml}</details>
   <details class="box" data-acc="-expedientes"${accOpen('-expedientes')}><summary><b>📁 Expedientes</b></summary><p>Consulta, corrige y revisa el historial de los pacientes.</p><button class="btn sec" id="settings-archivo">Administrar expedientes</button></details>
   <details class="box" data-acc="cargar-turno-desde-una-s"${accOpen('cargar-turno-desde-una-s')}><summary><b>Cargar turno desde una sesión anterior</b></summary>
@@ -2105,14 +2106,26 @@ const LABN={};LABG.forEach(g=>g[1].forEach(x=>{LABN[x[0]]=x}));
 const HEMO={hb:'DBAE25',eri:'DBAE24',hto:'DBAE26',vcm:'DBAE27',hcm:'DBAE28',chcm:'DBAE29',plq:'DBAE35',leu:'DBAE23',mon:'DBAE32',eos:'DBAE33',seg:'DBAE30',lin:'DBAE31',tp:'DBAE18',tpt:'DBAE19',glu:'DBAE9',bun:'DBAE1',cre:'DBAE3',aur:'DBAE10',alb:'DBAE11',tgo:'DBAE16',tgp:'DBAE17',fa:'DBAE20',ca:'DBAE6',p:'DBAE7',cl:'DBAE39',na:'DBAE4',k:'DBAE5',col:'DBAE12',tg:'DBAE15',hdl:'DBAE13',ldl:'DBAE14',prot:'DBAE40',co2:'DBAE21',pth:'DBAE22',ferr:'DBAE36',trf:'DBAE41',sat:'DBAE37',ktv:'TIWDBADVEDIT1',urr:'TIWDBADVEDIT2'};
 const HEMOS={hbs:'DBCB1',hcv:'DBCB2',hiv:'DBCB3'};
 const HEMO_BM=`javascript:(async()=>{const top=window;const fnd=w=>{try{if(w.document.getElementById('DBAE3'))return w}catch(e){}try{for(let i=0;i<w.frames.length;i++){const r=fnd(w.frames[i]);if(r)return r}}catch(e){}return null};const msg=(t,bad)=>{try{const d=top.document.createElement('div');d.textContent=t;d.style.cssText='position:fixed;z-index:99999;left:12px;right:12px;top:12px;text-align:center;padding:12px 18px;border-radius:10px;font:14px Arial;color:white;box-shadow:0 4px 14px rgba(0,0,0,.4);background:'+(bad?'rgb(179,38,30)':'rgb(11,122,90)');top.document.body.appendChild(d);setTimeout(()=>d.remove(),9000)}catch(e){alert(t)}};let tx='';try{tx=await navigator.clipboard.readText()}catch(e){}const ps=s=>{try{const o=JSON.parse(s);return o&&o.k==='pasehd-labs'?o:null}catch(e){return null}};let d=ps(tx);if(!d){d=ps(prompt('Pega aquí los valores copiados de Pase HD'))}if(!d){msg('No encontré valores de Pase HD. En la app toca Copiar para HemoHL7.',1);return}const w=fnd(top);if(!w){msg('No veo los campos de laboratorio. Abre la pantalla de labs y toca Nueva.',1);return}const D=w.document;let n=0;const sk=[];const ev=(el,t)=>el.dispatchEvent(new w.Event(t,{bubbles:true}));for(const id in d.d){const el=D.getElementById(id);const v=String(d.d[id]);if(!el){sk.push(id);continue}if(el.tagName==='SELECT'){el.value=v;ev(el,'change');ev(el,'blur')}else{if(el.maxLength>0&&v.length>el.maxLength){sk.push(id+' muy largo');continue}el.value=v;ev(el,'input');ev(el,'blur');try{if(w.containsName&&!w.containsName(id))w.ChangedControls+=id+','}catch(e){}}n++}let fm='';{const h=D.getElementById('DBDATE1_INPUT');if(d.f&&h&&h.value!==d.f)fm=' OJO: elige a mano en el calendario la fecha '+d.f+' (la plataforma tiene '+h.value+').'}msg('Listo: '+n+' campos llenados. Revisa y toca Aceptar.'+fm+(sk.length?' No se pudo: '+sk.join(', '):''),sk.length>0||fm!=='')})();`;
+/* Formato por campo de HemoHL7: largo máximo de cada caja y decimales que admite */
+const HEMOML={DBAE1:4,DBAE2:4,DBAE3:4,DBAE4:5,DBAE5:4,DBAE39:5,DBAE6:4,DBAE7:4,DBAE8:3,DBAE9:3,DBAE40:5,DBAE10:4,DBAE11:3,DBAE12:3,DBAE13:3,DBAE14:3,DBAE15:4,DBAE16:4,DBAE17:4,DBAE18:3,DBAE19:3,DBAE20:3,DBAE21:2,DBAE22:4,DBAE23:5,DBAE24:5,DBAE25:4,DBAE26:4,DBAE27:3,DBAE28:4,DBAE29:4,DBAE30:4,DBAE31:4,DBAE32:4,DBAE33:4,DBAE34:4,DBAE35:5,DBAE36:4,DBAE41:3,DBAE37:2};
+const HEMOD0={bun:1,cre:1,k:1,cl:1,ca:1,p:1,aur:1,alb:1,prot:1,leu:1,eri:1,hto:1,hb:1,hcm:1,chcm:1,seg:1,lin:1,mon:1,eos:1,ktv:2,urr:1,glu:0,col:0,hdl:0,ldl:0,tg:0,vcm:0,plq:0,ferr:0,sat:0,na:0,tgo:0,tgp:0,fa:0,tp:0,tpt:0,co2:0,pth:0,trf:0};
+const hemoDec=()=>{let o={};try{o=JSON.parse(lsGet('hemoDec')||'{}')}catch(e){}return {...HEMOD0,...o}};
+function hemoFmt(k,v,dec){
+  const t=String(v).trim().replace(',','.');
+  if(/^[<>]/.test(t))return {raro:true,v:t};
+  const n=parseFloat(t);if(!isFinite(n)||!/^-?\d+(\.\d+)?$/.test(t))return {raro:true,v:t};
+  const id=HEMO[k],ml=HEMOML[id]||0;let d=dec[k];if(d===undefined)d=2;
+  for(let x=d;x>=0;x--){const r=String(+n.toFixed(x));if(!ml||r.length<=ml)return {v:r,aj:+r!==+t?t+' → '+r:''}}
+  return {v:String(Math.round(n)),aj:t+' → '+Math.round(n)}}
+function HEMODEC_UI(){const dc=hemoDec();return '<div class="fcg">'+Object.keys(HEMO).filter(k=>HEMOML[HEMO[k]]||k==='ktv'||k==='urr').map(k=>`<label class="fcl">${esc(LABN[k][1])}<select data-hdk="${k}">${[0,1,2,3].map(n=>`<option value="${n}" ${dc[k]===n||(dc[k]===undefined&&n===2)?'selected':''}>${n} dec.</option>`).join('')}</select></label>`).join('')+'</div>'}
 function labsHemo(e){
-  const d={},fuera=[],raro=[];
+  const d={},fuera=[],raro=[],aj=[],dec=hemoDec();
   Object.keys(e.v).forEach(k=>{
-    if(HEMO[k])d[HEMO[k]]=String(e.v[k]).replace(',','.');
+    if(HEMO[k]){const r=hemoFmt(k,e.v[k],dec);if(r.raro)raro.push(LABN[k][1]+': '+r.v+' (no numérico)');else{d[HEMO[k]]=r.v;if(r.aj)aj.push(LABN[k][1]+' '+r.aj)}}
     else if(HEMOS[k]){const t=String(e.v[k]).trim().toLowerCase();if(/^(neg|-)/.test(t))d[HEMOS[k]]='1';else if(/^(pos|\+)/.test(t))d[HEMOS[k]]='0';else raro.push(LABN[k][1]+': '+e.v[k])}
     else fuera.push(LABN[k][1]);
   });
-  return {k:'pasehd-labs',f:e.f.slice(8)+'/'+e.f.slice(5,7)+'/'+e.f.slice(0,4),d,fuera,raro};
+  return {k:'pasehd-labs',f:e.f.slice(8)+'/'+e.f.slice(5,7)+'/'+e.f.slice(0,4),d,fuera,raro,aj};
 }
 function labsNorm(L){
   const a=(Array.isArray(L)?L:[]).map(x=>{const v={};Object.keys(LABN).forEach(k=>{const t=fS((x.v||{})[k]);if(t)v[k]=t});return {f:fS(x.f),v}}).filter(x=>/^\d{4}-\d{2}-\d{2}$/.test(x.f)&&Object.keys(x.v).length);
@@ -2254,7 +2267,7 @@ async function openResultados(exp){
       g[1].forEach(x=>{const k=x[0],pv=prev(k,fecha),t=LABT.has(k);
         h+=`<label class="lbr"><span>${esc(x[1])} <small>${esc(x[2])}</small></span><input data-lb="${k}" ${t?'list="lb-res"':'inputmode="decimal"'} autocomplete="off" value="${esc(v[k]===undefined?'':v[k])}"><em>${pv?'ant. '+esc(pv.v[k])+' ('+labFec(pv.f)+')':''}</em></label>`});
       h+='</details>'});
-    if(cur){const hm=labsHemo(cur);h+=`<div class="box" style="margin-top:10px"><b>Pasar a la plataforma</b><p class="mu">Copia los valores de esta fecha (${labFec(cur.f)}). Luego, en HemoHL7 con «Nueva» abierto, toca el bookmark.</p><button type="button" class="btn sec" id="lb-hemo">Copiar para HemoHL7</button> <button type="button" class="btn sec" id="lb-txt">Copiar como texto</button>${hm.fuera.length?`<p class="mu">Solo en papel (la plataforma no tiene campo): ${esc(hm.fuera.join(', '))}.</p>`:''}${hm.raro.length?`<p class="mu">No se pudo traducir a POS/NEG: ${esc(hm.raro.join(', '))}. Elígelo a mano en la plataforma.</p>`:''}</div>`}
+    if(cur){const hm=labsHemo(cur);h+=`<div class="box" style="margin-top:10px"><b>Pasar a la plataforma</b><p class="mu">Copia los valores de esta fecha (${labFec(cur.f)}). Luego, en HemoHL7 con «Nueva» abierto, toca el bookmark.</p><button type="button" class="btn sec" id="lb-hemo">Copiar para HemoHL7</button> <button type="button" class="btn sec" id="lb-txt">Copiar como texto</button>${hm.fuera.length?`<p class="mu">Solo en papel (la plataforma no tiene campo): ${esc(hm.fuera.join(', '))}.</p>`:''}${hm.aj.length?`<p class="mu">Se redondearon para que quepan en HemoHL7: ${esc(hm.aj.join(' · '))}.</p>`:''}${hm.raro.length?`<p class="mu">No se pudo pasar (elígelo o escríbelo a mano): ${esc(hm.raro.join(', '))}. Elígelo a mano en la plataforma.</p>`:''}</div>`}
     h+=`<details class="box" style="margin-top:10px"><summary><b>Bookmark de Chrome (una sola vez)</b></summary><ol class="mu" style="padding-left:18px"><li>Toca «Copiar código del bookmark».</li><li>En Chrome, Ctrl+Shift+O → menú ⋮ → Agregar marcador nuevo.</li><li>Nombre: Llenar labs. En URL pega el código y guarda.</li><li>En HemoHL7: abre los labs del paciente, toca Nueva y luego tu marcador «Llenar labs». Revisa y toca Aceptar.</li></ol><button type="button" class="btn sec" id="lb-bm">Copiar código del bookmark</button></details>`;
     h+=`<datalist id="lb-res"><option value="Negativo"><option value="Positivo"></datalist><div style="margin-top:10px"><button class="btn" id="lb-save">Guardar resultados</button> ${cur?'<button class="dng" id="lb-del">Eliminar esta fecha</button>':''}</div>${cur?`<details class="box" style="margin-top:10px"><summary><b>Me equivoqué de fecha</b></summary><p class="mu">Mueve todos los valores de esta captura a la fecha correcta.</p><div class="fcr">${fIn('id="lb-nf"',fecha)}<button type="button" class="btn sec" id="lb-mv">Mover a esta fecha</button></div></details>`:''}`;
     body.innerHTML=h;
@@ -2423,6 +2436,7 @@ document.addEventListener('click',async ev=>{
 async function cpInfo(){const i=$('#cp-info');if(!i)return;const f=$('#cp-date').value,t=+$('#cp-turn').value,s=$('#cp-src').value;if(!f||!s){i.textContent='';return}
   const o=await listaOrigen(s,t);i.textContent=o.length?`Hay ${o.length} paciente${o.length===1?'':'s'} en el turno ${t} del ${fmtFecha(s)}.`:`No hay pacientes en el turno ${t} del ${fmtFecha(s)}.`}
 document.addEventListener('change',async ev=>{
+  if(ev.target&&ev.target.dataset&&ev.target.dataset.hdk){let o={};try{o=JSON.parse(lsGet('hemoDec')||'{}')}catch(e){}o[ev.target.dataset.hdk]=+ev.target.value;try{lsSet('hemoDec',JSON.stringify(o))}catch(e){}toast('Guardado');return}
   if(ev.target.id==='cp-date'){$('#cp-src').value=fechaBase(ev.target.value)}
   if(ev.target.id==='cp-date'||ev.target.id==='cp-turn'||ev.target.id==='cp-src'){cpInfo().catch(()=>{})}
   if(ev.target.id==='r-file'){const f=ev.target.files[0];ev.target.value='';if(!f)return;
