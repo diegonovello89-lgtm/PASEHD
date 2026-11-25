@@ -58,7 +58,7 @@ button{cursor:pointer;border:0;background:none}
 .tg.on{background:var(--ac);color:var(--onac);border-color:var(--ac);font-weight:700}
 .fcg{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}.fcl{display:flex;flex-direction:column;font-size:12px;gap:3px}.fcl input,.fcl select{min-width:0}
 .fcr{display:flex;gap:6px;margin:6px 0;align-items:center;flex-wrap:wrap}.fcr input,.fcr select{min-width:0}.fcm{border:1px solid var(--bd);border-radius:10px;padding:6px 8px;margin:8px 0}.fcm.no{opacity:.65}
-.lbr{max-width:560px}.fcl input[type=date],.fcl select{min-height:44px;border:1px solid var(--bd);border-radius:12px;padding:6px 10px;background:var(--card);color:var(--tx);font:inherit;box-sizing:border-box}.lbt input[type=date]{min-height:40px;border:1px solid var(--bd);border-radius:10px;padding:4px 6px;background:var(--card);color:var(--tx);font:inherit;width:140px}.pr .btn.sec,#main .pg .hd .btn.sec[id^=sg-]{padding:8px 12px;font-size:14px;min-height:0}
+.lbr{max-width:560px}.fcl input[type=date],.fcl select{min-height:44px;border:1px solid var(--bd);border-radius:12px;padding:6px 10px;background:var(--card);color:var(--tx);font:inherit;box-sizing:border-box}.dti{min-height:44px;border:1px solid var(--bd);border-radius:12px;padding:6px 10px;background:var(--card);color:var(--tx);font:inherit;width:130px;box-sizing:border-box}.lbt .dti{min-height:38px;width:104px}.pr .btn.sec,#main .pg .hd .btn.sec[id^=sg-]{padding:8px 12px;font-size:14px;min-height:0}
 .sgc{display:inline-block;border-radius:8px;padding:1px 7px;margin:3px 4px 0 0;font-size:12px;background:var(--card);border:1px solid var(--bd)}.sgc.atr{background:#fde8e8;border-color:#e08a8a;color:#8a1c1c}.sgc.mes{background:#fff4d6;border-color:#e0b84a;color:#7a5600}
 .lbr{display:flex;align-items:center;gap:8px;margin:5px 0}.lbr span{flex:1 1 120px;min-width:0}.lbr input{width:90px;flex:0 0 90px}.lbr em{flex:0 0 120px;font-size:11px;color:var(--mu,#6b7785);font-style:normal}.lbt{border-collapse:collapse;font-size:13px}.lbt th,.lbt td{border:1px solid var(--bd);padding:4px 8px;text-align:right;white-space:nowrap}.lbt th:first-child{text-align:left;position:sticky;left:0;background:var(--card)}.lbt .lbg{text-align:left;background:var(--bd)}
 .fcq{margin:8px 0}.fcc details{margin:4px 0}.fcc .tg{padding:5px 9px;font-size:12px;margin:2px}
@@ -298,7 +298,7 @@ details{margin-top:12px}summary{padding:6px 0;color:var(--mu);font-weight:600}
 
 <script>
 'use strict';
-const VERSION='11.58';
+const VERSION='11.60';
 const TURNOS=[1,2,3,4,5];
 const DIAS_FOTO=7;
 const EV_DEF=['Hipotensión','Hipertensión','Calambres','Náuseas / vómito','Cefalea','Dolor torácico','Arritmia','Disnea','Problema de acceso','Coagulación del circuito','Sangrado','Fiebre / escalofríos','Alarma de máquina','Terminó antes de tiempo'];
@@ -712,7 +712,7 @@ async function renderHoy(){
 }
 
 async function renderPend(){
-  const [pats,ents]=await Promise.all([all('patients'),byDate(todayStr())]);
+  const [pats0,ents]=await Promise.all([all('patients'),byDate(todayStr())]);const pats=pats0.filter(p=>!p.deleted);
   const hoyE=Object.fromEntries(ents.map(e=>[e.expediente,e]));
   const hoyS=todayStr(),man=addDays(hoyS,1);
   const items=[];for(const p of pats)for(const x of pAct(p))items.push({p,x});
@@ -2121,6 +2121,16 @@ function labsNorm(L){
 const labFec=f=>f?f.slice(8)+'/'+f.slice(5,7)+'/'+f.slice(2,4):'';
 const labBun=u=>{const n=parseFloat(String(u).replace(',','.'));return isFinite(n)&&n>0?String(Math.round(n/2.14*10)/10):''};
 function labsLinea(e){return LABG.flatMap(g=>g[1]).filter(x=>e.v[x[0]]!==undefined&&x[0]!=='otros').map(x=>x[1]+' '+e.v[x[0]]).join(' · ')+(e.v.otros?' · Otros: '+e.v.otros:'')}
+/* Fechas escritas a mano (más cómodo en PC que el calendario): 25/11/26, 25-11-2026, 251126, 25/11, 25 */
+const fShow=iso=>/^\d{4}-\d{2}-\d{2}$/.test(iso||'')?iso.slice(8)+'/'+iso.slice(5,7)+'/'+iso.slice(0,4):'';
+function fParse(t){t=String(t||'').trim();if(!t)return '';const n=new Date();let d,mo,y,m;
+  if((m=/^(\d{1,2})$/.exec(t))){d=+m[1];mo=n.getMonth()+1;y=n.getFullYear()}
+  else if((m=/^(\d{1,2})[\/\-. ](\d{1,2})$/.exec(t))){d=+m[1];mo=+m[2];y=n.getFullYear()}
+  else if((m=/^(\d{1,2})[\/\-. ](\d{1,2})[\/\-. ](\d{2}|\d{4})$/.exec(t)||/^(\d{2})(\d{2})(\d{2}|\d{4})$/.exec(t))){d=+m[1];mo=+m[2];y=+m[3];if(y<100)y+=2000}
+  else return null;
+  const dt=new Date(y,mo-1,d,12);if(dt.getFullYear()!==y||dt.getMonth()!==mo-1||dt.getDate()!==d)return null;
+  return todayStr(dt)}
+const fIn=(attr,iso,extra)=>`<input type="text" inputmode="numeric" autocomplete="off" placeholder="dd/mm/aa" class="dti" ${attr} value="${esc(fShow(iso))}" ${extra||''}>`;
 /* ---------- Seguimiento de labs: cuándo toca cada grupo ---------- */
 const LSEG=[
  {id:'gen',t:'Panel general (BH, QS, transaminasas, electrolitos)',c:'Panel general',m:2,keys:['hb','glu','cre','tgo','na','k'],sel:['bh','qs','tr','el'],extra:[]},
@@ -2162,7 +2172,7 @@ const secSeg=pats=>{
   const body=rows.length?rows.map(({p,d})=>`<div class="pr" style="flex-wrap:wrap"><span style="flex:1 1 170px"><b>${esc(p.nombre||'(sin nombre)')}</b> <small class="mu">${esc(p.expediente)}</small><small style="display:block">${d.map(s=>`<span class="sgc ${s.est}">${esc(s.g.c)} · ${s.est==='atr'?'atrasado':'este mes'} (${labFec(s.toca)})</span>`).join(' ')}</small></span><span style="flex:0 0 auto;display:flex;gap:6px"><button class="btn sec" data-sgp="${esc(p.expediente)}" style="margin:0">Pedir</button><button class="btn sec" data-sgr="${esc(p.expediente)}" style="margin:0">Resultados</button></span></div>`).join(''):`<div class="empty" style="padding:10px">Nada por pedir este mes.</div>`;
   return `<div class="pg ${rows.some(r=>r.atr)?'dueb':''}" data-sg="1">${hd}${body}${sin?`<p class="mu" style="margin:8px 2px 0">${sin} paciente${sin===1?'':'s'} sin fecha base en algún grupo (aún no cuentan en el seguimiento). Usa «Fechas iniciales».</p>`:''}</div>`};
 async function openLabCal(){
-  const pats=await all('patients'),hoy=todayStr();
+  const pats=(await all('patients')).filter(p=>!p.deleted),hoy=todayStr();
   const rows=pats.map(p=>({p,S_:labSeg(p,hoy)}));
   const mn=r=>{const t=r.S_.filter(s=>s.toca&&s.est!=='off').map(s=>s.toca).sort();return t[0]||'9999'};
   rows.sort((a,b)=>mn(a).localeCompare(mn(b))||String(a.p.nombre).localeCompare(String(b.p.nombre)));
@@ -2170,10 +2180,55 @@ async function openLabCal(){
   openSheet(`<div class="sh-head"><b>Calendario de labs</b><button data-close>Cerrar</button></div><p class="mu">Ordenado por el que toca primero. Toca el nombre para abrir sus resultados.</p><div style="overflow:auto"><table class="lbt"><tr><th>Paciente</th>${LSEG.map(g=>`<th>${esc(g.c)}<br><small>c/${g.m} m</small></th>`).join('')}</tr>${rows.map(r=>`<tr><th><button type="button" class="lk" data-sgr="${esc(r.p.expediente)}" style="all:unset;cursor:pointer;text-decoration:underline">${esc(r.p.nombre||'(sin nombre)')}</button><br><small>${esc(r.p.expediente)}</small></th>${r.S_.map(s=>`<td>${cel(s)}</td>`).join('')}</tr>`).join('')}</table></div>`);
 }
 async function openLabIni(){
-  const pats=(await all('patients')).sort((a,b)=>String(a.nombre).localeCompare(String(b.nombre)));
-  const sh=openSheet(`<div class="sh-head"><b>Fechas iniciales de labs</b><button data-close>Cerrar</button></div><p class="mu">Pon la fecha del último estudio de cada grupo, solo para los que aún no tienen resultados capturados. En cuanto captures resultados, la app usa esas fechas. Se guarda al elegir cada fecha.</p><div style="overflow:auto"><table class="lbt"><tr><th>Paciente</th>${LSEG.map(g=>`<th>${esc(g.c)}<br><small>c/${g.m} m</small></th>`).join('')}</tr>${pats.map(p=>{const S_=labSeg(p);const P=p.labPlan||{};return `<tr><th>${esc(p.nombre||'(sin nombre)')}<br><small>${esc(p.expediente)}</small></th>${S_.map(s=>`<td>${s.est==='off'?'<small>no aplica</small>':`<input type="date" data-li="${esc(p.expediente)}|${s.g.id}" value="${esc((P.ini&&P.ini[s.g.id])||'')}">${s.ult?`<small style="display:block">captura ${labFec(s.ult)}</small>`:''}`}</td>`).join('')}</tr>`}).join('')}</table></div>`);
-  sh.addEventListener('change',async ev=>{const t=ev.target;if(!t.dataset||!t.dataset.li)return;const a=t.dataset.li.split('|');await labPlanSet(a[0],P=>{P.ini[a[1]]=/^\d{4}-\d{2}-\d{2}$/.test(t.value)?t.value:''});toast('Guardado');render().catch(()=>{})});
+  const pats=(await all('patients')).filter(p=>!p.deleted).sort((a,b)=>String(a.nombre).localeCompare(String(b.nombre)));
+  const sh=openSheet(`<div class="sh-head"><b>Fechas iniciales de labs</b><button data-close>Cerrar</button></div><p class="mu">Pon la fecha del último estudio de cada grupo, solo para los que aún no tienen resultados capturados. En cuanto captures resultados, la app usa esas fechas. Se guarda al elegir cada fecha.</p><div style="overflow:auto"><table class="lbt"><tr><th>Paciente</th>${LSEG.map(g=>`<th>${esc(g.c)}<br><small>c/${g.m} m</small></th>`).join('')}</tr>${pats.map(p=>{const S_=labSeg(p);const P=p.labPlan||{};return `<tr><th>${esc(p.nombre||'(sin nombre)')}<br><small>${esc(p.expediente)}</small></th>${S_.map(s=>`<td>${s.est==='off'?'<small>no aplica</small>':`${fIn('data-li="'+esc(p.expediente)+'|'+s.g.id+'"',(P.ini&&P.ini[s.g.id])||'')}${s.ult?`<small style="display:block">captura ${labFec(s.ult)}</small>`:''}`}</td>`).join('')}</tr>`}).join('')}</table></div>`);
+  sh.addEventListener('change',async ev=>{const t=ev.target;if(!t.dataset||!t.dataset.li)return;const a=t.dataset.li.split('|');await labPlanSet(a[0],P=>{P.ini[a[1]]=fParse(t.value)||''});toast('Guardado');render().catch(()=>{})});
 }
+/* ---------- Pegar resultados que devuelve una IA ---------- */
+const labFold=t=>String(t||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9]+/g,' ').trim();
+const LAB_AL={hb:['hgb','hb'],hto:['hct'],plq:['plt'],leu:['wbc','leucocitos totales'],eri:['rbc','globulos rojos'],vcm:['mcv'],hcm:['mch'],chcm:['mchc','cmhc'],cre:['crea'],aur:['urico','acido urico'],alb:['albumina'],tgo:['ast','got','tgo ast'],tgp:['alt','gpt','tgp alt'],fa:['fosfatasa alcalina'],p:['fosforo'],col:['colesterol total'],tg:['trigliceridos'],hdl:['c hdl','colesterol hdl'],ldl:['c ldl','colesterol ldl'],vldl:['c vldl'],fe:['hierro','hierro serico'],ctfh:['tibc','capacidad total de fijacion de hierro'],ferr:['ferritina'],trf:['transferrina'],sat:['saturacion de transferrina','indice de saturacion','ist','sat transferrina'],pth:['pthi','pth intacta','hormona paratiroidea'],co2:['co2 total','bicarbonato','hco3'],prot:['proteinas totales'],ktv:['kt v'],urr:['urr'],hbs:['hbsag','ag hbs','antigeno de superficie'],hcv:['anti hcv','vhc','hepatitis c'],hiv:['anti vih','vih','hiv','anti hiv'],otros:['otros']};
+let _labIdx=null;
+function labIdx(){if(_labIdx)return _labIdx;_labIdx={};Object.keys(LABN).forEach(k=>{const l=LABN[k][1];[labFold(l),labFold(l.replace(/\(.*\)/,'')),k].concat((LAB_AL[k]||[]).map(labFold)).concat((l.match(/\(([^)]*)\)/)||[,''])[1].split(/[\/,]/).map(labFold)).forEach(n=>{if(n&&!_labIdx[n])_labIdx[n]=k})});return _labIdx}
+function labParse(txt){
+  const out={f:'',v:{},no:[]},ix=labIdx();
+  String(txt||'').split(/\r?\n/).forEach(raw=>{
+    let ln=raw.replace(/[`*•]/g,'').replace(/^\s*[-–>]+\s*/,'').replace(/^\s*\|\s*|\s*\|\s*$/g,'').trim();if(!ln)return;
+    let nm,val,m;
+    if((m=/^([^:=\t|]+?)\s*[:=\t|]\s*(.+)$/.exec(ln))){nm=m[1];val=m[2].replace(/^\s*[|:=]\s*/,'')}
+    else if((m=/^(.*?[A-Za-zÁ-úµ.\/)])\s+(<|>)?\s*(-?\d.*)$/.exec(ln))){nm=m[1];val=(m[2]||'')+m[3]}
+    else return;
+    const n=labFold(nm);
+    if(/^fecha/.test(n)){const f=fParse(val.trim().split(/\s+/)[0]);if(f)out.f=f;return}
+    const k=ix[n];
+    if(!k){if(n&&!/^(paciente|nombre|expediente|edad|sexo)/.test(n))out.no.push(ln);return}
+    val=val.trim();
+    if(k==='otros'){out.v.otros=(out.v.otros?out.v.otros+'; ':'')+val;return}
+    if(LABT.has(k)){const t=labFold(val);out.v[k]=/^(neg|no reactivo|nr|-)/.test(t)||/^no reactiv/.test(t)?'Negativo':/^(pos|reactivo|\+)/.test(t)?'Positivo':val;return}
+    const q=/(<|>)?\s*(-?\d+(?:[.,]\d+)?)/.exec(val);
+    if(!q){out.no.push(ln);return}
+    out.v[k]=(q[1]||'')+q[2].replace(',','.')});
+  return out}
+function labPrompt(){
+  const nombres=LABG.map(g=>g[1].filter(x=>x[0]!=='otros').map(x=>x[1].replace(/\s*\(.*\)/,'')).join(', ')).join('\n');
+  return `Te voy a enviar un reporte de laboratorio (foto o PDF). Devuélveme SOLO un bloque de texto (sin explicaciones ni tablas), con una línea por valor, en el formato «Nombre: valor».
+
+Primera línea: Fecha: dd/mm/aaaa (fecha de toma de la muestra).
+
+Usa exactamente estos nombres:
+${nombres}
+
+Reglas:
+- Solo el número, con punto decimal, sin unidades ni símbolos (si viene con < o >, déjalo, por ejemplo <0.5).
+- Si un estudio no viene en el reporte, no pongas esa línea.
+- HBsAg, Anti-HCV y Anti-VIH: Negativo o Positivo.
+- Si hay estudios que no estén en la lista, ponlos juntos en una sola línea: Otros: nombre valor; nombre valor
+- No incluyas nombre, expediente ni otros datos del paciente.
+
+Ejemplo:
+Fecha: 20/11/2026
+Hemoglobina: 11.2
+Creatinina: 8.4
+HBsAg: Negativo`}
 async function openResultados(exp){
   const p=await get('patients',exp);if(!p)return;
   let L=labsNorm(p.labs),fecha=todayStr(),tab='cap';
@@ -2184,7 +2239,7 @@ async function openResultados(exp){
   const draw=()=>{
     if(tab==='seg'){
       const sg=labSeg({labs:L,labPlan:PL});
-      body.innerHTML=sg.map(s=>{const id=s.g.id,off=PL.off&&PL.off[id];return `<div class="box"><b>${esc(s.g.t)}</b><p class="mu"><span class="sgc ${s.est}">${LSEGT[s.est]}</span> Último: ${s.ult?labFec(s.ult):'sin captura'}${s.toca?' · Toca: '+labFec(s.toca):''}</p><div class="fcr"><label class="fcl">Cada (meses)<select data-sgi="${id}">${[1,2,3,4,5,6,9,12].map(n=>`<option value="${n}" ${n===s.m?'selected':''}>${n}</option>`).join('')}</select></label><label class="fcl">Fecha base manual<input type="date" data-sgb="${id}" value="${esc((PL.ini&&PL.ini[id])||'')}"></label></div><label style="display:flex;gap:8px;align-items:center;margin-top:6px"><input type="checkbox" data-sgo="${id}" ${off?'checked':''}> No aplica a este paciente</label></div>`}).join('')+'<p class="mu">La fecha base solo se usa si no hay captura, o si es más reciente que la última captura.</p>';return}
+      body.innerHTML=sg.map(s=>{const id=s.g.id,off=PL.off&&PL.off[id];return `<div class="box"><b>${esc(s.g.t)}</b><p class="mu"><span class="sgc ${s.est}">${LSEGT[s.est]}</span> Último: ${s.ult?labFec(s.ult):'sin captura'}${s.toca?' · Toca: '+labFec(s.toca):''}</p><div class="fcr"><label class="fcl">Cada (meses)<select data-sgi="${id}">${[1,2,3,4,5,6,9,12].map(n=>`<option value="${n}" ${n===s.m?'selected':''}>${n}</option>`).join('')}</select></label><label class="fcl">Fecha base manual${fIn('data-sgb="'+id+'"',(PL.ini&&PL.ini[id])||'')}</label></div><label style="display:flex;gap:8px;align-items:center;margin-top:6px"><input type="checkbox" data-sgo="${id}" ${off?'checked':''}> No aplica a este paciente</label></div>`}).join('')+'<p class="mu">La fecha base solo se usa si no hay captura, o si es más reciente que la última captura.</p>';return}
     if(tab==='his'){
       const cols=L.slice(-8);
       if(!cols.length){body.innerHTML='<p class="mu">Aún no hay resultados capturados.</p>';return}
@@ -2192,7 +2247,8 @@ async function openResultados(exp){
       LABG.forEach(g=>{const rows=g[1].filter(x=>cols.some(c=>c.v[x[0]]!==undefined));if(!rows.length)return;h+=`<tr><th colspan="${cols.length+1}" class="lbg">${esc(g[0])}</th></tr>`;rows.forEach(x=>{h+=`<tr><th>${esc(x[1])}</th>${cols.map(c=>`<td>${esc(c.v[x[0]]===undefined?'':c.v[x[0]])}</td>`).join('')}</tr>`})});
       body.innerHTML=h+'</table></div><p class="mu">Se muestran las últimas 8 fechas.</p>';return}
     const cur=L.find(x=>x.f===fecha),v=cur?cur.v:{};
-    let h=`<div class="fcr"><label class="fcl">Fecha de toma<input type="date" id="lb-f" value="${esc(fecha)}"></label>${L.length?`<label class="fcl">Fechas capturadas<select id="lb-sel"><option value="">—</option>${L.slice().reverse().map(x=>`<option value="${x.f}">${labFec(x.f)}</option>`).join('')}</select></label>`:''}</div><p class="mu">${cur?'Esta fecha ya tiene resultados: se edita.':'Fecha nueva.'} Solo llena lo que se pidió. La urea calcula el BUN sola (urea ÷ 2.14).</p>`;
+    let h=`<div class="fcr"><label class="fcl">Fecha de toma<span style="display:flex;gap:6px">${fIn('id="lb-f"',fecha)}<button type="button" class="btn sec" id="lb-hoy" style="margin:0;padding:6px 10px">Hoy</button></span></label>${L.length?`<label class="fcl">Fechas capturadas<select id="lb-sel"><option value="">—</option>${L.slice().reverse().map(x=>`<option value="${x.f}">${labFec(x.f)}</option>`).join('')}</select></label>`:''}</div><p class="mu">${cur?'Esta fecha ya tiene resultados: se edita.':'Fecha nueva.'} Solo llena lo que se pidió. La urea calcula el BUN sola (urea ÷ 2.14).</p>`;
+    h+=`<details class="box"><summary><b>🤖 Pegar resultados de una IA</b></summary><p class="mu">Manda el reporte a tu IA con las instrucciones y pega aquí lo que te devuelva. Se llenan los campos para que los revises; no se guarda hasta que toques Guardar.</p><textarea id="lb-ia" rows="6" placeholder="Fecha: 20/11/2026&#10;Hemoglobina: 11.2&#10;Creatinina: 8.4" style="width:100%;box-sizing:border-box"></textarea><div style="margin-top:6px"><button type="button" class="btn" id="lb-iago">Llenar campos</button> <button type="button" class="btn sec" id="lb-iacp">Copiar instrucciones para la IA</button></div><p class="mu" id="lb-iamsg"></p></details>`;
     LABG.forEach((g,gi)=>{
       h+=`<details class="box" ${gi<2?'open':''}><summary><b>${esc(g[0])}</b></summary>`;
       g[1].forEach(x=>{const k=x[0],pv=prev(k,fecha),t=LABT.has(k);
@@ -2200,31 +2256,41 @@ async function openResultados(exp){
       h+='</details>'});
     if(cur){const hm=labsHemo(cur);h+=`<div class="box" style="margin-top:10px"><b>Pasar a la plataforma</b><p class="mu">Copia los valores de esta fecha (${labFec(cur.f)}). Luego, en HemoHL7 con «Nueva» abierto, toca el bookmark.</p><button type="button" class="btn sec" id="lb-hemo">Copiar para HemoHL7</button> <button type="button" class="btn sec" id="lb-txt">Copiar como texto</button>${hm.fuera.length?`<p class="mu">Solo en papel (la plataforma no tiene campo): ${esc(hm.fuera.join(', '))}.</p>`:''}${hm.raro.length?`<p class="mu">No se pudo traducir a POS/NEG: ${esc(hm.raro.join(', '))}. Elígelo a mano en la plataforma.</p>`:''}</div>`}
     h+=`<details class="box" style="margin-top:10px"><summary><b>Bookmark de Chrome (una sola vez)</b></summary><ol class="mu" style="padding-left:18px"><li>Toca «Copiar código del bookmark».</li><li>En Chrome, Ctrl+Shift+O → menú ⋮ → Agregar marcador nuevo.</li><li>Nombre: Llenar labs. En URL pega el código y guarda.</li><li>En HemoHL7: abre los labs del paciente, toca Nueva y luego tu marcador «Llenar labs». Revisa y toca Aceptar.</li></ol><button type="button" class="btn sec" id="lb-bm">Copiar código del bookmark</button></details>`;
-    h+=`<datalist id="lb-res"><option value="Negativo"><option value="Positivo"></datalist><div style="margin-top:10px"><button class="btn" id="lb-save">Guardar resultados</button> ${cur?'<button class="dng" id="lb-del">Eliminar esta fecha</button>':''}</div>${cur?`<details class="box" style="margin-top:10px"><summary><b>Me equivoqué de fecha</b></summary><p class="mu">Mueve todos los valores de esta captura a la fecha correcta.</p><div class="fcr"><input type="date" id="lb-nf" value="${esc(fecha)}"><button type="button" class="btn sec" id="lb-mv">Mover a esta fecha</button></div></details>`:''}`;
+    h+=`<datalist id="lb-res"><option value="Negativo"><option value="Positivo"></datalist><div style="margin-top:10px"><button class="btn" id="lb-save">Guardar resultados</button> ${cur?'<button class="dng" id="lb-del">Eliminar esta fecha</button>':''}</div>${cur?`<details class="box" style="margin-top:10px"><summary><b>Me equivoqué de fecha</b></summary><p class="mu">Mueve todos los valores de esta captura a la fecha correcta.</p><div class="fcr">${fIn('id="lb-nf"',fecha)}<button type="button" class="btn sec" id="lb-mv">Mover a esta fecha</button></div></details>`:''}`;
     body.innerHTML=h;
   };
   const collect=()=>{const v={};body.querySelectorAll('[data-lb]').forEach(i=>{const t=i.value.trim();if(t)v[i.dataset.lb]=t});return v};
   const persist=async()=>{const c=await get('patients',exp);c.labs=L;c.pu=now();c.updatedAt=now();await put('patients',c)};
   sh.addEventListener('click',async ev=>{const b=ev.target.closest('button');if(!b)return;
     if(b.dataset.lt){tab=b.dataset.lt;sh.querySelectorAll('[data-lt]').forEach(x=>x.classList.toggle('on',x===b));draw();return}
+    if(b.id==='lb-iacp'){const ok=await copyText(labPrompt());toast(ok?'Instrucciones copiadas. Pégalas en tu IA junto con el reporte':'No se pudo copiar');return}
+    if(b.id==='lb-iago'){const r=labParse(body.querySelector('#lb-ia').value);const n=Object.keys(r.v).length;
+      if(!n){body.querySelector('#lb-iamsg').textContent='No encontré valores. Revisa que cada línea sea «Nombre: valor».';return}
+      if(r.f&&r.f!==fecha){fecha=r.f;draw()}
+      Object.keys(r.v).forEach(k=>{const i=body.querySelector('[data-lb="'+k+'"]');if(i)i.value=r.v[k]});
+      {const u=body.querySelector('[data-lb="ure"]'),bn=body.querySelector('[data-lb="bun"]');if(u&&bn&&u.value&&!r.v.bun){bn.value=labBun(u.value);bn.dataset.auto='1'}}
+      body.querySelectorAll('details.box').forEach(x=>{x.open=true});
+      const m=body.querySelector('#lb-iamsg');if(m)m.textContent='Llenados '+n+' campos'+(r.f?' para el '+fShow(r.f):'')+'. Revisa y toca Guardar.'+(r.no.length?' No reconocidos: '+r.no.join(' · '):'');
+      toast('Llenados '+n+' campos. Revisa y guarda');return}
+    if(b.id==='lb-hoy'){fecha=todayStr();draw();return}
     if(b.id==='lb-save'){const v=collect();if(!Object.keys(v).length){toast('No hay valores para guardar');return}
       L=labsNorm(L.filter(x=>x.f!==fecha).concat([{f:fecha,v}]));await persist();toast('Resultados guardados');draw();return}
     if(b.id==='lb-hemo'){const cur=L.find(x=>x.f===fecha);if(!cur)return;const ok=await copyText(JSON.stringify(labsHemo(cur)));toast(ok?'Copiado. Ve a HemoHL7 y toca el bookmark':'No se pudo copiar');return}
     if(b.id==='lb-txt'){const cur=L.find(x=>x.f===fecha);if(!cur)return;const ok=await copyText('Labs '+labFec(cur.f)+': '+labsLinea(cur));toast(ok?'Copiado como texto':'No se pudo copiar');return}
     if(b.id==='lb-bm'){const ok=await copyText(HEMO_BM);toast(ok?'Código copiado. Pégalo como URL de un marcador':'No se pudo copiar');return}
-    if(b.id==='lb-mv'){const nf=body.querySelector('#lb-nf').value;const cur=L.find(x=>x.f===fecha);if(!cur||!/^\d{4}-\d{2}-\d{2}$/.test(nf)||nf===fecha){toast('Elige una fecha distinta');return}
+    if(b.id==='lb-mv'){const nf=fParse(body.querySelector('#lb-nf').value)||'';const cur=L.find(x=>x.f===fecha);if(!cur||!/^\d{4}-\d{2}-\d{2}$/.test(nf)||nf===fecha){toast('Elige una fecha distinta');return}
       const dest=L.find(x=>x.f===nf);if(dest&&!(await askUI('Ya hay resultados el '+labFec(nf)+'. ¿Combinarlos? Los valores de esta captura reemplazan a los repetidos.','Combinar','Cancelar')))return;
       const v=Object.assign({},dest?dest.v:{},cur.v);L=labsNorm(L.filter(x=>x.f!==fecha&&x.f!==nf).concat([{f:nf,v}]));fecha=nf;await persist();toast('Fecha cambiada a '+labFec(nf));draw();return}
     if(b.id==='lb-del'){if(!(await askUI('¿Eliminar los resultados del '+labFec(fecha)+'?','Eliminar','Cancelar')))return;L=L.filter(x=>x.f!==fecha);await persist();toast('Fecha eliminada');draw();return}
   });
   sh.addEventListener('input',ev=>{const t=ev.target;
-    if(t.id==='lb-f'){if(/^\d{4}-\d{2}-\d{2}$/.test(t.value)){fecha=t.value;draw()}return}
     if(t.dataset&&t.dataset.lb==='ure'){const b=body.querySelector('[data-lb="bun"]');if(b&&(!b.value||b.dataset.auto==='1')){b.value=labBun(t.value);b.dataset.auto='1'}return}
     if(t.dataset&&t.dataset.lb==='bun')t.dataset.auto='0'});
   sh.addEventListener('change',async ev=>{const t=ev.target;if(t.id==='lb-sel'&&t.value){fecha=t.value;draw();return}
+    if(t.id==='lb-f'){const v=fParse(t.value);if(v){fecha=v;draw()}else{toast('Fecha no válida. Escribe día/mes/año, por ejemplo 25/11/26');t.value=fShow(fecha)}return}
     const d=t.dataset||{};if(d.sgi||d.sgb||d.sgo){const id=d.sgi||d.sgb||d.sgo;
-      PL=await labPlanSet(exp,P=>{if(d.sgi){P.int[id]=(+t.value===LSEG.find(g=>g.id===id).m)?0:+t.value}else if(d.sgb){P.ini[id]=/^\d{4}-\d{2}-\d{2}$/.test(t.value)?t.value:''}else P.off[id]=t.checked?1:0})||PL;draw()}});
-  sh.addEventListener('keydown',ev=>{if(ev.key==='Enter'&&ev.target.dataset&&ev.target.dataset.lb){ev.preventDefault();const all=[...body.querySelectorAll('[data-lb]')];const i=all.indexOf(ev.target);if(all[i+1])all[i+1].focus()}});
+      PL=await labPlanSet(exp,P=>{if(d.sgi){P.int[id]=(+t.value===LSEG.find(g=>g.id===id).m)?0:+t.value}else if(d.sgb){P.ini[id]=fParse(t.value)||''}else P.off[id]=t.checked?1:0})||PL;draw()}});
+  sh.addEventListener('keydown',ev=>{if(ev.key==='Enter'&&(ev.target.id==='lb-f'||ev.target.id==='lb-nf')){ev.preventDefault();ev.target.blur();return}if(ev.key==='Enter'&&ev.target.dataset&&ev.target.dataset.lb){ev.preventDefault();const all=[...body.querySelectorAll('[data-lb]')];const i=all.indexOf(ev.target);if(all[i+1])all[i+1].focus()}});
   draw();
 }
 
