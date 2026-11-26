@@ -59,6 +59,7 @@ button{cursor:pointer;border:0;background:none}
 .fcg{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}.fcl{display:flex;flex-direction:column;font-size:12px;gap:3px}.fcl input,.fcl select{min-width:0}
 .fcr{display:flex;gap:6px;margin:6px 0;align-items:center;flex-wrap:wrap}.fcr input,.fcr select{min-width:0}.fcm{border:1px solid var(--bd);border-radius:10px;padding:6px 8px;margin:8px 0}.fcm.no{opacity:.65}
 .lbr{max-width:560px}.fcl input[type=date],.fcl select{min-height:44px;border:1px solid var(--bd);border-radius:12px;padding:6px 10px;background:var(--card);color:var(--tx);font:inherit;box-sizing:border-box}.dti{min-height:44px;border:1px solid var(--bd);border-radius:12px;padding:6px 10px;background:var(--card);color:var(--tx);font:inherit;width:130px;box-sizing:border-box}.lbt .dti{min-height:38px;width:104px}.pr .btn.sec,#main .pg .hd .btn.sec[id^=sg-]{padding:8px 12px;font-size:14px;min-height:0}
+.chip.sgl.atr{background:#fde8e8;color:#8a1c1c}.chip.sgl.mes{background:#fff4d6;color:#7a5600}
 .sgc{display:inline-block;border-radius:8px;padding:1px 7px;margin:3px 4px 0 0;font-size:12px;background:var(--card);border:1px solid var(--bd)}.sgc.atr{background:#fde8e8;border-color:#e08a8a;color:#8a1c1c}.sgc.mes{background:#fff4d6;border-color:#e0b84a;color:#7a5600}
 .lbr{display:flex;align-items:center;gap:8px;margin:5px 0}.lbr span{flex:1 1 120px;min-width:0}.lbr input{width:90px;flex:0 0 90px}.lbr em{flex:0 0 120px;font-size:11px;color:var(--mu,#6b7785);font-style:normal}.lbt{border-collapse:collapse;font-size:13px}.lbt th,.lbt td{border:1px solid var(--bd);padding:4px 8px;text-align:right;white-space:nowrap}.lbt th:first-child{text-align:left;position:sticky;left:0;background:var(--card)}.lbt .lbg{text-align:left;background:var(--bd)}
 .fcq{margin:8px 0}.fcc details{margin:4px 0}.fcc .tg{padding:5px 9px;font-size:12px;margin:2px}
@@ -298,7 +299,7 @@ details{margin-top:12px}summary{padding:6px 0;color:var(--mu);font-weight:600}
 
 <script>
 'use strict';
-const VERSION='11.61';
+const VERSION='11.62';
 const TURNOS=[1,2,3,4,5];
 const DIAS_FOTO=7;
 const EV_DEF=['Hipotensión','Hipertensión','Calambres','Náuseas / vómito','Cefalea','Dolor torácico','Arritmia','Disnea','Problema de acceso','Coagulación del circuito','Sangrado','Fiebre / escalofríos','Alarma de máquina','Terminó antes de tiempo'];
@@ -676,6 +677,9 @@ async function render(){
   }catch(e){}
 }
 
+/* ---------- Próximos labs a la vista en el Pase ---------- */
+function labChip(p){if(!p||p.deleted)return '';const a=labSeg(p).filter(x=>x.toca&&x.est!=='off').sort((x,y)=>x.toca.localeCompare(y.toca));if(!a.length)return '';const x=a[0];return `<span class="chip sgl ${x.est}">🧪 ${esc(x.g.c)} ${labFec(x.toca)}</span>`}
+function labPaseLinea(p){if(!p)return '';const a=labSeg(p).filter(x=>x.toca&&x.est!=='off');if(!a.length)return '<div class="mu" style="font-size:12px">🧪 Labs: sin fecha base (captura resultados o usa «Fechas iniciales» en Pendientes)</div>';return `<div style="font-size:13px">🧪 <b>Próximos labs:</b> ${a.map(x=>`<span class="sgc ${x.est}">${esc(x.g.c)} ${labFec(x.toca)}</span>`).join(' ')}</div>`}
 async function renderHoy(){
   const [ents,pats]=await Promise.all([byDate(S.fecha),all('patients')]);
   const P=Object.fromEntries(pats.map(x=>[x.expediente,x]));
@@ -690,7 +694,7 @@ async function renderHoy(){
     return `<div class="card ${e.id===S.sel?'sel':''}" data-id="${e.id}">
       <div class="sil"><small>sillón</small><b>${esc(e.sillon||'–')}</b></div>
       <div><div class="nm">${esc(pe&&pe.nombre||'(sin nombre)')}</div><div class="ex">${e.temp?'sin expediente':esc(e.expediente)}</div>
-        <div class="chips">${pe&&pe.acceso?`<span class="chip ax">${esc(pe.acceso)}</span>`:''}${pe&&pe.aviso?`<span class="chip al">⚠ ${esc(pe.aviso)}</span>`:''}${(e.tags||[]).map(g=>`<span class="chip ev">${esc(g)}</span>`).join('')}${e.fotos&&e.fotos.length?`<span class="chip">📷 ${e.fotos.length}</span>`:''}${e.notaTxt?'<span class="chip">📝 texto</span>':''}${e.asistencia==='ausente'?'<span class="chip al">No acudió</span>':''}${open?`<span class="chip w">⏳ ${open} pendiente${open>1?'s':''}</span>`:''}</div>
+        <div class="chips">${labChip(pe)}${pe&&pe.acceso?`<span class="chip ax">${esc(pe.acceso)}</span>`:''}${pe&&pe.aviso?`<span class="chip al">⚠ ${esc(pe.aviso)}</span>`:''}${(e.tags||[]).map(g=>`<span class="chip ev">${esc(g)}</span>`).join('')}${e.fotos&&e.fotos.length?`<span class="chip">📷 ${e.fotos.length}</span>`:''}${e.notaTxt?'<span class="chip">📝 texto</span>':''}${e.asistencia==='ausente'?'<span class="chip al">No acudió</span>':''}${open?`<span class="chip w">⏳ ${open} pendiente${open>1?'s':''}</span>`:''}</div>
         ${e.comentario?`<div class="cm">${esc(e.comentario)}</div>`:''}${(e.evs&&e.evs.length)?`<div class="cm">⚠ ${esc(e.evs.map(evNom).join(', '))}</div>`:''}</div>
       <button class="nota ${e.nota?'ok':''}" data-nota="${e.id}">${e.nota?'✓':'○'}<small>nota</small></button></div>`}).join('');
   const showBanner=isIOS&&!standalone&&lsGet('bannerOff')!=='1';
@@ -1023,6 +1027,7 @@ async function addEntry(expRaw,nom,tur,sil,rapid=false){
   nom=nom.trim();sil=sil.trim();
   let pat=await get('patients',exp);
   if(!pat)pat={expediente:exp,nombre:'',pendientes:[],updatedAt:now(),pu:now()};
+  if(pat.deleted){pat.deleted=false;pat.updatedAt=now();pat.pu=now()}
   if(nom&&nom!==pat.nombre){pat.nombre=nom;pat.updatedAt=now();pat.pu=now()}
   await put('patients',pat);
   const ents=await byDate(S.fecha);
@@ -1061,6 +1066,7 @@ async function openEntry(id){
       <div class="stabs2"><button type="button" data-st="pase">Pase</button><button type="button" data-st="nota">Nota rápida</button><button type="button" class="notabtn" id="e-nota"></button></div></div>
     <div class="sp" data-pn="pase">
     <div class="evtop"><div class="tags" id="e-tags"></div></div>
+    <div id="e-labs" style="margin:2px 0 6px">${labPaseLinea(pat)}</div>
     <div class="row"><div><label>Sillón</label><input id="e-sil" inputmode="numeric" value="${esc(e.sillon)}"></div><div style="display:flex;align-items:end"><button type="button" class="btn sec" id="e-cal">Calculadora</button> <button type="button" class="btn sec" id="e-rx" style="margin-left:6px">🖨 Receta</button> <button type="button" class="btn sec" id="e-lab" style="margin-left:6px">🧪 Labs</button> <button type="button" class="btn sec" id="e-lres" style="margin-left:6px">📈 Resultados</button></div></div>
       <div id="e-hoja" style="margin:6px 0"></div><input type="file" id="e-hoja-f" accept="application/pdf,.pdf" hidden>
     <div class="box ncp"><b>Nota completa</b>
@@ -1395,8 +1401,8 @@ async function openEntry(id){
   // Enter pasa al siguiente campo de signos y pesos
   const orden=['#nr-seco','#nr-ing','#nr-gan','#nr-fc','#nr-tas','#nr-tad','#nr-fr','#nr-tp','#nr-sp','#nr-ufp','#nr-uft'];
   orden.forEach((id,i)=>q(id).addEventListener('keydown',ev=>{if(ev.key==='Enter'){ev.preventDefault();const n=orden[i+1];if(n)q(n).focus();else ev.target.blur()}}));
-  if(S.reopenViewer){S.reopenViewer=false;let n=0;const tryOpen=()=>{if(sheetEl!==sh)return;const im=q('#nr-fotos .nrimg');if(im){viewPhoto(im.dataset.u,null);return}if(++n<30){setTimeout(tryOpen,100);return}toast('Este paciente no tiene foto de la hoja')};setTimeout(tryOpen,150)}
-  q('#nr-fotos').addEventListener('click',ev=>{const im=ev.target.closest('.nrimg');if(!im)return;viewPhoto(im.dataset.u,null)});
+  if(S.reopenViewer){S.reopenViewer=false;let n=0;const tryOpen=()=>{if(sheetEl!==sh)return;const im=q('#nr-fotos .nrimg');if(im){viewPhoto(im.dataset.u,delFoto(im.dataset.ph));return}if(++n<30){setTimeout(tryOpen,100);return}toast('Este paciente no tiene foto de la hoja')};setTimeout(tryOpen,150)}
+  q('#nr-fotos').addEventListener('click',ev=>{const im=ev.target.closest('.nrimg');if(!im)return;viewPhoto(im.dataset.u,delFoto(im.dataset.ph))});
   q('#e-nr').addEventListener('click',async ev=>{
     const cp=ev.target.closest('[data-cp]');
     if(cp){
@@ -1493,23 +1499,25 @@ async function openEntry(id){
   };
   q('#e-padd').onclick=addP;q('#e-pin').addEventListener('keydown',ev=>{if(ev.key==='Enter'){ev.preventDefault();addP()}});
 
+  const ids=[];
   const drawFotos=async()=>{
-    urls.splice(0).forEach(u=>URL.revokeObjectURL(u));
+    urls.splice(0).forEach(u=>URL.revokeObjectURL(u));ids.length=0;
     const keep=[];let html='';
     for(const fid of e.fotos){
       const ph=await get('photos',fid);if(!ph)continue;keep.push(fid);
-      const u=URL.createObjectURL(ph.blob);urls.push(u);
+      const u=URL.createObjectURL(ph.blob);urls.push(u);ids.push(fid);
       const left=Math.max(0,Math.ceil((ph.created+DIAS_FOTO*DAY-now())/DAY));
       html+=`<div class="th" data-ph="${fid}" data-u="${u}"><img src="${u}" alt="Hoja de signos"><small>se borra en ${left} d</small></div>`;
     }
     if(keep.length!==e.fotos.length){e.fotos=keep;await flush().catch(()=>{})}
     if(!sheetEl||sheetEl!==sh)return;
     q('#e-fotos').innerHTML=html||'<div class="mu">Sin fotos</div>';
-    q('#nr-fotos').innerHTML=urls.length?urls.map(u=>`<img class="nrimg" src="${u}" data-u="${u}" alt="Hoja de signos">`).join(''):'<div class="mu" style="padding:10px">Sin foto de hoy.</div>';
+    q('#nr-fotos').innerHTML=urls.length?urls.map((u,i)=>`<img class="nrimg" src="${u}" data-u="${u}" data-ph="${ids[i]}" alt="Hoja de signos">`).join(''):'<div class="mu" style="padding:10px">Sin foto de hoy.</div>';
   };
+  function delFoto(fid){return async()=>{const ph=await get('photos',fid);await del('photos',fid);SYNC.dropPhoto(ph);e.fotos=e.fotos.filter(i=>i!==fid);await flush().catch(()=>{});await drawFotos()}}
   await drawFotos();
   q('#e-fotos').addEventListener('click',ev=>{const t=ev.target.closest('[data-ph]');if(!t)return;
-    viewPhoto(t.dataset.u,async()=>{const ph=await get('photos',t.dataset.ph);await del('photos',t.dataset.ph);SYNC.dropPhoto(ph);e.fotos=e.fotos.filter(i=>i!==t.dataset.ph);await flush().catch(()=>{});await drawFotos()})});
+    viewPhoto(t.dataset.u,delFoto(t.dataset.ph))});
   q('#e-file').onchange=async ev=>{
     const files=[...ev.target.files];ev.target.value='';if(!files.length)return;
     toast('Guardando foto…');
@@ -2319,7 +2327,7 @@ async function openProfile(exp){
 }
 async function openBatch(){
  const sh=openSheet(`<div class="sh-head"><b>Cargar lista de hemodiálisis</b><button data-close>Cerrar</button></div><p>Una línea por paciente: expediente, nombre, sillón. Se pueden usar tabulaciones, comas o punto y coma. Los pacientes quedarán como asistencia por confirmar.</p><label>Fecha de sesión</label><input id="ba-date" type="date" value="${esc(S.fecha)}"><label>Turno</label><select id="ba-turn">${turnoOpts(S.turno)}</select><textarea id="ba-lines" rows="12" placeholder="12345, María Pérez, 1&#10;67890, Juan López, 2"></textarea><button class="btn" id="ba-go">Cargar pacientes</button><p id="ba-msg"></p>`);
- $('#ba-go',sh).onclick=async()=>{const fecha=$('#ba-date',sh).value,turno=+$('#ba-turn',sh).value;const lines=$('#ba-lines',sh).value.split(/\r?\n/).map(x=>x.trim()).filter(Boolean);if(!fecha||!lines.length){toast('Indica fecha y pacientes');return}const old=await byDate(fecha);let added=0,skipped=0;for(const line of lines){const parts=line.includes('\t')?line.split('\t'):line.split(/[;,]/);const exp=normExp(parts[0]);if(!exp){skipped++;continue}if(old.some(e=>e.expediente===exp)){skipped++;continue}let p=await get('patients',exp);if(!p)p={expediente:exp,nombre:(parts[1]||'').trim(),pendientes:[],updatedAt:now(),pu:now()};else if(!p.nombre&&parts[1]){p.nombre=parts[1].trim();p.updatedAt=now()}await put('patients',p);const e={id:uid(),fecha,turno,sillon:(parts[2]||'').trim(),expediente:exp,comentario:'',nota:false,notaTxt:'',asistencia:'pendiente',fotos:[],tags:[],extras:{},creado:now(),updatedAt:now()};await put('entries',e);old.push(e);added++}S.fecha=fecha;S.turno=turno;closeSheet();toast(`${added} agregados; ${skipped} omitidos`)};
+ $('#ba-go',sh).onclick=async()=>{const fecha=$('#ba-date',sh).value,turno=+$('#ba-turn',sh).value;const lines=$('#ba-lines',sh).value.split(/\r?\n/).map(x=>x.trim()).filter(Boolean);if(!fecha||!lines.length){toast('Indica fecha y pacientes');return}const old=await byDate(fecha);let added=0,skipped=0;for(const line of lines){const parts=line.includes('\t')?line.split('\t'):line.split(/[;,]/);const exp=normExp(parts[0]);if(!exp){skipped++;continue}if(old.some(e=>e.expediente===exp)){skipped++;continue}let p=await get('patients',exp);if(!p)p={expediente:exp,nombre:(parts[1]||'').trim(),pendientes:[],updatedAt:now(),pu:now()};else if(p.deleted){p.deleted=false;p.updatedAt=now();p.pu=now();if(parts[1])p.nombre=parts[1].trim()}else if(!p.nombre&&parts[1]){p.nombre=parts[1].trim();p.updatedAt=now()}await put('patients',p);const e={id:uid(),fecha,turno,sillon:(parts[2]||'').trim(),expediente:exp,comentario:'',nota:false,notaTxt:'',asistencia:'pendiente',fotos:[],tags:[],extras:{},creado:now(),updatedAt:now()};await put('entries',e);old.push(e);added++}S.fecha=fecha;S.turno=turno;closeSheet();toast(`${added} agregados; ${skipped} omitidos`)};
 }
 function openCalcFloating(){
  const old=$('#calc-floating');if(old){old.remove();return}
@@ -2463,7 +2471,8 @@ const SYNC=(()=>{
   const fail=(err,n=1)=>{if(err&&err.code==='permission-denied')st.denied+=n;else logErr('subir',err)};
 
   /* --- registros --- */
-  const recPat=p=>{const r={expediente:p.expediente,acceso:p.acceso||'',aviso:p.aviso||'',sexo:p.sexo||'',updatedAt:patStamp(p)};if(p.dias)r.dias=p.dias;if(p.turnoHab)r.turnoHab=p.turnoHab;if(st.syncNames){r.nombre=p.nombre||'';if(p.plantilla!==undefined)r.plantilla=p.plantilla;if(p.ficha)r.ficha=fNorm(p.ficha);if(p.labs&&p.labs.length)r.labs=labsNorm(p.labs);if(p.labPlan&&Object.keys(p.labPlan).length)r.labPlan=p.labPlan}return r};
+  const DELMIG=1795694400000; /* 26-nov-2026: obliga a subir una vez los expedientes que ya estaban eliminados */
+  const recPat=p=>{if(p.deleted)return {expediente:p.expediente,deleted:true,updatedAt:Math.max(patStamp(p),DELMIG)};const r={expediente:p.expediente,deleted:false,acceso:p.acceso||'',aviso:p.aviso||'',sexo:p.sexo||'',updatedAt:patStamp(p)};if(p.dias)r.dias=p.dias;if(p.turnoHab)r.turnoHab=p.turnoHab;if(st.syncNames){r.nombre=p.nombre||'';if(p.plantilla!==undefined)r.plantilla=p.plantilla;if(p.ficha)r.ficha=fNorm(p.ficha);if(p.labs&&p.labs.length)r.labs=labsNorm(p.labs);if(p.labPlan&&Object.keys(p.labPlan).length)r.labPlan=p.labPlan}return r};
   const recPend=(p,x)=>({id:x.id,expediente:p.expediente,texto:x.texto,hecho:!!x.hecho,hechoEn:x.hechoEn||null,creado:x.creado||0,del:!!x.del,vence:x.vence||null,tipo:x.tipo||null,datos:x.datos||null,updatedAt:pStamp(x)});
   const recEnt=e=>{const r={...e};delete r.fotos;r.deleted=!!e.deleted;r.updatedAt=e.updatedAt||0;return r};
   // Fotos: ya vienen comprimidas (ligeras ~100-150 KB); van dentro del documento como texto base64.
@@ -2475,7 +2484,7 @@ const SYNC=(()=>{
     return {id:ph.id,entry:ph.entry||'',expediente:ph.expediente||'',created:ph.created||0,deleted:false,data,updatedAt:ph.created||0};
   }
   function itemsFor(name,v){
-    if(name==='patients'){const a=[['patients',v.expediente,recPat(v)]];for(const x of v.pendientes||[])a.push(['pendientes',x.id,recPend(v,x)]);return a}
+    if(name==='patients'){const a=[['patients',v.expediente,recPat(v)]];for(const x of v.pendientes||[]){const r=recPend(v,x);if(v.deleted){r.del=true;r.texto='';r.datos=null;r.updatedAt=Math.max(r.updatedAt,DELMIG)}a.push(['pendientes',x.id,r])}return a}
     if(name==='entries')return [['entries',v.id,recEnt(v)]];
     if(name==='meta'&&v.k==='tags')return [['meta','tags',{v:v.v,updatedAt:v.updatedAt||0}]];
     return [];
@@ -2485,7 +2494,7 @@ const SYNC=(()=>{
   /* --- subir --- */
   function write(it){
     st.remote[it[0]+'~'+it[1]]=it[2].updatedAt;st.pending++;
-    return ref(it[0],it[1]).set(it[2],{merge:true})
+    return (it[0]==='patients'&&it[2].deleted?ref(it[0],it[1]).set(it[2]):ref(it[0],it[1]).set(it[2],{merge:true}))
       .then(()=>{st.last=now()})
       .catch(fail)
       .then(()=>{st.pending--;changed()});
@@ -2540,6 +2549,8 @@ const SYNC=(()=>{
       const cur=await get('patients',r.expediente),rs=r.updatedAt||0;
       if(!st.forceNames&&cur&&patStamp(cur)>=rs)return null;
       const p=cur||{expediente:r.expediente,nombre:'',pendientes:[],updatedAt:0};
+      if('deleted' in r)p.deleted=!!r.deleted;
+      if(r.deleted){p.pu=rs;p.updatedAt=Math.max(p.updatedAt||0,rs);await put('patients',p,{nosync:true});return p}
       if(st.syncNames&&typeof r.nombre==='string')p.nombre=r.nombre;
       if(st.syncNames&&typeof r.plantilla==='string')p.plantilla=r.plantilla;if(st.syncNames&&r.ficha&&typeof r.ficha==='object')p.ficha=r.ficha;if(st.syncNames&&Array.isArray(r.labs))p.labs=r.labs;if(st.syncNames&&r.labPlan&&typeof r.labPlan==='object')p.labPlan=r.labPlan;
       if('acceso' in r)p.acceso=r.acceso;if('aviso' in r)p.aviso=r.aviso;if('sexo' in r)p.sexo=r.sexo;if('dias' in r)p.dias=r.dias;if('turnoHab' in r)p.turnoHab=r.turnoHab;
@@ -2674,7 +2685,7 @@ const SYNC=(()=>{
     changed();
   }
   const syncNow=()=>{if(!st.uid)return Promise.resolve();listen();return enq(()=>pushAll())};
-  return {push,pushPhoto,dropPhoto,init,login,logout,setNames,setPhotos,syncNow,state:()=>st};
+  return {_t:{itemsFor,applyRemote},push,pushPhoto,dropPhoto,init,login,logout,setNames,setPhotos,syncNow,state:()=>st};
 })();
 
 /* ---------- Inicio ---------- */
