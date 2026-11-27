@@ -11,7 +11,10 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="icon-180.png">
 <title>Pase HD</title>
-<!-- 11.64 (solo labs): sin sincronización; scripts de Firebase desactivados -->
+<script defer src="firebase-config.js"></script>
+<script defer src="vendor/firebase-app-compat.js"></script>
+<script defer src="vendor/firebase-auth-compat.js"></script>
+<script defer src="vendor/firebase-firestore-compat.js"></script>
 <style>
 :root{--bg:#f2f5f7;--card:#fff;--tx:#0f1b24;--mu:#5b6b78;--ac:#0f766e;--onac:#fff;--ac2:#d5f5ef;--bd:#dce3e8;--wa:#b45309;--wabg:#fef3c7;--ok:#15803d;--okbg:#dcfce7;--dn:#b91c1c;--albg:#fee2e2}
 @media(prefers-color-scheme:dark){:root{--bg:#0b1218;--card:#141f28;--tx:#e8eef2;--mu:#8fa1ae;--ac:#2dd4bf;--onac:#06201e;--ac2:#0f3b38;--bd:#25343f;--wa:#fbbf24;--wabg:#3a2e0b;--ok:#4ade80;--okbg:#0f3320;--dn:#f87171;--albg:#3b1414}}
@@ -296,7 +299,7 @@ details{margin-top:12px}summary{padding:6px 0;color:var(--mu);font-weight:600}
 
 <script>
 'use strict';
-const VERSION='11.64';
+const VERSION='11.65';
 const TURNOS=[1,2,3,4,5];
 const DIAS_FOTO=7;
 const EV_DEF=['Hipotensión','Hipertensión','Calambres','Náuseas / vómito','Cefalea','Dolor torácico','Arritmia','Disnea','Problema de acceso','Coagulación del circuito','Sangrado','Fiebre / escalofríos','Alarma de máquina','Terminó antes de tiempo'];
@@ -2653,13 +2656,13 @@ const SYNC=(()=>{
       firebase.initializeApp(window.FIREBASE_CONFIG);
       st.auth=firebase.auth();st.fs=firebase.firestore();
       try{st.fs.settings({ignoreUndefinedProperties:true,experimentalAutoDetectLongPolling:true,merge:true})}catch(e){logErr('firestore',e)}
-      try{const p=st.fs.enablePersistence({synchronizeTabs:true});if(p&&p.catch)p.catch(e=>logErr('persistencia',e))}catch(e){logErr('persistencia',e)}
+      // 11.65: sin caché offline de Firestore (la app ya guarda todo en su propia base y reenvía lo pendiente); evita bloqueos de IndexedDB en iOS
     }catch(e){logErr('firebase',e);st.status='error';st.err=String((e&&e.message)||e);changed();return}
     st.status='out';
     st.auth.onAuthStateChanged(async u=>{
       try{
         if(u){const m=await get('meta','syncnames');st.syncNames=!(m&&m.v===false);
-          const m2=await get('meta','syncphotos');st.syncPhotos=!(m2&&m2.v===false);st.uid=u.uid;st.email=u.email||'';st.status='on';listen()}
+          const m2=await get('meta','syncphotos2');st.syncPhotos=!!(m2&&m2.v===true);st.uid=u.uid;st.email=u.email||'';st.status='on';listen()}
         else{unlisten();st.uid=null;st.email='';st.status='out'}
       }catch(e){logErr('sesión',e)}
       changed();
@@ -2680,7 +2683,7 @@ const SYNC=(()=>{
     changed();
   }
   async function setPhotos(on){
-    st.syncPhotos=!!on;await put('meta',{k:'syncphotos',v:!!on},{nosync:true});
+    st.syncPhotos=!!on;await put('meta',{k:'syncphotos2',v:!!on},{nosync:true});
     if(st.uid)listen(); // al encender se bajan las fotos de la nube y se suben las que solo están aquí
     changed();
   }
@@ -2697,7 +2700,7 @@ const SYNC=(()=>{
   const bootOk=()=>lsSet('booting','0');
   if(lsGet('booting')==='1'){lsSet('safe','1');lsSet('safeWhy',lastCrumb);logErr('inicio','La app se cerró durante el inicio anterior (último paso: '+lastCrumb+'): modo seguro')}
   lsSet('booting','1');setTimeout(bootOk,8000);window.addEventListener('pagehide',bootOk);
-  const safe=true; // 11.64: sin sincronización ni limpieza automática
+  const safe=lsGet('safe')==='1';
   try{db=await openDB()}catch(e){logErr('abrir base',e);$('#main').innerHTML='<div class="empty">Este navegador no permite guardar datos locales (¿modo privado?).</div>';return}
   try{if(navigator.storage&&navigator.storage.persist)navigator.storage.persist()}catch(e){}
   await render();
