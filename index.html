@@ -299,7 +299,7 @@ details{margin-top:12px}summary{padding:6px 0;color:var(--mu);font-weight:600}
 
 <script>
 'use strict';
-const VERSION='11.62';
+const VERSION='11.63';
 const TURNOS=[1,2,3,4,5];
 const DIAS_FOTO=7;
 const EV_DEF=['Hipotensión','Hipertensión','Calambres','Náuseas / vómito','Cefalea','Dolor torácico','Arritmia','Disnea','Problema de acceso','Coagulación del circuito','Sangrado','Fiebre / escalofríos','Alarma de máquina','Terminó antes de tiempo'];
@@ -565,6 +565,7 @@ const expFull=x=>{x=String(x||'').trim();return /^[A-Za-z]/.test(x)?x.toUpperCas
 
 /* ---------- Registro de errores (se ve en Ajustes) ---------- */
 function readErrs(){try{const a=JSON.parse(lsGet('errlog')||'[]');return Array.isArray(a)?a:[]}catch(e){return[]}}
+const lastCrumb=(()=>{try{return String((JSON.parse(localStorage.getItem('crumb'))||{}).s||'')}catch(e){return ''}})();
 const crumb=m=>{try{localStorage.setItem('crumb',JSON.stringify({t:Date.now(),s:m}))}catch(e){}};
 function logErr(donde,err){
   try{
@@ -678,8 +679,10 @@ async function render(){
 }
 
 /* ---------- Próximos labs a la vista en el Pase ---------- */
-function labChip(p){if(!p||p.deleted)return '';const a=labSeg(p).filter(x=>x.toca&&x.est!=='off').sort((x,y)=>x.toca.localeCompare(y.toca));if(!a.length)return '';const x=a[0];return `<span class="chip sgl ${x.est}">🧪 ${esc(x.g.c)} ${labFec(x.toca)}</span>`}
-function labPaseLinea(p){if(!p)return '';const a=labSeg(p).filter(x=>x.toca&&x.est!=='off');if(!a.length)return '<div class="mu" style="font-size:12px">🧪 Labs: sin fecha base (captura resultados o usa «Fechas iniciales» en Pendientes)</div>';return `<div style="font-size:13px">🧪 <b>Próximos labs:</b> ${a.map(x=>`<span class="sgc ${x.est}">${esc(x.g.c)} ${labFec(x.toca)}</span>`).join(' ')}</div>`}
+function labChip(p){try{return labChip0(p)}catch(e){return ''}}
+function labChip0(p){if(!p||p.deleted)return '';const a=labSeg(p).filter(x=>x.toca&&x.est!=='off').sort((x,y)=>x.toca.localeCompare(y.toca));if(!a.length)return '';const x=a[0];return `<span class="chip sgl ${x.est}">🧪 ${esc(x.g.c)} ${labFec(x.toca)}</span>`}
+function labPaseLinea(p){try{return labPaseLinea0(p)}catch(e){return ''}}
+function labPaseLinea0(p){if(!p)return '';const a=labSeg(p).filter(x=>x.toca&&x.est!=='off');if(!a.length)return '<div class="mu" style="font-size:12px">🧪 Labs: sin fecha base (captura resultados o usa «Fechas iniciales» en Pendientes)</div>';return `<div style="font-size:13px">🧪 <b>Próximos labs:</b> ${a.map(x=>`<span class="sgc ${x.est}">${esc(x.g.c)} ${labFec(x.toca)}</span>`).join(' ')}</div>`}
 async function renderHoy(){
   const [ents,pats]=await Promise.all([byDate(S.fecha),all('patients')]);
   const P=Object.fromEntries(pats.map(x=>[x.expediente,x]));
@@ -707,7 +710,7 @@ async function renderHoy(){
         <button class="ib" data-batch title="Cargar lista del turno">☷ Lista</button><button class="ib pl" data-add aria-label="Agregar paciente">＋</button></div>
       <div class="tabs">${tabs}</div>
       <div class="sbar"><input id="s-q" type="search" placeholder="Buscar paciente (atajo: / o Ctrl+K)" autocomplete="off" autocorrect="off" enterkeyhint="search" value="${esc(S.q||'')}"><div id="s-res" class="sres"></div></div></div>
-    ${lsGet('safe')==='1'?'<div class="banner"><div>Modo seguro: la app se cerró sola al iniciar la última vez. La sincronización y la limpieza de fotos están en pausa. <button type="button" class="mini" data-resume style="margin-top:6px">Reanudar</button></div></div>':''}
+    ${lsGet('safe')==='1'?'<div class="banner"><div>Modo seguro: la app se cerró sola al iniciar la última vez. La sincronización y la limpieza de fotos están en pausa.${lsGet('safeWhy')?` <small>(Último paso antes del cierre: ${esc(lsGet('safeWhy'))})</small>`:''} <button type="button" class="mini" data-resume style="margin-top:6px">Reanudar</button></div></div>':''}
     ${showBanner?`<div class="banner"><div>Para que iOS no borre tus datos, instala la app: botón Compartir → <b>Agregar a pantalla de inicio</b>, y úsala siempre desde ese ícono.</div><button data-bn>×</button></div>`:''}
     ${esHoy?secHoy(pats):''}${secLabs(pats)}${hojasBtn}
     ${cards||`<div class="empty">Sin pacientes en el turno ${S.turno}.<br><button class="btn" data-loadprev style="margin-top:10px">Cargar desde la sesión anterior</button></div>`}
@@ -2136,7 +2139,7 @@ function labsHemo(e){
   return {k:'pasehd-labs',f:e.f.slice(8)+'/'+e.f.slice(5,7)+'/'+e.f.slice(0,4),d,fuera,raro,aj};
 }
 function labsNorm(L){
-  const a=(Array.isArray(L)?L:[]).map(x=>{const v={};Object.keys(LABN).forEach(k=>{const t=fS((x.v||{})[k]);if(t)v[k]=t});return {f:fS(x.f),v}}).filter(x=>/^\d{4}-\d{2}-\d{2}$/.test(x.f)&&Object.keys(x.v).length);
+  const a=(Array.isArray(L)?L:[]).filter(x=>x&&typeof x==='object').map(x=>{const v={};Object.keys(LABN).forEach(k=>{const t=fS((x.v||{})[k]);if(t)v[k]=t});return {f:fS(x.f),v}}).filter(x=>/^\d{4}-\d{2}-\d{2}$/.test(x.f)&&Object.keys(x.v).length);
   return a.sort((p,q)=>p.f.localeCompare(q.f));
 }
 const labFec=f=>f?f.slice(8)+'/'+f.slice(5,7)+'/'+f.slice(2,4):'';
@@ -2158,14 +2161,14 @@ const LSEG=[
  {id:'vir',t:'Hepatitis B y C',c:'Hepatitis B/C',m:4,keys:['hbs','hcv'],sel:['vh'],extra:[]},
  {id:'hiv',t:'VIH',c:'VIH',m:6,keys:['hiv'],sel:['vi'],extra:[]},
  {id:'fe',t:'PTHi y perfil de hierro',c:'PTHi y hierro',m:3,keys:['pth','ferr','fe','trf','sat'],sel:['pt'],extra:['Perfil de hierro']}];
-const addMes=(f,n)=>{const a=f.split('-').map(Number);const t=new Date(a[0],a[1]-1+n,1),ult=new Date(t.getFullYear(),t.getMonth()+1,0).getDate();return todayStr(new Date(t.getFullYear(),t.getMonth(),Math.min(a[2],ult),12))};
+const addMes=(f,n)=>{if(!/^\d{4}-\d{2}-\d{2}$/.test(f||'')||!isFinite(+n))return '';const a=f.split('-').map(Number);if(Math.abs(n)>1200)return '';const t=new Date(a[0],a[1]-1+n,1),ult=new Date(t.getFullYear(),t.getMonth()+1,0).getDate();return todayStr(new Date(t.getFullYear(),t.getMonth(),Math.min(a[2],ult),12))};
 function labSeg(p,hoy){
   hoy=hoy||todayStr();const L=labsNorm(p.labs),P=p.labPlan||{},ym=hoy.slice(0,7),nx=addMes(ym+'-01',1).slice(0,7);
   return LSEG.map(g=>{
     const m=+(P.int&&P.int[g.id])||g.m;let ult=null;
-    for(let i=L.length-1;i>=0;i--){if(g.keys.some(k=>L[i].v[k]!==undefined)){ult=L[i].f;break}}
-    const ini=(P.ini&&P.ini[g.id])||'';let base=ult||'';if(ini&&(!base||ini>base))base=ini;
-    const toca=base?addMes(base,m):'';let est;
+    for(let i=L.length-1;i>=0;i--){if(L[i]&&L[i].v&&g.keys.some(k=>L[i].v[k]!==undefined)){ult=L[i].f;break}}
+    let ini=(P.ini&&P.ini[g.id])||'';if(!/^\d{4}-\d{2}-\d{2}$/.test(ini))ini='';let base=ult||'';if(ini&&(!base||ini>base))base=ini;
+    const toca=base?addMes(base,m):'';let est;if(base&&!toca)base='';
     if(P.off&&P.off[g.id])est='off';
     else if(!toca)est='sin';
     else if(toca.slice(0,7)<ym)est='atr';else if(toca.slice(0,7)===ym)est='mes';else if(toca.slice(0,7)===nx)est='prox';else est='ok';
@@ -2626,7 +2629,7 @@ const SYNC=(()=>{
           enq(async()=>{
             const res=await applyRemote(name,d);if(res)afterApply(name,res);
             // al reactivar los nombres: si la nube no tiene nombre de este paciente pero aquí sí, se publica
-            if(name==='patients'&&st.forceNames&&st.syncNames&&typeof d.nombre!=='string'){
+            if(name==='patients'&&st.forceNames&&st.syncNames&&!d.deleted&&typeof d.nombre!=='string'){
               const p=await get('patients',d.expediente);
               if(p&&p.nombre){p.pu=now();p.updatedAt=now();await put('patients',p)}
             }
@@ -2695,7 +2698,7 @@ const SYNC=(()=>{
   document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')crumb('segundo plano')});window.addEventListener('pagehide',()=>crumb('segundo plano'));
   crumb('inicio');
   const bootOk=()=>lsSet('booting','0');
-  if(lsGet('booting')==='1'){lsSet('safe','1');logErr('inicio','La app se cerró durante el inicio anterior: modo seguro')}
+  if(lsGet('booting')==='1'){lsSet('safe','1');lsSet('safeWhy',lastCrumb);logErr('inicio','La app se cerró durante el inicio anterior (último paso: '+lastCrumb+'): modo seguro')}
   lsSet('booting','1');setTimeout(bootOk,8000);window.addEventListener('pagehide',bootOk);
   const safe=lsGet('safe')==='1';
   try{db=await openDB()}catch(e){logErr('abrir base',e);$('#main').innerHTML='<div class="empty">Este navegador no permite guardar datos locales (¿modo privado?).</div>';return}
