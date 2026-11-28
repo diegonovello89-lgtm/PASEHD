@@ -299,7 +299,7 @@ details{margin-top:12px}summary{padding:6px 0;color:var(--mu);font-weight:600}
 
 <script>
 'use strict';
-const VERSION='11.65';
+const VERSION='11.67';
 const TURNOS=[1,2,3,4,5];
 const DIAS_FOTO=7;
 const EV_DEF=['Hipotensión','Hipertensión','Calambres','Náuseas / vómito','Cefalea','Dolor torácico','Arritmia','Disnea','Problema de acceso','Coagulación del circuito','Sangrado','Fiebre / escalofríos','Alarma de máquina','Terminó antes de tiempo'];
@@ -1070,7 +1070,7 @@ async function openEntry(id){
     <div class="sp" data-pn="pase">
     <div class="evtop"><div class="tags" id="e-tags"></div></div>
     <div id="e-labs" style="margin:2px 0 6px">${labPaseLinea(pat)}</div>
-    <div class="row"><div><label>Sillón</label><input id="e-sil" inputmode="numeric" value="${esc(e.sillon)}"></div><div style="display:flex;align-items:end"><button type="button" class="btn sec" id="e-cal">Calculadora</button> <button type="button" class="btn sec" id="e-rx" style="margin-left:6px">🖨 Receta</button> <button type="button" class="btn sec" id="e-lab" style="margin-left:6px">🧪 Labs</button> <button type="button" class="btn sec" id="e-lres" style="margin-left:6px">📈 Resultados</button></div></div>
+    <div class="row"><div><label>Sillón</label><input id="e-sil" inputmode="numeric" value="${esc(e.sillon)}"></div><div style="display:flex;align-items:end;flex-wrap:wrap;gap:6px"><button type="button" class="mini" id="e-cal">🧮 Calc.</button><button type="button" class="mini" id="e-rx">🖨 Receta</button><button type="button" class="mini" id="e-lab">🧪 Labs</button><button type="button" class="mini" id="e-lres">📈 Resultados</button></div></div>
       <div id="e-hoja" style="margin:6px 0"></div><input type="file" id="e-hoja-f" accept="application/pdf,.pdf" hidden>
     <div class="box ncp"><b>Nota completa</b>
       <div class="ncp-b"><button type="button" class="cp" id="nc-quick2">Copiar nota</button><button type="button" class="cp2" id="nc-open2">Abrir en ventana grande</button><button type="button" class="cp2" id="nc-sig2">Signos y pesos</button></div></div>
@@ -2054,6 +2054,7 @@ function fichaHTML(){
   const dl=`<datalist id="fc-fr">${FREC.map(x=>`<option value="${fEsc(x)}">`).join('')}</datalist>`;
   const rxs=Object.keys(FRXL).map(k=>`<label class="fcl">${FRXL[k]}<input data-fr="${k}" autocomplete="off"></label>`).join('');
   return `<h4>Ficha del paciente</h4><p class="mu">Se captura una vez. La nota y el Excel la usan. Nada se guarda hasta que toques «Guardar cambios».</p>${dl}
+  ${hojaPC()?`<details class="box" data-fc="hoj"><summary><b>Leer datos de la hoja PDF</b> <span class="mu">(solo PC)</span></summary><p class="mu">Toma de la hoja de HemoHL7 el nacimiento, ingreso, alergias, prescripción, sello, EPO y uresis, y los pone aquí para que los revises. Solo lee cuando tocas el botón.</p><button type="button" class="cp2" id="fc-hojago">Leer la hoja guardada</button> <button type="button" class="cp2" id="fc-hojaf">Elegir otro PDF…</button><input type="file" id="fc-hojain" accept="application/pdf" style="display:none"></details>`:''}
   <details class="box" data-fc="imp"><summary><b>Importar desde la nota</b></summary><p class="mu">Lee diagnósticos, medicamentos y plan de una nota ya escrita y llena la ficha para que la revises.</p><textarea id="fc-impt" rows="6" placeholder="Pega aquí una nota, o deja la plantilla de este paciente"></textarea><button type="button" class="cp2" id="fc-impgo">Leer nota</button></details>
   <details class="box" data-fc="dat"><summary><b>Datos generales</b></summary>
    <div class="fcg"><label class="fcl">Fecha de nacimiento<input type="date" data-fk="nac"></label><label class="fcl">Edad<input id="fc-edad" readonly></label><label class="fcl">Inicio de hemodiálisis<input type="date" data-fk="ini"></label><label class="fcl">Ingreso a la clínica<input type="date" data-fk="ing"></label><label class="fcl">Gpo y Rh<input data-fk="gpo" placeholder="O Rh+" autocomplete="off"></label><label class="fcl">Protocolo de trasplante<select data-fk="trasp"><option value="">—</option><option>No</option><option>Sí, en protocolo</option><option>Sí, lista de espera</option></select></label></div>
@@ -2084,6 +2085,16 @@ function fichaBind(sh,p){
     if(t.dataset.mi!==undefined){F.meds[+t.dataset.mi][t.dataset.f]=t.value;return}
     if(t.id==='fc-dxq'||t.id==='fc-mdq')cats()});
   sh.addEventListener('change',ev=>{const t=ev.target;if(t.dataset&&t.dataset.mi!==undefined&&t.dataset.f==='pr')F.meds[+t.dataset.mi].pr=t.value});
+  const hojaAplica=async buf=>{
+    toast('Leyendo la hoja…',8000);
+    const pdfjs=await loadPdfJs();const r=hojaParse(await hojaTexto(pdfjs,buf));
+    if(r.exp&&p.expediente&&normExp(r.exp)!==normExp(p.expediente)&&!confirm('Esta hoja es del expediente '+r.exp+' y no del '+p.expediente+'. ¿Usarla de todos modos?'))return;
+    const got=[];
+    [['nac','nacimiento'],['ing','ingreso'],['ini','inicio de HD'],['alerg','alergias'],['ures','uresis']].forEach(([k,n])=>{if(r[k]){F[k]=r[k];got.push(n)}});
+    const rk=Object.keys(r.rx);rk.forEach(k=>{F.rx[k]=r.rx[k]});if(rk.length)got.push('prescripción');
+    fill();['dat','rx','ot'].forEach(k=>{const d=q('[data-fc="'+k+'"]');if(d)d.open=true});
+    toast(got.length?'Leído de la hoja: '+got.join(', ')+'. Revisa y toca «Guardar cambios».':'No encontré datos en esa hoja',6000)};
+  const hin=q('#fc-hojain');if(hin)hin.addEventListener('change',async()=>{const f=hin.files&&hin.files[0];hin.value='';if(!f)return;try{await hojaAplica(await blobBuf(f))}catch(err){logErr('leer hoja',err);toast('No se pudo leer la hoja: '+((err&&err.message)||err))}});
   sh.addEventListener('click',ev=>{const b=ev.target.closest('button');if(!b)return;
     if(b.dataset.fnew==='dx'){F.dxs.push({t:'',y:''});dxRows();const i=q('#fc-dxl').querySelectorAll('input[data-f="t"]');i[i.length-1].focus();return}
     if(b.dataset.fnew==='med'){F.meds.push({n:'',pr:'',d:'',f:'',toma:true});medRows();const i=q('#fc-mdl').querySelectorAll('input[data-f="n"]');i[i.length-1].focus();return}
@@ -2093,6 +2104,9 @@ function fichaBind(sh,p){
       if(b.dataset.cat==='dx'){if(!F.dxs.some(d=>fold(d.t)===fold(it)))F.dxs.push({t:it,y:''});q('#fc-dxq').value='';dxRows()}
       else{F.meds.push({n:it[0],pr:it[1]||'',d:it[2]||'',f:it[3]||'',toma:true});q('#fc-mdq').value='';medRows()}
       cats();return}
+    if(b.id==='fc-hojaf'){q('#fc-hojain').click();return}
+    if(b.id==='fc-hojago'||b.id==='fc-hojain-go'){(async()=>{
+      try{const h=await hojaGet(p.expediente);if(!h||!h.buf){toast('Este paciente no tiene hoja guardada: usa «Elegir otro PDF…»');return}await hojaAplica(h.buf)}catch(err){logErr('leer hoja',err);toast('No se pudo leer la hoja: '+((err&&err.message)||err))}})();return}
     if(b.id==='fc-impgo'){const r=fParseNote(q('#fc-impt').value);const got=[];
       if(r.dxs){F.dxs=r.dxs.map(d=>F.dxs.find(x=>fold(x.t)===fold(d.t))||d);got.push(r.dxs.length+' diagnósticos')}
       if(r.meds){const keep=F.meds.filter(m=>!m.toma&&!r.meds.some(x=>fold(x.n)===fold(fMedTxt(m))));F.meds=r.meds.map(m=>F.meds.find(x=>x.toma&&fold(fMedTxt(x))===fold(m.n))||m).concat(keep);got.push(r.meds.length+' medicamentos')}
@@ -2105,6 +2119,48 @@ function fichaBind(sh,p){
   return {get:()=>fNorm(F)};
 }
 
+/*HOJA-START*/
+// ---- Leer datos de la hoja PDF de HemoHL7 (solo PC y solo al tocar el botón; usa vendor/pdf.min.js + vendor/pdf.worker.min.js)
+const hojaPC=()=>!/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)&&!(navigator.maxTouchPoints>1&&/Mac/.test(navigator.platform||''));
+function loadPdfJs(){return new Promise((res,rej)=>{if(window.pdfjsLib)return res(window.pdfjsLib);
+  const sc=document.createElement('script');sc.src='vendor/pdf.min.js';sc.onload=()=>{if(!window.pdfjsLib)return rej(new Error('pdf.js vacío'));window.pdfjsLib.GlobalWorkerOptions.workerSrc='vendor/pdf.worker.min.js';res(window.pdfjsLib)};sc.onerror=()=>rej(new Error('No se encontró vendor/pdf.min.js'));document.head.appendChild(sc)})}
+// agrupa el texto de la primera página en renglones (por altura) y los une de izquierda a derecha
+async function hojaTexto(pdfjs,buf){
+  const doc=await pdfjs.getDocument({data:new Uint8Array(buf)}).promise;
+  try{const pg=await doc.getPage(1);const tc=await pg.getTextContent();
+    const its=tc.items.filter(i=>i.str&&i.str.trim()).map(i=>({s:i.str.trim(),x:i.transform[4],y:i.transform[5]})).sort((a,b)=>b.y-a.y||a.x-b.x);
+    const ls=[];for(const it of its){const l=ls[ls.length-1];if(l&&Math.abs(l.y-it.y)<3)l.a.push(it);else ls.push({y:it.y,a:[it]})}
+    return ls.map(l=>l.a.sort((a,b)=>a.x-b.x).map(i=>i.s).join('  ')).join('\n')}
+  finally{try{doc.destroy()}catch(_){}}
+}
+function hojaIso(d,nac){const m=/^(\d\d)\/(\d\d)\/(\d{2}|\d{4})$/.exec(d||'');if(!m)return '';let y=+m[3];if(m[3].length===2)y+=(nac&&y>(new Date().getFullYear()%100))?1900:2000;
+  if(+m[2]<1||+m[2]>12||+m[1]<1||+m[1]>31)return '';return y+'-'+m[2]+'-'+m[1]}
+function hojaParse(txt){
+  const L=String(txt||'').split('\n'),T=L.join('\n'),g=(re,i)=>{const m=re.exec(T);return m?String(m[i||1]).trim():''};
+  const o={rx:{}};
+  o.nac=hojaIso(g(/F\.\s*de\s*Nacimiento:\s*(\d\d\/\d\d\/\d{2,4})/),true);
+  o.ing=hojaIso(g(/F\.\s*de\s*Ingreso:\s*(\d\d\/\d\d\/\d{2,4})/));
+  o.ini=hojaIso(g(/Fecha\s*de\s*inicio\s*de\s*hemodi[aá]lisis:\s*(\d\d\/\d\d\/\d{2,4})/i));
+  const al=g(/Alergias:\s*([A-Za-zÁÉÍÓÚáéíóúñÑ]+)/);if(al)o.alerg=al.charAt(0).toUpperCase()+al.slice(1).toLowerCase();
+  o.acceso=g(/Acceso:\s*(.+?)(?:\s{2,}Fecha\s*de\s*colocaci[oó]n|\n|$)/);
+  o.exp=g(/Expediente:\s*([A-Z]{0,3}\d+)/);
+  const r=o.rx;
+  r.filtro=g(/Dializador\s*\(Filtro\):\s*(.+?)\s{2,}Tiempo:/);
+  const ti=g(/Tiempo:\s*(\d{2,3})/);if(ti)r.tiempo=ti+' min';
+  r.qs=g(/\bQs:\s*(\d{2,4})/);r.qd=g(/\bQd:\s*(\d{2,4})/);
+  r.na=g(/Dializante\s*Na:\s*(\d{3})/);r.k=g(/K\+:\s*(\d+(?:[.,]\d+)?)/);r.ca=g(/Dializante[^\n]*?Ca:\s*(\d+(?:[.,]\d+)?)/);r.tmp=g(/Temp\.:\s*(\d{2}(?:[.,]\d+)?)/);
+  const hb=g(/Heparina\s*Bolo:\s*(\d+)/),hi=g(/Heparina\s*Infusi[oó]n:\s*(\d+)/);if(hb!==''&&hi!=='')r.hep=hb+'/'+hi;
+  // «Recordatorios»: texto al final de los renglones de Kt/V, Peso seco y Conductividad
+  const rec=[g(/Kt\/V:\s*[\d.]+\s+(.+)/),g(/Peso\s*seco:\s*[\d.,]+\s+(.+)/),g(/Conductividad:\s*(?:[\d.,]+\s+)?(.+)/)].filter(Boolean);
+  o.rec=rec;
+  const epo=rec.find(x=>/\bEPO\b/i.test(x));if(epo)r.otros=epo;
+  const sel=rec.find(x=>/sellad/i.test(x));if(sel)r.sello=sel.replace(/^sellad[oa]\s*(?:c\/|con)?\s*/i,'').trim()||sel;
+  const ur=rec.join(' ').match(/uresis(?:\s+r(?:esidual|\.)?)?\s*:?\s*(\d+)\s*ml/i);
+  if(ur)o.ures=ur[1]+' ml';else if(rec.some(x=>/anuria/i.test(x)))o.ures='Anuria';
+  Object.keys(r).forEach(k=>{if(!r[k])delete r[k]});
+  return o;
+}
+/*HOJA-END*/
 /* ---------- Resultados de laboratorio (captura desde la hoja física) ---------- */
 const LABG=[
  ['Hematología',[['hb','Hemoglobina','g/dL'],['eri','Eritrocitos','10⁶/µL'],['hto','Hematocrito','%'],['vcm','VCM (MCV)','fL'],['hcm','HCM (MCH)','pg'],['chcm','CMHC (MCHC)','g/dL'],['rdw','RDW','%'],['plq','Plaquetas','10³/µL'],['leu','Leucocitos','10³/µL'],['mon','Monocitos','%'],['eos','Eosinófilos','%'],['seg','Segmentados','%'],['lin','Linfocitos','%'],['vsg','VSG',''],['ban','Bandas','%'],['ret','Reticulocitos','%'],['tp','TP','s'],['tpt','TPT','s'],['inr','INR','']]],
