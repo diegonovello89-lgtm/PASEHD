@@ -299,7 +299,7 @@ details{margin-top:12px}summary{padding:6px 0;color:var(--mu);font-weight:600}
 
 <script>
 'use strict';
-const VERSION='11.67';
+const VERSION='11.68';
 const TURNOS=[1,2,3,4,5];
 const DIAS_FOTO=7;
 const EV_DEF=['Hipotensión','Hipertensión','Calambres','Náuseas / vómito','Cefalea','Dolor torácico','Arritmia','Disnea','Problema de acceso','Coagulación del circuito','Sangrado','Fiebre / escalofríos','Alarma de máquina','Terminó antes de tiempo'];
@@ -460,6 +460,24 @@ async function cargarHojas(files){
   for(const f of files){const p=hojaMatch(f.name,pats);if(!p){sin.push(f.name);continue}
     await hojaSet(p.expediente,f);okN.push((p.nombre||p.expediente))}
   return {ok:okN,sin}}
+// ---- Prellenado de la hoja al imprimir (solo PC): No. HD, HD previa y peso seco de prediálisis
+const hojaFec=iso=>{const m=/^(\d{4})-(\d\d)-(\d\d)$/.exec(iso||'');return m?m[3]+'/'+m[2]+'/'+m[1].slice(2):''};
+// No. de HD de la sesión de «fecha»: la última hecha (hdn el día hdf) + 1 + las sesiones registradas entre ambas fechas
+function hojaNumHD(ficha,exp,fecha,ents){
+  const f=fNorm(ficha);if(!f.hdn||!f.hdf)return '';
+  const n=ents.filter(x=>!x.deleted&&!x.temp&&x.expediente===exp&&x.fecha>f.hdf&&x.fecha<fecha);
+  const dias=new Set(n.map(x=>x.fecha));
+  return String(+f.hdn+1+dias.size)}
+async function hojaPosiciones(pdfjs,buf){
+  const doc=await pdfjs.getDocument({data:new Uint8Array(buf.slice?buf.slice(0):buf)}).promise;
+  try{const pg=await doc.getPage(1);const tc=await pg.getTextContent();const o={};
+    const sec=[];
+    for(const i of tc.items){const t=i.str.trim(),p={x:i.transform[4]+i.width+3,y:i.transform[5]};
+      if(t==='No. HD:')o.nohd=p;else if(t==='HD previa:')o.prev=p;else if(t==='Peso seco:')sec.push(p)}
+    sec.sort((a,b)=>a.x-b.x);if(sec.length&&sec[0].x<120)o.seco=sec[0];
+    return o}
+  finally{try{doc.destroy()}catch(_){}}
+}
 async function hojasPrint(){
   if(hojasPrint.busy){toast('Ya se están uniendo las hojas…');return}
   hojasPrint.busy=true;
@@ -475,11 +493,21 @@ async function hojasPrint(){
       if(h){con.push({e,h,nm})}else sin.push(nm)}
     if(!con.length){cerrar();toast('Ningún paciente del turno tiene hoja cargada',4000);return}
     const L=await loadPdfLib();const out=await L.PDFDocument.create();
-    for(const {h} of con){const src=await L.PDFDocument.load(new Uint8Array(h.buf),{ignoreEncryption:true});(await out.copyPages(src,src.getPageIndices())).forEach(pg=>out.addPage(pg))}
+    let pdfjs=null;try{pdfjs=await Promise.race([loadPdfJs(),new Promise((_,rj)=>setTimeout(()=>rj(new Error('pdf.js tardó demasiado')),4000))])}catch(err){logErr('prellenado',err)}
+    const ents2=await all('entries');const hoy=todayStr();let llenas=0,sinNum=0;
+    for(const {e,h} of con){const src=await L.PDFDocument.load(new Uint8Array(h.buf),{ignoreEncryption:true});
+      if(pdfjs){try{
+        const pos=await hojaPosiciones(pdfjs,h.buf);const pg0=src.getPage(0),ft=await src.embedFont(L.StandardFonts.HelveticaBold);
+        const put=(p,t)=>{if(p&&t)pg0.drawText(String(t),{x:p.x,y:p.y,size:8.5,font:ft})};
+        const num=hojaNumHD((pats[e.expediente]||{}).ficha,e.expediente,e.fecha,ents2);if(!num)sinNum++;
+        put(pos.nohd,num);put(pos.prev,hojaFec(hoy));put(pos.seco,e.nr&&e.nr.seco?String(e.nr.seco).trim():'');llenas++;
+      }catch(err){logErr('prellenado '+e.expediente,err)}}
+      (await out.copyPages(src,src.getPageIndices())).forEach(pg=>out.addPage(pg))}
     const bytes=await out.save();const name='hojas_T'+S.turno+'_'+S.fecha+'.pdf';
     const url=URL.createObjectURL(new Blob([bytes],{type:'application/pdf'}));
     if(win&&!win.closed){win.location=url}else{await rxShare(bytes,name)}
     let m=con.length+' hojas listas · Ctrl+P para imprimir';
+    if(!pdfjs)m+=' · Sin prellenado (falta vendor/pdf.min.js)';else if(sinNum)m+=' · '+sinNum+' sin No. de HD (captúralo en la ficha)';
     if(sin.length)m+=' · Sin hoja: '+sin.slice(0,4).join(', ')+(sin.length>4?' y '+(sin.length-4)+' más':'');
     toast(m,9000);
   }catch(err){cerrar();logErr('hojas',err);toast('No se pudieron unir las hojas: '+(err&&err.message||err),9000)}
@@ -1958,7 +1986,7 @@ const FREC=['cada 8 horas','cada 12 horas','cada 24 horas','por las noches','por
 const FRXL={ses:'Sesiones/sem',tiempo:'Tiempo',qs:'QS',qd:'QD',filtro:'Filtro',na:'Na',k:'K',ca:'Ca',tmp:'Temp (°C)',hep:'Heparina bolo/inf',sello:'Sello de catéter',otros:'Otros (EPO, etc.)'};
 const fS=x=>String(x==null?'':x).trim();
 function fNorm(f){
-  f=f||{};const o={nac:fS(f.nac),ini:fS(f.ini),ing:fS(f.ing),gpo:fS(f.gpo),alerg:fS(f.alerg),trasp:fS(f.trasp),accF:fS(f.accF),accI:fS(f.accI),ures:fS(f.ures),bact:fS(f.bact)};
+  f=f||{};const o={nac:fS(f.nac),ini:fS(f.ini),ing:fS(f.ing),gpo:fS(f.gpo),alerg:fS(f.alerg),trasp:fS(f.trasp),accF:fS(f.accF),accI:fS(f.accI),ures:fS(f.ures),bact:fS(f.bact),hdn:fS(f.hdn).replace(/\D/g,'').slice(0,5),hdf:/^\d{4}-\d{2}-\d{2}$/.test(fS(f.hdf))?fS(f.hdf):''};
   o.dxs=(Array.isArray(f.dxs)?f.dxs:[]).map(d=>({t:fS(d.t),y:fS(d.y)})).filter(d=>d.t);
   o.meds=(Array.isArray(f.meds)?f.meds:[]).map(m=>({n:fS(m.n),pr:fS(m.pr),d:fS(m.d),f:fS(m.f),toma:m.toma!==false})).filter(m=>m.n);
   o.rx={};Object.keys(FRXL).forEach(k=>{o.rx[k]=fS((f.rx||{})[k])});
@@ -2057,7 +2085,7 @@ function fichaHTML(){
   ${hojaPC()?`<details class="box" data-fc="hoj"><summary><b>Leer datos de la hoja PDF</b> <span class="mu">(solo PC)</span></summary><p class="mu">Toma de la hoja de HemoHL7 el nacimiento, ingreso, alergias, prescripción, sello, EPO y uresis, y los pone aquí para que los revises. Solo lee cuando tocas el botón.</p><button type="button" class="cp2" id="fc-hojago">Leer la hoja guardada</button> <button type="button" class="cp2" id="fc-hojaf">Elegir otro PDF…</button><input type="file" id="fc-hojain" accept="application/pdf" style="display:none"></details>`:''}
   <details class="box" data-fc="imp"><summary><b>Importar desde la nota</b></summary><p class="mu">Lee diagnósticos, medicamentos y plan de una nota ya escrita y llena la ficha para que la revises.</p><textarea id="fc-impt" rows="6" placeholder="Pega aquí una nota, o deja la plantilla de este paciente"></textarea><button type="button" class="cp2" id="fc-impgo">Leer nota</button></details>
   <details class="box" data-fc="dat"><summary><b>Datos generales</b></summary>
-   <div class="fcg"><label class="fcl">Fecha de nacimiento<input type="date" data-fk="nac"></label><label class="fcl">Edad<input id="fc-edad" readonly></label><label class="fcl">Inicio de hemodiálisis<input type="date" data-fk="ini"></label><label class="fcl">Ingreso a la clínica<input type="date" data-fk="ing"></label><label class="fcl">Gpo y Rh<input data-fk="gpo" placeholder="O Rh+" autocomplete="off"></label><label class="fcl">Protocolo de trasplante<select data-fk="trasp"><option value="">—</option><option>No</option><option>Sí, en protocolo</option><option>Sí, lista de espera</option></select></label></div>
+   <div class="fcg"><label class="fcl">Fecha de nacimiento<input type="date" data-fk="nac"></label><label class="fcl">Edad<input id="fc-edad" readonly></label><label class="fcl">Inicio de hemodiálisis<input type="date" data-fk="ini"></label><label class="fcl">Ingreso a la clínica<input type="date" data-fk="ing"></label><label class="fcl">Última HD hecha (No.)<input data-fk="hdn" inputmode="numeric" maxlength="5" placeholder="342" autocomplete="off"></label><label class="fcl">Fecha de esa HD<input type="date" data-fk="hdf"></label><label class="fcl">Gpo y Rh<input data-fk="gpo" placeholder="O Rh+" autocomplete="off"></label><label class="fcl">Protocolo de trasplante<select data-fk="trasp"><option value="">—</option><option>No</option><option>Sí, en protocolo</option><option>Sí, lista de espera</option></select></label></div>
    <label>Alergias</label><input data-fk="alerg" placeholder="Negadas / especificar" autocomplete="off"></details>
   <details class="box" data-fc="dx"><summary><b>Diagnósticos con año</b> <span class="mu" id="fc-dxn"></span></summary><div id="fc-dxl"></div><button type="button" class="cp2" data-fnew="dx">+ Escribir otro</button><div class="fcq"><input id="fc-dxq" placeholder="Buscar en el catálogo (diabetes, hepatitis, catéter…)" autocomplete="off"></div><div id="fc-dxc" class="fcc"></div></details>
   <details class="box" data-fc="med"><summary><b>Medicamentos</b> <span class="mu" id="fc-mdn"></span></summary><div id="fc-mdl"></div><button type="button" class="cp2" data-fnew="med">+ Escribir otro</button><div class="fcq"><input id="fc-mdq" placeholder="Buscar en el catálogo (insulina, sertralina…)" autocomplete="off"></div><div id="fc-mdc" class="fcc"></div></details>
@@ -2126,7 +2154,7 @@ function loadPdfJs(){return new Promise((res,rej)=>{if(window.pdfjsLib)return re
   const sc=document.createElement('script');sc.src='vendor/pdf.min.js';sc.onload=()=>{if(!window.pdfjsLib)return rej(new Error('pdf.js vacío'));window.pdfjsLib.GlobalWorkerOptions.workerSrc='vendor/pdf.worker.min.js';res(window.pdfjsLib)};sc.onerror=()=>rej(new Error('No se encontró vendor/pdf.min.js'));document.head.appendChild(sc)})}
 // agrupa el texto de la primera página en renglones (por altura) y los une de izquierda a derecha
 async function hojaTexto(pdfjs,buf){
-  const doc=await pdfjs.getDocument({data:new Uint8Array(buf)}).promise;
+  const doc=await pdfjs.getDocument({data:new Uint8Array(buf.slice?buf.slice(0):buf)}).promise;
   try{const pg=await doc.getPage(1);const tc=await pg.getTextContent();
     const its=tc.items.filter(i=>i.str&&i.str.trim()).map(i=>({s:i.str.trim(),x:i.transform[4],y:i.transform[5]})).sort((a,b)=>b.y-a.y||a.x-b.x);
     const ls=[];for(const it of its){const l=ls[ls.length-1];if(l&&Math.abs(l.y-it.y)<3)l.a.push(it);else ls.push({y:it.y,a:[it]})}
